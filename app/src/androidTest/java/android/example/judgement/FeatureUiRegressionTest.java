@@ -502,7 +502,6 @@ public class FeatureUiRegressionTest {
     private void launchGame() { launch(); clickLabel(R.string.resume_game); awaitView(withId(R.id.bottom_navigation)); }
     private void option(int label) {
         Espresso.openActionBarOverflowOrOptionsMenu(context);
-        onView(withText(R.string.options)).perform(click());
         onView(withText(label)).perform(click());
     }
     private void addSaved(String name) {

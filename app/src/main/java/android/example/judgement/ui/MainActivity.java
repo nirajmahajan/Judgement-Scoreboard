@@ -186,12 +186,14 @@ public final class MainActivity extends AppCompatActivity {
         } else if ("ROUND_DETAILS".equals(screen)) open(model.historyReturn());
         else if ("SCORING_HELP".equals(screen)) open(model.scoringHelpReturn());
         else if ("MANAGE".equals(screen)) {
-            confirm(R.string.discard_title, R.string.discard_message, R.string.discard, () -> open("GAME"));
+            if (hasRosterChanges()) confirm(R.string.discard_title, R.string.discard_message,
+                    R.string.discard, () -> open("GAME"));
+            else open("GAME");
         } else if ("SETTINGS".equals(screen) || "SETUP_DIRECTION".equals(screen)) open("PLAYERS");
         else if ("SETUP_DEALER".equals(screen)) open("SETUP_DIRECTION");
         else if ("CONFIRM_START".equals(screen)) open("PLAYERS");
         else if ("SAVED_MANAGE".equals(screen)) open(savedManageReturn);
-        else if ("PICK_DEALER".equals(screen)) open(pickerReturn);
+        else if ("PICK_DEALER".equals(screen) || "CONFIRM_ROSTER_DEALER".equals(screen)) open(pickerReturn);
         else if ("QUICK_ADD".equals(screen)) open(pickerReturn);
         else if ("RESTORE".equals(screen)) open("MANAGE");
         else if ("PICK_SCORE".equals(screen)) open("GAME");
@@ -224,7 +226,7 @@ public final class MainActivity extends AppCompatActivity {
         toolbar.getMenu().clear();
         toolbar.setTitle(R.string.app_name);
         if (game) {
-            toolbar.getMenu().add(R.string.options).setOnMenuItemClickListener(item -> { options(); return true; });
+            options();
             int tab = "HISTORY".equals(model.tab()) ? R.id.tab_history : "SCOREBOARD".equals(model.tab()) ? R.id.tab_scoreboard : R.id.tab_round;
             navigation.getMenu().findItem(tab).setChecked(true);
         }
@@ -241,7 +243,7 @@ public final class MainActivity extends AppCompatActivity {
             case "SCORING_HELP": scoringHelp(); break;
             case "ROUND_DETAILS": roundDetails(); break;
             case "ROUND_EDIT": editHistoricalRound(); break;
-            case "PICK_DEALER": pickDealer(false); break;
+            case "PICK_DEALER": case "CONFIRM_ROSTER_DEALER": pickDealer(false); break;
             case "PICK_SCORE": pickScore(); break;
             case "RESTORE": restorePlayers(); break;
             case "SAVED": savedPlayers(false); break;
@@ -556,7 +558,7 @@ public final class MainActivity extends AppCompatActivity {
             strategy = ScoringStrategy.decode(state.draft.scoringConfig);
         } else if (state.game != null && ("GAME".equals(screen) || "MANAGE".equals(screen)
                 || "ROUND_DETAILS".equals(screen) || "ROUND_EDIT".equals(screen)
-                || "PICK_SCORE".equals(screen) || "RESTORE".equals(screen) || "PICK_DEALER".equals(screen)
+                || "PICK_SCORE".equals(screen) || "RESTORE".equals(screen) || "PICK_DEALER".equals(screen) || "CONFIRM_ROSTER_DEALER".equals(screen)
                 || ("QUICK_ADD".equals(screen) && "MANAGE".equals(pickerReturn)))) {
             strategy = ScoringStrategy.decode(state.round == null ? state.game.scoringConfig : state.round.scoringConfig);
         }
@@ -614,7 +616,11 @@ public final class MainActivity extends AppCompatActivity {
         MaterialButton confirm = new MaterialButton(this);
         confirm.setId(R.id.primary_action); confirm.setText(R.string.confirm_dealer); confirm.setEnabled(valid);
         confirm.setOnClickListener(view -> {
-            if (manage) { model.stagedDealer(selected); open("MANAGE"); }
+            if (manage) {
+                boolean applying = "CONFIRM_ROSTER_DEALER".equals(model.screen());
+                model.stagedDealer(selected); model.confirmStagedDealer(); open("MANAGE");
+                if (applying) applyRoster();
+            }
             else if (required) model.chooseSetupDealer(draftId, signature, selected);
             else model.run(() -> model.repository.chooseDraftDealer(draftId, selected), "SETTINGS");
         });
@@ -808,47 +814,60 @@ public final class MainActivity extends AppCompatActivity {
         HistoryEntry(long time, ScoreAdapter.Row row) { this.time = time; this.row = row; }
     }
     private void options() {
-        if (state.round == null || "COMPLETE".equals(state.game.status)) {
-            int[] labels = {R.string.correct_score, R.string.new_game, R.string.help, R.string.home};
-            String[] text = new String[labels.length]; for (int i = 0; i < labels.length; i++) text[i] = getString(labels[i]);
-            new MaterialAlertDialogBuilder(this).setTitle(R.string.options).setItems(text, (dialog, which) -> {
-                if (which == 0) open("PICK_SCORE");
-                else if (which == 1) newSetup();
-                else open(which == 2 ? "HELP" : "HOME");
-            }).show();
-            return;
-        }
-        final int[] labels = {R.string.manage_players, R.string.change_dealer, R.string.correct_score, R.string.restart_round, R.string.change_scoring, R.string.new_game, R.string.how_scoring_works, R.string.help, R.string.home};
-        String[] text = new String[labels.length]; for (int i = 0; i < labels.length; i++) text[i] = getString(labels[i]);
-        new MaterialAlertDialogBuilder(this).setTitle(R.string.options).setItems(text, (dialog, which) -> {
-            switch (which) {
-                case 0: case 1:
-                    if (state.round == null) return;
-                    List<PlayerSpec> players = new ArrayList<>(); for (Records.GamePlayer player : state.players) players.add(new PlayerSpec(player.id, player.name, player.savedPlayerId));
-                    model.stage(players); model.stagedDealer(state.round.dealerId);
-                    model.stagedRoundId(state.round.id);
-                    if (which == 1) { pickerReturn = "MANAGE"; open("PICK_DEALER"); } else open("MANAGE");
-                    break;
-                case 2: open("PICK_SCORE"); break;
-                case 3: if (state.round != null) {
-                    long id = state.round.id;
-                    confirm(R.string.restart_title, R.string.restart_message, R.string.restart, () -> model.run(() -> model.repository.restartRound(id)));
-                } break;
-                case 4:
-                    if (state.round != null) model.beginStrategy(new StrategyRequest(StrategyRequest.Target.ROUND,
-                            state.round.id, "GAME", ScoringStrategy.decode(state.game.pendingScoringConfig == null
-                                    ? state.round.scoringConfig : state.game.pendingScoringConfig)));
-                    break;
-                case 5: newSetup(); break;
-                case 6: if (state.round != null) showScoringHelp(ScoringStrategy.decode(state.round.scoringConfig), "GAME"); break;
-                case 7: open("HELP"); break;
-                default: open("HOME"); break;
-            }
-        }).show();
+        boolean active = state.round != null && !"COMPLETE".equals(state.game.status);
+        int[] labels = active
+                ? new int[]{R.string.manage_players, R.string.change_dealer, R.string.correct_score,
+                    R.string.restart_round, R.string.change_scoring, R.string.new_game,
+                    R.string.how_scoring_works, R.string.help, R.string.home}
+                : new int[]{R.string.correct_score, R.string.new_game, R.string.help, R.string.home};
+        for (int label : labels) toolbar.getMenu().add(android.view.Menu.NONE, label, 0, label)
+                .setOnMenuItemClickListener(item -> { gameOption(label); return true; });
+    }
+    private void gameOption(int label) {
+        if (label == R.string.manage_players || label == R.string.change_dealer) {
+            if (state.round == null) return;
+            List<PlayerSpec> players = new ArrayList<>();
+            for (Records.GamePlayer player : state.players)
+                players.add(new PlayerSpec(player.id, player.name, player.savedPlayerId));
+            model.stage(players); model.stagedDealer(state.round.dealerId); model.stagedRoundId(state.round.id);
+            if (label == R.string.change_dealer) { pickerReturn = "MANAGE"; open("PICK_DEALER"); }
+            else open("MANAGE");
+        } else if (label == R.string.correct_score) open("PICK_SCORE");
+        else if (label == R.string.restart_round && state.round != null) {
+            long id = state.round.id;
+            confirm(R.string.restart_title, R.string.restart_message, R.string.restart,
+                    () -> model.run(() -> model.repository.restartRound(id)));
+        } else if (label == R.string.change_scoring && state.round != null)
+            model.beginStrategy(new StrategyRequest(StrategyRequest.Target.ROUND,
+                    state.round.id, "GAME", ScoringStrategy.decode(state.game.pendingScoringConfig == null
+                            ? state.round.scoringConfig : state.game.pendingScoringConfig)));
+        else if (label == R.string.new_game) newSetup();
+        else if (label == R.string.how_scoring_works && state.round != null)
+            showScoringHelp(ScoringStrategy.decode(state.round.scoringConfig), "GAME");
+        else if (label == R.string.help || label == R.string.home)
+            open(label == R.string.help ? "HELP" : "HOME");
     }
     private void newSetup() {
         if (state.draft == null) model.run(() -> model.repository.saveDraft(new DraftSpec(0, new ArrayList<>(), "ASCENDING", "CUSTOM", null)), "PLAYERS");
         else open("PLAYERS");
+    }
+    private boolean hasSeatingChanges(List<PlayerSpec> players) {
+        if (players.size() != state.players.size()) return true;
+        for (int index = 0; index < players.size(); index++)
+            if (players.get(index).id != state.players.get(index).id) return true;
+        return false;
+    }
+    private boolean hasRosterChanges() {
+        List<PlayerSpec> players = model.staged();
+        if (state.round == null || hasSeatingChanges(players)
+                || !java.util.Objects.equals(model.stagedDealer(), state.round.dealerId)) return true;
+        for (int index = 0; index < players.size(); index++) {
+            PlayerSpec staged = players.get(index);
+            Records.GamePlayer current = state.players.get(index);
+            if (!staged.name.equals(current.name) || staged.saveForFuture
+                    || !java.util.Objects.equals(staged.savedPlayerId, current.savedPlayerId)) return true;
+        }
+        return false;
     }
     private void applyRoster() {
         if (state.round == null) return;
@@ -861,9 +880,11 @@ public final class MainActivity extends AppCompatActivity {
         Long dealer = model.stagedDealer();
         try { GameRules.validateCards(state.round.cards, players.size()); }
         catch (IllegalArgumentException exception) { model.error.setValue(exception.getMessage()); return; }
-        boolean structure = players.size() != state.players.size();
-        for (int i = 0; !structure && i < players.size(); i++) structure = players.get(i).id != state.players.get(i).id;
-        structure |= dealer == null || dealer != state.round.dealerId;
+        boolean seatingChanged = hasSeatingChanges(players);
+        if (seatingChanged && !model.confirmedRosterDealer()) {
+            pickerReturn = "MANAGE"; open("CONFIRM_ROSTER_DEALER"); return;
+        }
+        boolean structure = seatingChanged || dealer == null || dealer != state.round.dealerId;
         boolean started = false; for (Records.RoundPlayer player : state.roundPlayers) started |= player.bid != null;
         long roundId = stagedRoundId; long selected = dealer == null ? 0 : dealer;
         Runnable apply = () -> model.run(() -> model.repository.applyRoster(roundId, players, selected, true), "GAME");

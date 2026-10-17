@@ -189,6 +189,103 @@ public final class StrategyUiRegressionTest {
         assertEquals(completed.game.id,repository.snapshot().game.id);
     }
 
+    @Test public void unchangedAndRestoredRosterLeaveWithoutDiscardConfirmation() {
+        seed(true,ScoringStrategy.defaults()); launch("GAME");
+        Snapshot original=repository.snapshot();
+        option(R.string.manage_players); await(() -> screen().equals("MANAGE"));
+        Espresso.pressBack(); await(() -> screen().equals("GAME"));
+        onView(withText(R.string.discard_title)).check(androidx.test.espresso.assertion.ViewAssertions.doesNotExist());
+        option(R.string.manage_players); await(() -> screen().equals("MANAGE"));
+        String first=original.players.get(0).name;
+        moveRoster(first,R.string.move_down);
+        await(() -> stagedPlayers().get(0).id==original.players.get(1).id);
+        moveRoster(first,R.string.move_up);
+        await(() -> stagedPlayers().get(0).id==original.players.get(0).id);
+        Espresso.pressBack(); await(() -> screen().equals("GAME"));
+        onView(withText(R.string.discard_title)).check(androidx.test.espresso.assertion.ViewAssertions.doesNotExist());
+        assertRosterUnchanged(original);
+    }
+
+    @Test public void changedNameDealerOrSeatingStillRequiresDiscardConfirmation() {
+        seed(true,ScoringStrategy.defaults()); launch("GAME");
+        Snapshot original=repository.snapshot();
+        for(int change=0;change<3;change++) {
+            option(R.string.manage_players); await(() -> screen().equals("MANAGE"));
+            final int kind=change;
+            scenario.onActivity(activity -> {
+                ScoreViewModel model=new ViewModelProvider(activity).get(ScoreViewModel.class);
+                List<PlayerSpec> players=model.staged();
+                if(kind==0) {
+                    PlayerSpec player=players.get(0);
+                    players.set(0,new PlayerSpec(player.id,"Renamed player",player.savedPlayerId));
+                    model.stage(players);
+                } else if(kind==1) model.stagedDealer(otherPlayer(original,original.round.dealerId));
+                else {
+                    java.util.Collections.swap(players,0,1); model.stage(players);
+                }
+            });
+            Espresso.pressBack();
+            onView(withText(R.string.discard_title)).check(androidx.test.espresso.assertion.ViewAssertions.matches(
+                    androidx.test.espresso.matcher.ViewMatchers.isDisplayed()));
+            onView(withText(R.string.cancel)).perform(click());
+            assertEquals("MANAGE",screen()); assertRosterUnchanged(original);
+            Espresso.pressBack(); onView(withText(R.string.discard)).perform(click());
+            await(() -> screen().equals("GAME")); assertRosterUnchanged(original);
+        }
+    }
+
+    @Test public void reorderedRosterRequiresPreselectedDealerAndKeepsChoiceAcrossRecreation() {
+        seed(true,ScoringStrategy.defaults()); launch("GAME");
+        Snapshot original=repository.snapshot(); long previousDealer=original.round.dealerId;
+        long selected=otherPlayer(original,previousDealer);
+        option(R.string.manage_players); await(() -> screen().equals("MANAGE"));
+        moveRoster(original.players.get(0).name,R.string.move_down);
+        await(() -> stagedPlayers().get(0).id==original.players.get(1).id);
+        clickId(R.id.primary_action); await(() -> screen().equals("CONFIRM_ROSTER_DEALER"));
+        assertDealerChecked(original,previousDealer);
+        chooseDealer(original,selected);
+        scenario.recreate(); await(() -> screen().equals("CONFIRM_ROSTER_DEALER"));
+        assertDealerChecked(original,selected);
+        assertEquals(original.players.get(1).id,stagedPlayers().get(0).id);
+        assertRosterUnchanged(original);
+        Espresso.pressBack(); await(() -> screen().equals("MANAGE")); assertRosterUnchanged(original);
+        clickId(R.id.primary_action); await(() -> screen().equals("CONFIRM_ROSTER_DEALER"));
+        assertDealerChecked(original,previousDealer);
+        chooseDealer(original,selected); clickId(R.id.primary_action);
+        await(() -> screen().equals("GAME") && repository.snapshot().round.dealerId==selected);
+        Snapshot applied=repository.snapshot();
+        assertEquals(original.players.get(1).id,applied.players.get(0).id);
+        assertEquals(original.players.get(0).id,applied.players.get(1).id);
+        assertEquals(original.round.number,applied.round.number);
+        assertEquals(original.round.cards,applied.round.cards);
+        assertEquals("BIDDING",applied.round.phase);
+    }
+
+    @Test public void manuallyConfirmedDealerForReorderedRosterStillRequiresRestartAfterPrediction() {
+        seed(true,ScoringStrategy.defaults());
+        Snapshot initial=repository.snapshot();
+        repository.submitBid(initial.round.id,initial.roundPlayers.get(0).playerId,0);
+        launch("GAME"); Snapshot original=repository.snapshot();
+        option(R.string.manage_players); await(() -> screen().equals("MANAGE"));
+        moveRoster(original.players.get(0).name,R.string.move_down);
+        await(() -> stagedPlayers().get(0).id==original.players.get(1).id);
+        clickText(R.string.choose_dealer); await(() -> screen().equals("PICK_DEALER"));
+        assertDealerChecked(original,original.round.dealerId);
+        clickId(R.id.primary_action); await(() -> screen().equals("MANAGE"));
+        clickId(R.id.primary_action);
+        onView(withText(R.string.restart_title)).check(androidx.test.espresso.assertion.ViewAssertions.matches(
+                androidx.test.espresso.matcher.ViewMatchers.isDisplayed()));
+        assertEquals("Manual confirmation covers this exact seating", "MANAGE",screen());
+        onView(withText(R.string.cancel)).perform(click()); assertRosterUnchanged(original);
+        assertEquals(Integer.valueOf(0),repository.snapshot().roundPlayers.get(0).bid);
+        clickId(R.id.primary_action); onView(withId(android.R.id.button1)).perform(click());
+        await(() -> screen().equals("GAME") && repository.snapshot().round.id!=original.round.id);
+        Snapshot applied=repository.snapshot();
+        assertEquals(original.players.get(1).id,applied.players.get(0).id);
+        assertEquals(original.round.dealerId,applied.round.dealerId);
+        for(Records.RoundPlayer player:applied.roundPlayers) assertNull(player.bid);
+    }
+
     @Test public void systemDarkModeKeepsAppLightAndNarrowLargeFontErrorsReachableWithKeyboard() throws Exception {
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         String font=device.executeShellCommand("settings get system font_scale").trim();
@@ -312,6 +409,62 @@ public final class StrategyUiRegressionTest {
         });
     }
 
+    private List<PlayerSpec> stagedPlayers() {
+        AtomicReference<List<PlayerSpec>> players=new AtomicReference<>();
+        scenario.onActivity(activity -> players.set(new ViewModelProvider(activity).get(ScoreViewModel.class).staged()));
+        return players.get();
+    }
+    private void assertRosterUnchanged(Snapshot original) {
+        Snapshot actual=repository.snapshot();
+        assertEquals(original.round.id,actual.round.id); assertEquals(original.round.dealerId,actual.round.dealerId);
+        assertEquals(original.players.size(),actual.players.size());
+        for(int i=0;i<original.players.size();i++) {
+            assertEquals(original.players.get(i).id,actual.players.get(i).id);
+            assertEquals(original.players.get(i).name,actual.players.get(i).name);
+        }
+    }
+    private static long otherPlayer(Snapshot snapshot,long dealer) {
+        for(Records.GamePlayer player:snapshot.players) if(player.id!=dealer) return player.id;
+        throw new AssertionError("Another player is required");
+    }
+    private Matcher<View> dealerRadio(Snapshot snapshot,long id) {
+        for(Records.GamePlayer player:snapshot.players) if(player.id==id) return org.hamcrest.Matchers.allOf(
+                withId(R.id.dealer_choice_radio),androidx.test.espresso.matcher.ViewMatchers.withContentDescription(player.name));
+        throw new AssertionError("Dealer must be in the roster");
+    }
+    private void chooseDealer(Snapshot snapshot,long id) {
+        onView(withId(R.id.screen_list)).perform(findAndClick(dealerRadio(snapshot,id)));
+    }
+    private void assertDealerChecked(Snapshot snapshot,long id) {
+        onView(dealerRadio(snapshot,id)).check(androidx.test.espresso.assertion.ViewAssertions.matches(
+                androidx.test.espresso.matcher.ViewMatchers.isChecked()));
+    }
+    private void moveRoster(String name,int direction) {
+        onView(withId(R.id.screen_list)).perform(new ViewAction() {
+            @Override public Matcher<View> getConstraints(){return isAssignableFrom(RecyclerView.class);}
+            @Override public String getDescription(){return "move "+name+" "+context.getString(direction);}
+            @Override public void perform(UiController controller,View view) {
+                RecyclerView list=(RecyclerView)view;
+                for(int i=0;i<list.getAdapter().getItemCount();i++) {
+                    list.scrollToPosition(i); controller.loopMainThreadUntilIdle();
+                    RecyclerView.ViewHolder holder=list.findViewHolderForAdapterPosition(i);
+                    if(!(holder instanceof RosterAdapter.Holder)) continue;
+                    RosterAdapter.Holder row=(RosterAdapter.Holder)holder;
+                    if(!name.equals(row.name.getText().toString())) continue;
+                    for(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction action:
+                            row.handle.createAccessibilityNodeInfo().getActionList()) {
+                        if(context.getString(direction).contentEquals(action.getLabel()==null?"":action.getLabel())) {
+                            assertTrue(row.handle.performAccessibilityAction(action.getId(),new android.os.Bundle()));
+                            controller.loopMainThreadUntilIdle(); return;
+                        }
+                    }
+                    throw new AssertionError("Move action is missing for "+name);
+                }
+                throw new AssertionError("Roster player is missing: "+name);
+            }
+        });
+    }
+
     private long seed(boolean active,ScoringStrategy strategy) {
         long id=repository.saveDraft(new DraftSpec(0,Arrays.asList(new PlayerSpec("Ada with a complete long name"),
                 new PlayerSpec("Grace with a complete long name")),"ASCENDING","FIXED",null,strategy));
@@ -407,7 +560,9 @@ public final class StrategyUiRegressionTest {
         });
     }
     private void option(int label) {
-        Espresso.openActionBarOverflowOrOptionsMenu(context);onView(withText(R.string.options)).perform(click());onView(withText(label)).perform(click());
+        Espresso.openActionBarOverflowOrOptionsMenu(context);
+        onView(withText(R.string.options)).check(androidx.test.espresso.assertion.ViewAssertions.doesNotExist());
+        onView(withText(label)).perform(click());
     }
     private void enter(int id,String value) { onView(withId(id)).perform(reveal(),replaceText(value),closeSoftKeyboard()); }
     private void clickId(int id) {

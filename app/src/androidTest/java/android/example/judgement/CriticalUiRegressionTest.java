@@ -107,7 +107,6 @@ public class CriticalUiRegressionTest {
     @Test public void blankAndOverflowScoreErrorsKeepCorrectionFormOpen() {
         seed(2, false, 0); launchGame();
         androidx.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu(context);
-        onView(withText(R.string.options)).perform(click());
         onView(withText(R.string.correct_score)).perform(click());
         rowAction(0, context.getString(R.string.correct_score));
         onView(withId(R.id.edit_value)).perform(replaceText(""), closeSoftKeyboard());

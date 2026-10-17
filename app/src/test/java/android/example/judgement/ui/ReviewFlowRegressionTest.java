@@ -96,9 +96,12 @@ public class ReviewFlowRegressionTest {
         assertEquals("A participant already staged for restoration is excluded", 0, content().getItemCount());
         invoke("open", "MANAGE");
         Method apply = MainActivity.class.getDeclaredMethod("applyRoster"); apply.setAccessible(true); apply.invoke(activity);
+        assertEquals("CONFIRM_ROSTER_DEALER", model.screen()); layout();
+        clickFooter(R.id.primary_action);
         CountDownLatch drained = new CountDownLatch(1); model.repository.execute(drained::countDown);
         assertTrue(drained.await(10, TimeUnit.SECONDS)); Shadows.shadowOf(Looper.getMainLooper()).idle();
         assertNull("Restoring participants must allow Apply", model.error.getValue());
+        assertEquals(3, model.state.getValue().players.size());
     }
 
     @Test public void startingGameNavigatesTheRecreatedActivity() throws Exception {

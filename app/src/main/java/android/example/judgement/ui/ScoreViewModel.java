@@ -168,7 +168,7 @@ public final class ScoreViewModel extends AndroidViewModel {
     LiveData<String> screenState() { return saved.getLiveData("screen", "HOME"); }
     String screen() { String value = saved.get("screen"); return value == null ? "HOME" : value; }
     void screen(String screen) {
-        if (!screen.equals(screen()) && ("SETUP_DEALER".equals(screen) || "PICK_DEALER".equals(screen)))
+        if (!screen.equals(screen()) && ("SETUP_DEALER".equals(screen) || "PICK_DEALER".equals(screen) || "CONFIRM_ROSTER_DEALER".equals(screen)))
             saved.set("dealerChoiceOwner", null);
         saved.set("screen", screen); error.setValue(null);
     }
@@ -327,7 +327,16 @@ public final class ScoreViewModel extends AndroidViewModel {
     Long stagedDealer() { return saved.get("stagedDealer"); }
     void stagedDealer(Long id) { saved.set("stagedDealer", id); }
     Long stagedRoundId() { return saved.get("stagedRoundId"); }
-    void stagedRoundId(long id) { saved.set("stagedRoundId", id); }
+    void stagedRoundId(long id) {
+        saved.set("stagedRoundId", id); saved.set("confirmedRosterDealer", null);
+    }
+    private String stagedDealerSignature() {
+        JSONArray seating = new JSONArray();
+        for (PlayerSpec player : staged()) seating.put(player.id == 0 ? player.name : player.id);
+        return stagedRoundId() + ":" + stagedDealer() + ":" + seating;
+    }
+    void confirmStagedDealer() { saved.set("confirmedRosterDealer", stagedDealerSignature()); }
+    boolean confirmedRosterDealer() { return stagedDealerSignature().equals(saved.get("confirmedRosterDealer")); }
     void stage(List<PlayerSpec> players) {
         JSONArray array = new JSONArray();
         try {

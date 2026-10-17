@@ -442,6 +442,66 @@ public class ScreenVisualTest {
         capture("setup_dealer_320");
     }
 
+    @Test public void threeDotsShowGameActionsDirectly() throws Exception {
+        seedEnglishSetup(false);
+        databaseWorker.submit(() -> {
+            try (ScoreRepository repository = new ScoreRepository(context)) {
+                repository.startGame(repository.snapshot().draft.id);
+            }
+        }).get(10, TimeUnit.SECONDS);
+        launch(false, false, false); open("GAME", "ROUND");
+        com.google.android.material.appbar.MaterialToolbar toolbar = activity.findViewById(R.id.toolbar);
+        assertNull(toolbar.getMenu().findItem(R.string.options));
+        assertEquals(9, toolbar.getMenu().size());
+        assertNotNull(toolbar.getMenu().findItem(R.string.manage_players));
+        assertNotNull(toolbar.getMenu().findItem(R.string.change_dealer));
+        assertTrue(toolbar.showOverflowMenu());
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        assertTrue(toolbar.isOverflowMenuShowing());
+        android.widget.PopupWindow popup = Shadows.shadowOf((android.app.Application) context).getLatestPopupWindow();
+        assertNotNull(popup);
+        View popupRoot = popup.getContentView().getRootView();
+        popupRoot.measure(View.MeasureSpec.makeMeasureSpec(popup.getWidth(), View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(dp(640), View.MeasureSpec.AT_MOST));
+        popupRoot.layout(0, 0, popupRoot.getMeasuredWidth(), popupRoot.getMeasuredHeight());
+        capture("game_actions_direct_320", popupRoot);
+        toolbar.dismissPopupMenus();
+        toolbar.getMenu().performIdentifierAction(R.string.manage_players, 0); layout();
+        assertEquals("MANAGE", model.screen());
+    }
+
+    @Test public void reorderedPlayersReconfirmTheExistingDealer() throws Exception {
+        seedEnglishSetup(false);
+        databaseWorker.submit(() -> {
+            try (ScoreRepository repository = new ScoreRepository(context)) {
+                repository.startGame(repository.snapshot().draft.id);
+            }
+        }).get(10, TimeUnit.SECONDS);
+        launch(false, false, false);
+        Snapshot snapshot = model.state.getValue();
+        List<PlayerSpec> players = new ArrayList<>();
+        for (Records.GamePlayer player : snapshot.players)
+            players.add(new PlayerSpec(player.id, player.name, player.savedPlayerId));
+        model.stage(players); model.stagedDealer(snapshot.round.dealerId); model.stagedRoundId(snapshot.round.id);
+        java.util.Collections.rotate(players, 1); model.stage(players);
+        open("MANAGE", "ROUND"); showFooter();
+        activity.findViewById(R.id.primary_action).performClick(); layout();
+        assertEquals("CONFIRM_ROSTER_DEALER", model.screen());
+        controller.recreate(); activity = controller.get();
+        model = new ViewModelProvider(activity).get(ScoreViewModel.class);
+        await(() -> model.state.getValue() != null); layout();
+        RecyclerView list = activity.findViewById(R.id.screen_list);
+        for (int index = 0; index < players.size(); index++) {
+            View row = list.findViewHolderForAdapterPosition(index + contentOffset(list)).itemView;
+            android.widget.RadioButton choice = row.findViewById(R.id.dealer_choice_radio);
+            assertEquals(players.get(index).id == snapshot.round.dealerId, choice.isChecked());
+        }
+        View confirm = activity.findViewById(R.id.primary_action);
+        assertTrue(confirm.isEnabled()); assertFullyVisible(confirm);
+        assertEquals(snapshot.round.id, model.state.getValue().round.id);
+        capture("manage_reconfirm_dealer_320");
+    }
+
     @Test public void savedPlayersShowOnlyCompactCheckboxRowsAndBottomAddAction() throws Exception {
         seedEnglishSetup(true); launch(false, false, false); open("SAVED", "ROUND");
         RecyclerView list = activity.findViewById(R.id.screen_list);
