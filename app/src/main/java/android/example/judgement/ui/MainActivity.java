@@ -15,6 +15,7 @@ import android.text.TextWatcher;
 import android.text.InputType;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import androidx.activity.OnBackPressedCallback;
@@ -36,7 +37,9 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /** Screens render immutable repository snapshots; UI callbacks always carry record IDs. */
 public final class MainActivity extends AppCompatActivity {
@@ -57,11 +60,16 @@ public final class MainActivity extends AppCompatActivity {
     private AlertDialog inputDialog;
     private String activeFormToken;
     private boolean destroyingForms;
+    private final Set<Long> selectedProfiles = new HashSet<>();
+    private String search = "";
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (savedInstanceState != null) {
             pickerReturn = savedInstanceState.getString("pickerReturn", "SETTINGS");
+            search = savedInstanceState.getString("search", "");
+            long[] selected = savedInstanceState.getLongArray("selectedProfiles");
+            if (selected != null) for (long id : selected) selectedProfiles.add(id);
         }
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         boolean light = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) != android.content.res.Configuration.UI_MODE_NIGHT_YES;
@@ -104,7 +112,9 @@ public final class MainActivity extends AppCompatActivity {
         model.repository.failures().observe(this, message -> { if (message != null) model.error.setValue(message); });
     }
     @Override protected void onSaveInstanceState(Bundle outState) {
-        outState.putString("pickerReturn", pickerReturn);
+        outState.putString("pickerReturn", pickerReturn); outState.putString("search", search);
+        long[] selected = new long[selectedProfiles.size()]; int i = 0; for (long id : selectedProfiles) selected[i++] = id;
+        outState.putLongArray("selectedProfiles", selected);
         super.onSaveInstanceState(outState);
     }
     @Override protected void onDestroy() {
@@ -121,6 +131,7 @@ public final class MainActivity extends AppCompatActivity {
             confirm(R.string.discard_title, R.string.discard_message, R.string.discard, () -> open("GAME"));
         } else if ("SETTINGS".equals(screen)) open("PLAYERS");
         else if ("PICK_DEALER".equals(screen)) open(pickerReturn);
+        else if ("QUICK_ADD".equals(screen)) open(pickerReturn);
         else if ("RESTORE".equals(screen)) open("MANAGE");
         else if ("PICK_SCORE".equals(screen)) open("GAME");
         else if ("HOME".equals(screen)) finish();
@@ -154,6 +165,8 @@ public final class MainActivity extends AppCompatActivity {
             case "PICK_DEALER": pickDealer(); break;
             case "PICK_SCORE": pickScore(); break;
             case "RESTORE": restorePlayers(); break;
+            case "SAVED": savedPlayers(false); break;
+            case "QUICK_ADD": savedPlayers(true); break;
             case "HELP": header(getString(R.string.help_title), ""); rows(new ScoreAdapter.Row(1, getString(R.string.help_title), getString(R.string.help_body))); break;
             case "RECOVERY": recovery(); break;
             case "GAME": game(); break;
@@ -216,6 +229,7 @@ public final class MainActivity extends AppCompatActivity {
         if (state.game != null) rows.add(new ScoreAdapter.Row(1, getString("COMPLETE".equals(state.game.status) ? R.string.completed_results : R.string.resume_game), "")
                 .action(getString("COMPLETE".equals(state.game.status) ? R.string.completed_results : R.string.resume_game), () -> open("GAME")));
         if (state.draft != null) rows.add(new ScoreAdapter.Row(2, getString(R.string.continue_setup), "").action(getString(R.string.continue_setup), () -> open("PLAYERS")));
+        rows.add(new ScoreAdapter.Row(3, getString(R.string.saved_players), "").action(getString(R.string.saved_players), () -> open("SAVED")));
         rows.add(new ScoreAdapter.Row(4, getString(R.string.help), "").action(getString(R.string.help), () -> open("HELP")));
         if (!state.recoveries.isEmpty()) rows.add(new ScoreAdapter.Row(5, getString(R.string.recovery_title), "").action(getString(R.string.recovery_title), () -> open("RECOVERY")));
         rows(rows);
@@ -267,6 +281,7 @@ public final class MainActivity extends AppCompatActivity {
             roster.attachTo(list, false);
         } else roster.update(players, dealer);
         action(R.string.add_player, R.id.add_player, () -> addPlayer(manage));
+        action(R.string.quick_add, R.id.quick_add, () -> { pickerReturn = manage ? "MANAGE" : "PLAYERS"; selectedProfiles.clear(); search = ""; open("QUICK_ADD"); });
         if (manage) {
             action(R.string.choose_dealer, View.generateViewId(), () -> { pickerReturn = "MANAGE"; open("PICK_DEALER"); });
             if (!state.inactivePlayers.isEmpty()) action(R.string.restore_players, View.generateViewId(), () -> open("RESTORE"));
@@ -507,7 +522,53 @@ public final class MainActivity extends AppCompatActivity {
         }
         rows(rows);
     }
-
+    private void savedPlayers(boolean picker) {
+        header(getString(picker ? R.string.quick_add : R.string.saved_players), state.savedPlayers.isEmpty() ? getString(R.string.no_saved_players) : "");
+        List<ScoreAdapter.Row> rows = new ArrayList<>();
+        rows.add(new ScoreAdapter.Row(Long.MIN_VALUE, getString(R.string.search_saved), search)
+                .action(getString(R.string.search_saved), () -> model.beginForm(new FormRequest(
+                        FormRequest.Kind.SEARCH, search, false, 0, 0, 0, 0, 0))));
+        String query;
+        try { query = Names.key(search); } catch (IllegalArgumentException blankQuery) { query = ""; }
+        boolean stagedPicker = picker && "MANAGE".equals(pickerReturn);
+        List<PlayerSpec> currentPlayers = stagedPicker ? model.staged() : draftPlayers();
+        for (Records.SavedPlayer player : state.savedPlayers) {
+            if (!player.nameKey.contains(query)) continue;
+            boolean present = false, conflict = false;
+            for (PlayerSpec current : currentPlayers) {
+                present |= current.savedPlayerId != null && current.savedPlayerId == player.id;
+                conflict |= Names.key(current.name).equals(player.nameKey);
+            }
+            ScoreAdapter.Row row = new ScoreAdapter.Row(player.id, player.name, picker && (present || conflict) ? getString(present ? R.string.already_added : R.string.name_conflict) : "");
+            if (picker) {
+                boolean selected = selectedProfiles.contains(player.id);
+                row.action((selected ? "✓ " : "") + getString(R.string.add_selected), !present && !conflict, () -> {
+                    if (!selectedProfiles.add(player.id)) selectedProfiles.remove(player.id); render();
+                });
+            } else {
+                row.action(getString(R.string.rename), () -> model.beginForm(new FormRequest(
+                        FormRequest.Kind.RENAME_SAVED, player.name, false, 0, player.id, 0, 0, 0)));
+                row.action(getString(R.string.remove), () -> confirm(R.string.delete_profile_title, R.string.delete_profile_message, R.string.remove,
+                        () -> model.run(() -> model.repository.removeSavedPlayer(player.id))));
+            }
+            rows.add(row);
+        }
+        rows(rows);
+        if (picker) action(R.string.add_selected, R.id.primary_action, () -> {
+            List<Long> selected = new ArrayList<>(selectedProfiles);
+            if (stagedPicker) {
+                List<PlayerSpec> players = model.staged();
+                for (Records.SavedPlayer profile : state.savedPlayers) if (selectedProfiles.contains(profile.id)) players.add(new PlayerSpec(-System.nanoTime(), profile.name, profile.id));
+                if (players.size() > 52) { model.error.setValue("A game supports at most 52 players."); return; }
+                model.stage(players); open("MANAGE");
+            } else {
+                long draftId = state.draft.id;
+                model.run(() -> model.repository.addSavedPlayersToDraft(draftId, selected), () -> open("PLAYERS"));
+            }
+        }).setEnabled(!selectedProfiles.isEmpty());
+        else action(R.string.add_saved, R.id.primary_action, () -> model.beginForm(new FormRequest(
+                FormRequest.Kind.ADD_SAVED, "", false, 0, 0, 0, 0, 0)));
+    }
     private void recovery() {
         header(getString(R.string.recovery_title), getString(R.string.recovery_description));
         List<ScoreAdapter.Row> rows = new ArrayList<>();
@@ -558,26 +619,30 @@ public final class MainActivity extends AppCompatActivity {
         input.setInputType(number ? InputType.TYPE_CLASS_NUMBER : InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
         input.setMinHeight(dp(48)); input.setSingleLine(number); input.setText(request.text); input.setSelectAllOnFocus(number);
         field.addView(input, new LinearLayout.LayoutParams(-1, -2)); form.addView(field, new LinearLayout.LayoutParams(-1, -2));
+        CheckBox check = new CheckBox(this); check.setText(R.string.save_future); check.setMinHeight(dp(48)); check.setChecked(request.saveFuture);
+        if (request.kind == FormRequest.Kind.ADD_PLAYER) form.addView(check);
         androidx.core.widget.NestedScrollView scrollingForm = new androidx.core.widget.NestedScrollView(this);
         scrollingForm.addView(form);
         input.setMaxLines(number ? 1 : 6);
-        AlertDialog dialog = new MaterialAlertDialogBuilder(this).setTitle(heading).setView(scrollingForm).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, null).create();
+        AlertDialog dialog = new MaterialAlertDialogBuilder(this).setTitle(heading).setView(scrollingForm).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, null).setNeutralButton(R.string.use_saved_player, null).create();
         dialog.setOnShowListener(ignored -> {
             inputError = field;
             inputDialog = dialog;
             input.addTextChangedListener(new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) { }
                 @Override public void onTextChanged(CharSequence text, int start, int before, int count) {
-                    model.editForm(request.token, text.toString());
+                    model.editForm(request.token, text.toString(), check.isChecked());
                 }
                 @Override public void afterTextChanged(Editable text) { }
             });
+            check.setOnCheckedChangeListener((button, checked) -> model.editForm(request.token,
+                    input.getText() == null ? "" : input.getText().toString(), checked));
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
                 FormRequest current = model.form();
                 if (current == null || !current.token.equals(request.token)) return;
                 try { submitForm(current); }
                 catch (IllegalArgumentException | ArithmeticException exception) {
-                    model.formError(current.token, exception.getMessage());
+                    model.formError(current.token, exception.getMessage(), null);
                     input.requestFocus();
                 }
             });
@@ -595,10 +660,11 @@ public final class MainActivity extends AppCompatActivity {
     private int formHeading(FormRequest.Kind kind) {
         switch (kind) {
             case ADD_PLAYER: return R.string.add_player;
-            case RENAME_PLAYER: return R.string.rename;
+            case RENAME_PLAYER: case RENAME_SAVED: return R.string.rename;
             case BID: return R.string.enter_bid;
             case SCORE: return R.string.correct_score;
-            default: throw new IllegalArgumentException("Unknown input form.");
+            case SEARCH: return R.string.search_saved;
+            default: return R.string.add_saved;
         }
     }
 
@@ -606,10 +672,22 @@ public final class MainActivity extends AppCompatActivity {
         if (inputDialog == null || !request.token.equals(activeFormToken)) return;
         inputError.setError(request.error);
         inputDialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(!model.submittingForm(request.token));
+        android.widget.Button existing = inputDialog.getButton(AlertDialog.BUTTON_NEUTRAL);
+        existing.setVisibility(request.kind == FormRequest.Kind.ADD_PLAYER
+                && request.existingProfileId != null ? View.VISIBLE : View.GONE);
+        existing.setOnClickListener(view -> {
+            FormRequest current = model.form();
+            if (current == null || !current.token.equals(request.token)) return;
+            try { useExistingProfile(current); }
+            catch (IllegalArgumentException exception) { model.formError(current.token, exception.getMessage(), null); }
+        });
     }
 
     private void submitForm(FormRequest request) {
         if (model.submittingForm(request.token)) return;
+        if (request.kind == FormRequest.Kind.SEARCH) {
+            search = request.text; model.finishForm(request.token); render(); return;
+        }
         if (request.kind == FormRequest.Kind.SCORE) {
             long total;
             try { total = Long.parseLong(request.text); }
@@ -627,6 +705,12 @@ public final class MainActivity extends AppCompatActivity {
             return;
         }
         String display = Names.displayName(request.text);
+        if (request.kind == FormRequest.Kind.ADD_SAVED) {
+            model.runForm(request, () -> model.repository.addSavedPlayer(display)); return;
+        }
+        if (request.kind == FormRequest.Kind.RENAME_SAVED) {
+            model.runForm(request, () -> model.repository.renameSavedPlayer(request.playerId, display)); return;
+        }
         List<PlayerSpec> players = request.manage ? model.staged() : draftPlayers();
         if (request.manage && (model.stagedRoundId() == null || model.stagedRoundId() != request.roundId)) {
             throw new IllegalArgumentException("This player editor is no longer current. Reopen Manage players.");
@@ -643,19 +727,45 @@ public final class MainActivity extends AppCompatActivity {
                 for (int index = 0; index < players.size(); index++) if (players.get(index).id == request.playerId) position = index;
                 if (position < 0) throw new IllegalArgumentException("This player is no longer in this roster.");
                 PlayerSpec prior = players.get(position);
-                players.set(position, new PlayerSpec(prior.id, display, prior.savedPlayerId));
+                players.set(position, new PlayerSpec(prior.id, display, prior.savedPlayerId, prior.saveForFuture));
                 model.stage(players); model.finishForm(request.token); render();
             } else model.runForm(request, () -> model.repository.renameDraftPlayer(request.gameId, request.playerId, display));
             return;
         }
         if (players.size() >= GameRules.MAX_PLAYERS) throw new IllegalArgumentException("A game supports at most 52 players.");
+        if (request.saveFuture) {
+            for (Records.SavedPlayer profile : state.savedPlayers) {
+                if (profile.nameKey.equals(Names.key(display))) {
+                    model.formError(request.token, getString(R.string.saved_exists), profile.id);
+                    return;
+                }
+            }
+        }
         if (request.manage) {
-            players.add(new PlayerSpec(-System.nanoTime(), display));
+            players.add(new PlayerSpec(-System.nanoTime(), display, null, request.saveFuture));
             model.stage(players); model.finishForm(request.token); render();
-        } else model.runForm(request, () -> model.repository.addPlayerToDraft(request.gameId, display, false));
+        } else model.runForm(request, () -> model.repository.addPlayerToDraft(request.gameId, display, request.saveFuture));
     }
 
-
+    private void useExistingProfile(FormRequest request) {
+        if (request.existingProfileId == null) return;
+        if (!request.manage) {
+            long profileId = request.existingProfileId;
+            model.runForm(request, () -> model.repository.addSavedPlayersToDraft(request.gameId,
+                    java.util.Collections.singletonList(profileId)));
+            return;
+        }
+        List<PlayerSpec> players = model.staged();
+        Records.SavedPlayer selected = null;
+        for (Records.SavedPlayer profile : state.savedPlayers) if (profile.id == request.existingProfileId) selected = profile;
+        if (selected == null) throw new IllegalArgumentException("This saved player is no longer available.");
+        for (PlayerSpec player : players) if (Names.key(player.name).equals(selected.nameKey)) {
+            throw new IllegalArgumentException(getString(R.string.name_conflict));
+        }
+        if (players.size() >= GameRules.MAX_PLAYERS) throw new IllegalArgumentException("A game supports at most 52 players.");
+        players.add(new PlayerSpec(-System.nanoTime(), selected.name, selected.id));
+        model.stage(players); model.finishForm(request.token); render();
+    }
     private void confirm(int heading, int message, int positive, Runnable run) {
         new MaterialAlertDialogBuilder(this).setTitle(heading).setMessage(message).setNegativeButton(R.string.cancel, null).setPositiveButton(positive, (dialog, which) -> run.run()).show();
     }

@@ -172,7 +172,20 @@ public class ScreenVisualTest {
         capture("scoreboard_navigation_font_200_320");
     }
 
-
+    @Test public void savedLibraryPreservesCommonPrefixesAndUnicode() throws Exception {
+        launch(true, false, false);
+        open("SAVED", "ROUND");
+        RecyclerView list = activity.findViewById(R.id.screen_list);
+        assertEquals(4, contentAdapter(list).getItemCount());
+        for (int row = 1; row < 4; row++) {
+            scrollTo(row);
+            RecyclerView.ViewHolder holder = list.findViewHolderForAdapterPosition(row + contentOffset(list));
+            assertNotNull(holder);
+            assertCompleteText(holder.itemView.findViewById(R.id.row_name));
+            assertRowLayout(holder.itemView);
+        }
+        capture("saved_players_common_prefix_320");
+    }
 
     @Test public void tenThousandCharacterNameRemainsCompleteInItsScrollableRow() throws Exception {
         String stressName = repeated("LongPlayer", 1_000);
@@ -202,9 +215,9 @@ public class ScreenVisualTest {
 
     @Test public void keyboardSizedDialogKeepsErrorTextAndSaveReachable() throws Exception {
         launch(true, false, false);
-        open("PLAYERS", "ROUND");
+        open("SAVED", "ROUND");
         showFooter();
-        activity.findViewById(R.id.add_player).performClick();
+        activity.findViewById(R.id.primary_action).performClick();
         Shadows.shadowOf(Looper.getMainLooper()).idle();
         Dialog latest = ShadowDialog.getLatestDialog();
         assertTrue(latest instanceof AlertDialog);
@@ -249,6 +262,9 @@ public class ScreenVisualTest {
                             new PlayerSpec(UNBROKEN_NAME), new PlayerSpec("محمد नीरज 🙂"));
                     long draftId = repository.saveDraft(new DraftSpec(0, players,
                             "ASCENDING", "FIXED", null));
+                    repository.addSavedPlayer("Alex Smith");
+                    repository.addSavedPlayer("Alex Smith Junior with a longer complete profile name");
+                    repository.addSavedPlayer("محمد نीरज 🙂");
                     if (game) {
                         repository.startGame(draftId);
                         if (completedRound) {

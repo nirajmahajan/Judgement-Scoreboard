@@ -56,7 +56,28 @@ public class FormLifecycleTest {
         repository.close();
     }
 
-
+    @Test public void longNameAndUncheckedOptInSurviveActivityRecreation() {
+        seed(false);
+        launch("PLAYERS");
+        AtomicReference<Integer> last = new AtomicReference<>();
+        scenario.onActivity(activity -> last.set(((RecyclerView) activity.findViewById(R.id.screen_list))
+                .getAdapter().getItemCount() - 1));
+        onView(withId(R.id.screen_list)).perform(RecyclerViewActions.scrollToPosition(last.get()));
+        onView(withId(R.id.add_player)).perform(click());
+        onView(withText(R.string.save_future)).check(matches(not(isChecked())));
+        String value = "  Alexandra नीरज with a long name and a shared prefix %_ 🙂  ";
+        onView(withId(R.id.edit_value)).perform(replaceText(value));
+        onView(withText(R.string.save_future)).perform(click());
+        scenario.recreate();
+        awaitForm();
+        onView(withId(R.id.edit_value)).check(matches(withText(value)));
+        onView(withText(R.string.save_future)).check(matches(isChecked()));
+        onView(withText(R.string.save)).perform(click());
+        await(() -> repository.snapshot().draftPlayers.size() == 3);
+        Snapshot snapshot = repository.snapshot();
+        assertEquals(value.trim(), snapshot.draftPlayers.get(2).name);
+        assertEquals(1, snapshot.savedPlayers.size());
+    }
 
     @Test public void invalidScoreTextAndInlineErrorSurviveActivityRecreation() {
         Snapshot snapshot = seed(true);

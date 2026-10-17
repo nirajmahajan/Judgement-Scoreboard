@@ -54,13 +54,13 @@ public final class ScoreViewModel extends AndroidViewModel {
     LiveData<Bundle> formState() { return saved.getLiveData("form"); }
     FormRequest form() { return FormRequest.fromBundle(saved.get("form")); }
     void beginForm(FormRequest request) { saved.set("form", request.toBundle()); }
-    void editForm(String token, String value) {
+    void editForm(String token, String value, boolean saveFuture) {
         FormRequest current = form();
-        if (current != null && current.token.equals(token)) beginForm(current.withInput(value));
+        if (current != null && current.token.equals(token)) beginForm(current.withInput(value, saveFuture));
     }
-    void formError(String token, String message) {
+    void formError(String token, String message, Long profileId) {
         FormRequest current = form();
-        if (current != null && current.token.equals(token)) beginForm(current.withError(message));
+        if (current != null && current.token.equals(token)) beginForm(current.withError(message, profileId));
     }
     void finishForm(String token) {
         FormRequest current = form();
@@ -69,7 +69,7 @@ public final class ScoreViewModel extends AndroidViewModel {
     boolean submittingForm(String token) { return submittingForms.contains(token); }
     void runForm(FormRequest request, Command command) {
         if (!submittingForms.add(request.token)) return;
-        formError(request.token, null);
+        formError(request.token, null, null);
         repository.execute(() -> {
             try {
                 command.run();
@@ -77,8 +77,11 @@ public final class ScoreViewModel extends AndroidViewModel {
             } catch (RuntimeException exception) {
                 main.post(() -> {
                     submittingForms.remove(request.token);
+                    Long existing = exception instanceof ScoreRepository.DuplicateSavedPlayerException
+                            && request.kind == FormRequest.Kind.ADD_PLAYER
+                            ? ((ScoreRepository.DuplicateSavedPlayerException) exception).existingId : null;
                     formError(request.token, exception.getMessage() == null
-                            ? "Could not save. Try again." : exception.getMessage());
+                            ? "Could not save. Try again." : exception.getMessage(), existing);
                 });
             }
         });
@@ -94,6 +97,7 @@ public final class ScoreViewModel extends AndroidViewModel {
                 JSONObject row = new JSONObject();
                 row.put("id", player.id); row.put("name", player.name);
                 row.put("profile", player.savedPlayerId == null ? JSONObject.NULL : player.savedPlayerId);
+                row.put("saveForFuture", player.saveForFuture);
                 array.put(row);
             }
         } catch (JSONException exception) { throw new IllegalStateException(exception); }
@@ -108,7 +112,8 @@ public final class ScoreViewModel extends AndroidViewModel {
             for (int i = 0; i < array.length(); i++) {
                 JSONObject row = array.getJSONObject(i);
                 players.add(new PlayerSpec(row.getLong("id"), row.getString("name"),
-                        row.isNull("profile") ? null : row.getLong("profile")));
+                        row.isNull("profile") ? null : row.getLong("profile"),
+                        row.optBoolean("saveForFuture", false)));
             }
         } catch (JSONException exception) { throw new IllegalStateException("Invalid staged roster", exception); }
         return players;

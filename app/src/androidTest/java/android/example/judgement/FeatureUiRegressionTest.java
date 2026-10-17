@@ -77,11 +77,69 @@ public class FeatureUiRegressionTest {
         inspector.close();
     }
 
+    @Test public void savedLibraryCrudRejectsCanonicalDuplicateAndKeepsInvalidText() {
+        launch(); clickLabel(R.string.saved_players);
+        addSaved("Élodie");
+        long profileId = inspector.snapshot().savedPlayers.get(0).id;
+        clickId(R.id.primary_action);
+        String duplicate = "  E\u0301LODIE\u2003";
+        enter(duplicate); save();
+        awaitView(withId(R.id.edit_value));
+        onView(withId(R.id.edit_value)).check(matches(withText(duplicate)));
+        awaitView(withText("This name already has a saved player. Use the existing profile."));
+        assertEquals(1, inspector.snapshot().savedPlayers.size());
+        clickLabel(R.string.cancel);
+        rowAction(1, text(R.string.rename));
+        enter("Élodie with a longer complete name"); save();
+        awaitState(s -> s.savedPlayers.get(0).name.equals("Élodie with a longer complete name"));
+        assertEquals(profileId, inspector.snapshot().savedPlayers.get(0).id);
+        rowAction(1, text(R.string.remove)); clickLabel(R.string.cancel);
+        assertEquals(1, inspector.snapshot().savedPlayers.size());
+        rowAction(1, text(R.string.remove)); clickDialogPositive();
+        awaitState(s -> s.savedPlayers.isEmpty());
+        try (ScoreRepository reopened = new ScoreRepository(context)) {
+            assertTrue(reopened.snapshot().savedPlayers.isEmpty());
+        }
+    }
 
+    @Test public void saveForFutureStartsUncheckedAndOffersCanonicalExistingProfile() {
+        long profileId = inspector.addSavedPlayer("Élodie");
+        launch(); clickId(R.id.primary_action);
+        awaitView(withText(R.string.setup_players));
+        clickId(R.id.add_player);
+        onView(withText(R.string.save_future)).check(matches(not(isChecked())));
+        String entered = "\u2003E\u0301LODIE  ";
+        enter(entered);
+        clickLabel(R.string.save_future); save();
+        awaitView(withText(R.string.saved_exists));
+        onView(withId(R.id.edit_value)).check(matches(withText(entered)));
+        assertEquals(1, inspector.snapshot().savedPlayers.size());
+        clickLabel(R.string.use_saved_player);
+        awaitState(s -> s.draftPlayers.size() == 1);
+        Records.GamePlayer player = inspector.snapshot().draftPlayers.get(0);
+        assertEquals(Long.valueOf(profileId), player.savedPlayerId);
+        assertEquals("Élodie", player.name);
+        assertEquals("Élodie", inspector.snapshot().savedPlayers.get(0).name);
+    }
 
-
-
-
+    @Test public void savingNewPlayersRequiresOptInAndNeverPrefillsAnotherSetup() {
+        launch(); clickId(R.id.primary_action);
+        awaitState(s -> s.draft != null && s.draftPlayers.isEmpty());
+        addGamePlayer("Session only"); awaitState(s -> s.draftPlayers.size() == 1);
+        assertTrue(inspector.snapshot().savedPlayers.isEmpty());
+        clickId(R.id.add_player); enter("Reusable player");
+        clickLabel(R.string.save_future); save();
+        awaitState(s -> s.draftPlayers.size() == 2 && s.savedPlayers.size() == 1);
+        assertNull(inspector.snapshot().draftPlayers.get(0).savedPlayerId);
+        assertEquals(Long.valueOf(inspector.snapshot().savedPlayers.get(0).id),
+                inspector.snapshot().draftPlayers.get(1).savedPlayerId);
+        clickId(R.id.primary_action); awaitView(withText(R.string.setup_settings));
+        clickId(R.id.primary_action); awaitView(withId(R.id.bottom_navigation));
+        option(R.string.new_game);
+        awaitState(s -> s.draft != null);
+        assertTrue(inspector.snapshot().draftPlayers.isEmpty());
+        assertEquals(1, inspector.snapshot().savedPlayers.size());
+    }
 
     @Test public void invalidNameAndSaveRemainReachableWithKeyboardActuallyOpen() throws Exception {
         UiDevice device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
@@ -111,7 +169,34 @@ public class FeatureUiRegressionTest {
         }
     }
 
-
+    @Test public void quickAddSearchKeepsMultipleSelectionsAndDisablesProfileAndNameConflicts() {
+        long alice = inspector.addSavedPlayer("Alice");
+        long bob = inspector.addSavedPlayer("Bob");
+        long carol = inspector.addSavedPlayer("Carol");
+        inspector.addSavedPlayer("Table conflict");
+        inspector.saveDraft(new DraftSpec(0, Arrays.asList(new PlayerSpec(0, "Alice", alice),
+                new PlayerSpec("TABLE CONFLICT")), "ASCENDING", "FIXED", null));
+        launch(); clickLabel(R.string.continue_setup);
+        awaitView(withText(R.string.setup_players));
+        clickId(R.id.quick_add);
+        awaitView(withText(R.string.already_added));
+        assertRowActionEnabled(1, text(R.string.add_selected), false);
+        assertRowActionEnabled(4, text(R.string.add_selected), false);
+        rowAction(0, text(R.string.search_saved)); enter("car"); save();
+        awaitRowCount(2);
+        rowAction(1, text(R.string.add_selected));
+        rowAction(0, text(R.string.search_saved)); enter(""); save();
+        awaitRowCount(5);
+        rowAction(2, text(R.string.add_selected));
+        clickId(R.id.primary_action);
+        awaitState(s -> s.draftPlayers.size() == 4);
+        List<Long> linked = new ArrayList<>();
+        for (Records.GamePlayer player : inspector.snapshot().draftPlayers) linked.add(player.savedPlayerId);
+        assertTrue(linked.containsAll(Arrays.asList(alice, bob, carol)));
+        assertEquals(4, inspector.snapshot().savedPlayers.size());
+        assertEquals("Bob", inspector.snapshot().draftPlayers.get(2).name);
+        assertEquals("Carol", inspector.snapshot().draftPlayers.get(3).name);
+    }
 
     @Test public void stagedRosterDiscardAndRestartCancellationLeaveGameUntouched() {
         seedActive(true, false); launchGame();
@@ -141,9 +226,49 @@ public class FeatureUiRegressionTest {
         for (Records.RoundPlayer player : applied.roundPlayers) { assertNull(player.bid); assertNull(player.outcome); }
     }
 
+    @Test public void managePlayerSaveIntentCommitsOnlyAfterConfirmedApply() {
+        seedActive(true, false); launchGame();
+        Snapshot original = inspector.snapshot();
+        option(R.string.manage_players);
+        addStagedSavedPlayer("Reusable at this table");
+        awaitRowCount(4);
+        assertTrue(inspector.snapshot().savedPlayers.isEmpty());
+        assertUnchangedRound(original);
+        pressBack(); clickLabel(R.string.discard);
+        assertTrue(inspector.snapshot().savedPlayers.isEmpty());
+        assertUnchangedRound(original);
+        option(R.string.manage_players);
+        addStagedSavedPlayer("Reusable at this table");
+        clickId(R.id.primary_action); awaitView(withText(R.string.restart_title));
+        clickDialogPositive();
+        awaitState(s -> s.players.size() == 4 && s.savedPlayers.size() == 1);
+        Snapshot applied = inspector.snapshot();
+        assertEquals("Reusable at this table", applied.savedPlayers.get(0).name);
+        assertEquals(Long.valueOf(applied.savedPlayers.get(0).id), applied.players.get(3).savedPlayerId);
+        assertNotEquals(original.round.id, applied.round.id);
+        assertEquals(original.history.size(), applied.history.size());
+    }
 
-
-
+    @Test public void existingSavedProfileIsOfferedInManageWithoutWritingBeforeApply() {
+        long savedId = inspector.addSavedPlayer("Élodie");
+        seedActive(false, false); launchGame();
+        Snapshot original = inspector.snapshot();
+        option(R.string.manage_players);
+        clickId(R.id.add_player); enter("E\u0301LODIE");
+        clickLabel(R.string.save_future); save();
+        awaitView(withText(R.string.saved_exists));
+        clickLabel(R.string.use_saved_player);
+        awaitRowCount(4);
+        assertRowText(3, "Élodie");
+        assertUnchangedRound(original);
+        assertEquals(1, inspector.snapshot().savedPlayers.size());
+        clickId(R.id.primary_action); clickDialogPositive();
+        awaitState(s -> s.players.size() == 4);
+        Snapshot applied = inspector.snapshot();
+        assertEquals("Élodie", applied.players.get(3).name);
+        assertEquals(Long.valueOf(savedId), applied.players.get(3).savedPlayerId);
+        assertEquals(1, applied.savedPlayers.size());
+    }
 
     @Test public void removingDealerPreselectsNextSeatAndAllowsAnExplicitReplacement() {
         seedActive(false, true); launchGame();
@@ -170,6 +295,7 @@ public class FeatureUiRegressionTest {
     }
 
     @Test public void openingNewGamePreservesCurrentGameUntilConfirmedStart() {
+        inspector.addSavedPlayer("Keep for future games");
         seedActive(true, false); launchGame();
         Snapshot original = inspector.snapshot();
         option(R.string.new_game);
@@ -189,6 +315,8 @@ public class FeatureUiRegressionTest {
         assertEquals(1, replacement.round.number);
         assertTrue(replacement.history.isEmpty());
         for (long total : replacement.totals.values()) assertEquals(0L, total);
+        assertEquals(1, replacement.savedPlayers.size());
+        assertEquals("Keep for future games", replacement.savedPlayers.get(0).name);
     }
 
     @Test public void oldStartConfirmationCannotStartAReplacementDraft() throws Exception {
@@ -222,9 +350,58 @@ public class FeatureUiRegressionTest {
         awaitView(withText("This setup has already started."));
     }
 
+    @Test public void queuedQuickAddCannotRetargetAReplacementDraft() throws Exception {
+        inspector.addSavedPlayer("Selected saved profile");
+        inspector.saveDraft(new DraftSpec(0, new ArrayList<>(), "ASCENDING", "FIXED", null));
+        launch(); clickLabel(R.string.continue_setup); clickId(R.id.quick_add);
+        rowAction(1, text(R.string.add_selected));
+        ScoreViewModel model = activityModel();
+        CountDownLatch blocked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        model.repository.execute(() -> {
+            blocked.countDown();
+            try {
+                if (!release.await(30, TimeUnit.SECONDS)) throw new IllegalStateException("Test command barrier timed out");
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted);
+            }
+        });
+        assertTrue("The actual Activity command executor is blocked", blocked.await(10, TimeUnit.SECONDS));
+        long replacementDraft;
+        try {
+            clickId(R.id.primary_action);
+            replacementDraft = inspector.saveDraft(new DraftSpec(0, new ArrayList<>(), "ASCENDING", "FIXED", null));
+            model.repository.refresh();
+            awaitActivityDraft(model, replacementDraft);
+        } finally { release.countDown(); }
+        awaitExecutor(model.repository);
+        Snapshot after = inspector.snapshot();
+        assertNotNull(after.draft);
+        assertEquals(replacementDraft, after.draft.id);
+        assertTrue("Queued selection must not add anyone to a later setup", after.draftPlayers.isEmpty());
+        assertEquals(1, after.savedPlayers.size());
+        awaitView(withText("Open setup before adding saved players."));
+    }
 
-
-
+    @Test public void editingAndDeletingSavedProfileNeverChangesItsActiveParticipantOrHistory() {
+        long profile = inspector.addSavedPlayer("Original saved name");
+        long draft = inspector.saveDraft(new DraftSpec(0, Arrays.asList(
+                new PlayerSpec(0, "Original saved name", profile), new PlayerSpec("Other player")),
+                "ASCENDING", "FIXED", null));
+        inspector.startGame(draft); completeRound();
+        Snapshot original = inspector.snapshot();
+        launch(); clickLabel(R.string.saved_players);
+        rowAction(1, text(R.string.rename)); enter("Renamed saved profile"); save();
+        awaitState(s -> s.savedPlayers.get(0).name.equals("Renamed saved profile"));
+        rowAction(1, text(R.string.remove)); clickDialogPositive();
+        awaitState(s -> s.savedPlayers.isEmpty());
+        Snapshot after = inspector.snapshot();
+        assertEquals(original.players.get(0).id, after.players.get(0).id);
+        assertEquals("Original saved name", after.players.get(0).name);
+        assertEquals(original.totals, after.totals);
+        assertEquals(original.history.get(0).players.get(0).nameSnapshot,
+                after.history.get(0).players.get(0).nameSnapshot);
+    }
 
     @Test public void historyNumbersParticipantsWithinEachRound() {
         seedActive(false, false);
@@ -306,15 +483,24 @@ public class FeatureUiRegressionTest {
         onView(withText(R.string.options)).perform(click());
         onView(withText(label)).perform(click());
     }
-
+    private void addSaved(String name) {
+        int count = inspector.snapshot().savedPlayers.size();
+        clickId(R.id.primary_action); enter(name); save();
+        awaitState(s -> s.savedPlayers.size() == count + 1);
+    }
     private void addGamePlayer(String name) { clickId(R.id.add_player); enter(name); save(); }
-
+    private void addStagedSavedPlayer(String name) {
+        clickId(R.id.add_player); enter(name);
+        onView(withText(R.string.save_future)).check(matches(not(isChecked())));
+        clickLabel(R.string.save_future); save();
+    }
     private void enter(String value) { onView(withId(R.id.edit_value)).perform(replaceText(value), closeSoftKeyboard()); }
     private void save() { onView(withId(android.R.id.button1)).perform(click()); }
     private void clickDialogPositive() { onView(withId(android.R.id.button1)).perform(click()); }
     private String text(int id) { return context.getString(id); }
     private void clickLabel(int id) {
-        if (id == R.string.cancel || id == R.string.discard) {
+        if (id == R.string.cancel || id == R.string.discard || id == R.string.save_future
+                || id == R.string.use_saved_player) {
             onView(allOf(withText(id), isClickable())).perform(revealAndClick());
         } else {
             onView(withId(R.id.screen_list)).perform(clickInList(allOf(withText(id), isClickable())));
