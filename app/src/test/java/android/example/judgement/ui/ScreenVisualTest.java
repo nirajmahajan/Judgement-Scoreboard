@@ -380,21 +380,14 @@ public class ScreenVisualTest {
 
     @Test public void playersStrategySectionKeepsSixPlayersAndStartTogether() throws Exception {
         seedEnglishSetup(false); launch(false, false, false); open("PLAYERS", "ROUND");
-        assertTrue(((android.widget.RadioButton) activity.findViewById(R.id.setup_strategy_default)).isChecked());
-        assertFalse(((android.widget.RadioButton) activity.findViewById(R.id.setup_strategy_aggressive)).isChecked());
+        TextView choices = activity.findViewById(R.id.setup_strategy_choices);
+        assertEquals("Default", choices.getText().toString());
+        assertFullyVisible(choices);
         RecyclerView list = activity.findViewById(R.id.screen_list);
         for (int index = 0; index < 6; index++) {
             View row = list.findViewHolderForAdapterPosition(contentOffset(list) + index).itemView;
             assertFullyVisible(row.findViewById(R.id.row_name));
         }
-        for (int id : new int[]{R.id.setup_strategy_default, R.id.setup_strategy_aggressive}) {
-            TextView choice = activity.findViewById(id);
-            assertEquals("Preset names stay on one line on a narrow phone", 1, choice.getLineCount());
-            assertFullyVisible(choice);
-        }
-        assertFullyVisible(activity.findViewById(R.id.create_custom_strategy));
-        assertFullyVisible(activity.findViewById(R.id.default_strategy_info));
-        assertFullyVisible(activity.findViewById(R.id.aggressive_strategy_info));
         assertFullyVisible(activity.findViewById(R.id.primary_action));
         assertEquals(activity.getString(R.string.start_game), ((TextView) activity.findViewById(R.id.primary_action)).getText().toString());
         capture("players_strategy_320");

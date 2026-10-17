@@ -234,7 +234,9 @@ public final class ScoreViewModel extends AndroidViewModel {
         editStrategy(request);
         repository.execute(() -> {
             try {
-                if (request.target == StrategyRequest.Target.DRAFT) repository.updateDraftScoring(request.targetId, strategy);
+                if (request.customEditor) repository.saveCustomStrategyForTarget(request.profileId, request.name,
+                        strategy, request.targetId, request.target == StrategyRequest.Target.ROUND ? request.targetId : null);
+                else if (request.target == StrategyRequest.Target.DRAFT) repository.updateDraftScoring(request.targetId, strategy);
                 else repository.changeScoringStrategy(request.targetId, strategy);
                 main.post(() -> { submittingForms.remove(request.token); finishStrategy(request.token); });
             } catch (IllegalArgumentException | IllegalStateException | ArithmeticException exception) {
@@ -242,6 +244,17 @@ public final class ScoreViewModel extends AndroidViewModel {
                     submittingForms.remove(request.token);
                     strategyError(request.token, exception.getMessage());
                 });
+            }
+        });
+    }
+    void deleteStrategy(StrategyRequest request) {
+        if (request.profileId == 0 || !submittingForms.add(request.token)) return;
+        repository.execute(() -> {
+            try {
+                repository.deleteCustomStrategy(request.profileId);
+                main.post(() -> { submittingForms.remove(request.token); finishStrategy(request.token); });
+            } catch (RuntimeException exception) {
+                main.post(() -> { submittingForms.remove(request.token); strategyError(request.token, exception.getMessage()); });
             }
         });
     }

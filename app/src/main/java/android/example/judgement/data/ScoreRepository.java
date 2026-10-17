@@ -140,6 +140,64 @@ public final class ScoreRepository implements AutoCloseable {
         });
     }
 
+    public long saveCustomStrategy(long id, String name, ScoringStrategy strategy) {
+        return write(() -> saveCustomStrategyRecord(id, name, strategy));
+    }
+
+    /** Catalog and target snapshots commit together, including deferred changes after predictions. */
+    public long saveCustomStrategyForTarget(long id, String name, ScoringStrategy strategy,
+            long draftId, Long roundId) {
+        return write(() -> {
+            ScoringStrategy named = namedCustomStrategy(name, strategy);
+            if (roundId == null) {
+                Records.Game draft = requireDraft(draftId);
+                draft.scoringConfig = named.encode(); draft.pendingScoringConfig = null;
+                dao.updateGame(draft);
+            } else {
+                Records.Round round = requireOpenRound(roundId, null);
+                Records.Game game = requireGame(round.gameId);
+                String config = named.encode();
+                if ("BIDDING".equals(round.phase) && bids(dao.roundPlayers(roundId)).isEmpty()) {
+                    round.scoringConfig = config; dao.updateRound(round);
+                    game.scoringConfig = config; game.pendingScoringConfig = null;
+                } else {
+                    game.pendingScoringConfig = config.equals(round.scoringConfig) ? null : config;
+                }
+                dao.updateGame(game);
+            }
+            return saveCustomStrategyRecord(id, name, named);
+        });
+    }
+
+    private long saveCustomStrategyRecord(long id, String name, ScoringStrategy strategy) {
+        ScoringStrategy named = namedCustomStrategy(name, strategy);
+        if (id < 0) fail("This saved strategy no longer exists. Open the strategy list again.");
+        Records.SavedStrategy stored = id == 0 ? new Records.SavedStrategy() : dao.savedStrategy(id);
+        if (stored == null) fail("This saved strategy was deleted. Create a new strategy instead.");
+        String key = Names.key(named.name);
+        Records.SavedStrategy duplicate = dao.savedStrategyByKey(key);
+        if (duplicate != null && duplicate.id != id) fail("A strategy with this name already exists. Choose another name.");
+        stored.name = named.name; stored.nameKey = key; stored.scoringConfig = named.encode();
+        if (id == 0) return dao.insertSavedStrategy(stored);
+        dao.updateSavedStrategy(stored);
+        return id;
+    }
+
+    public void deleteCustomStrategy(long id) {
+        write(() -> {
+            if (id <= 0) fail("Default and Aggressive strategies cannot be deleted.");
+            dao.deleteSavedStrategy(id);
+            return null;
+        });
+    }
+
+    private static ScoringStrategy namedCustomStrategy(String name, ScoringStrategy strategy) {
+        if (requireStrategy(strategy).preset != ScoringStrategy.Preset.CUSTOM) {
+            fail("Default and Aggressive strategies cannot be modified.");
+        }
+        return strategy.withName(name);
+    }
+
     /** Reuse the table explicitly, while keeping the existing scorecard until Start is confirmed. */
     public long playAgain(long gameId) {
         return write(() -> {
@@ -771,7 +829,7 @@ public final class ScoreRepository implements AutoCloseable {
         }
         return new Snapshot(draft, draft == null ? new ArrayList<>() : activePlayers(draft.id), current,
                 players, inactive, totals, open, roundPlayers, history, adjustments, dao.savedPlayers(), dao.recovery(),
-                current == null ? new ArrayList<>() : dao.roundEdits(current.id));
+                current == null ? new ArrayList<>() : dao.roundEdits(current.id), dao.savedStrategies());
     }
 
     private static ScoringStrategy requireStrategy(ScoringStrategy strategy) {

@@ -3,6 +3,9 @@ package android.example.judgement.ui;
 import android.content.Context;
 import android.example.judgement.R;
 import android.example.judgement.domain.Outcome;
+import android.example.judgement.data.Records;
+import java.util.List;
+import java.util.Collections;
 import android.example.judgement.domain.ScoringStrategy;
 import android.text.Editable;
 import android.text.InputType;
@@ -27,6 +30,7 @@ final class StrategyEditor extends RecyclerView.Adapter<StrategyEditor.Holder> {
     }
     private final Listener listener;
     private StrategyRequest request;
+    private List<Records.SavedStrategy> saved = Collections.emptyList();
     private Holder bound;
     private final View.OnLayoutChangeListener viewportChanged = (view, left, top, right, bottom,
             oldLeft, oldTop, oldRight, oldBottom) -> {
@@ -54,6 +58,7 @@ final class StrategyEditor extends RecyclerView.Adapter<StrategyEditor.Holder> {
     @Override public void onViewRecycled(@NonNull Holder holder) {
         if (bound == holder) bound = null;
     }
+    void savedStrategies(List<Records.SavedStrategy> profiles) { saved = profiles; }
     void update(StrategyRequest next) {
         boolean newError = next.error != null && !next.error.equals(request.error);
         request = next;
@@ -64,6 +69,9 @@ final class StrategyEditor extends RecyclerView.Adapter<StrategyEditor.Holder> {
     }
     void focusFirstError() {
         if (bound == null) return;
+        if (bound.nameField.getError() != null) {
+            bound.nameInput.requestFocus(); revealAfterLayout(bound.nameField); return;
+        }
         for (int i = 0; i < bound.fields.length; i++) {
             if (bound.fields[i].getError() != null) {
                 bound.inputs[i].requestFocus();
@@ -97,6 +105,7 @@ final class StrategyEditor extends RecyclerView.Adapter<StrategyEditor.Holder> {
         }));
     }
     static String label(Context context, ScoringStrategy strategy) {
+        if (strategy.preset == ScoringStrategy.Preset.CUSTOM && strategy.name != null) return strategy.name;
         return context.getString(strategy.preset == ScoringStrategy.Preset.AGGRESSIVE
                 ? R.string.strategy_aggressive : strategy.preset == ScoringStrategy.Preset.CUSTOM
                 ? R.string.strategy_custom : R.string.strategy_default);
@@ -128,7 +137,9 @@ final class StrategyEditor extends RecyclerView.Adapter<StrategyEditor.Holder> {
         final LinearLayout custom;
         final TextInputLayout[] fields = new TextInputLayout[3];
         final TextInputEditText[] inputs = new TextInputEditText[3];
-        final MaterialButton[] presets = new MaterialButton[3];
+        final MaterialButton choices;
+        final TextInputLayout nameField;
+        final TextInputEditText nameInput;
         final CheckBox bonus;
         final TextView rules, examples, error;
         boolean binding;
@@ -136,17 +147,25 @@ final class StrategyEditor extends RecyclerView.Adapter<StrategyEditor.Holder> {
             super(new LinearLayout(context));
             LinearLayout root = (LinearLayout) itemView; root.setOrientation(LinearLayout.VERTICAL);
             root.setLayoutParams(new RecyclerView.LayoutParams(-1,-2));
-            int[] names = {R.string.strategy_default,R.string.strategy_aggressive,R.string.strategy_custom};
-            int[] ids = {R.id.strategy_default,R.id.strategy_aggressive,R.id.strategy_custom};
-            for (int i = 0; i < presets.length; i++) {
-                final ScoringStrategy.Preset preset = ScoringStrategy.Preset.values()[i];
-                MaterialButton button = new MaterialButton(context, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
-                button.setText(names[i]); button.setId(ids[i]); button.setMinHeight(dp(context,48));
-                button.setSingleLine(false); button.setCheckable(true);
-                button.setOnClickListener(view -> listener.onChanged(request.choose(preset)));
-                root.addView(button,new LinearLayout.LayoutParams(-1,-2)); presets[i] = button;
-            }
-            rules = text(context); rules.setId(R.id.strategy_rules); root.addView(rules);
+            choices = new MaterialButton(context,null,com.google.android.material.R.attr.materialButtonOutlinedStyle);
+            choices.setId(R.id.setup_strategy_choices); choices.setMinHeight(dp(context,48));
+            choices.setGravity(android.view.Gravity.START|android.view.Gravity.CENTER_VERTICAL);
+            root.addView(choices,new LinearLayout.LayoutParams(-1,-2));
+            nameField = new TextInputLayout(context); nameField.setHint(R.string.strategy_name);
+            nameInput = new TextInputEditText(nameField.getContext()); nameInput.setId(R.id.strategy_name);
+            nameInput.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+            nameInput.setSingleLine(true); nameInput.setMinHeight(dp(context,48));
+            nameField.addView(nameInput,new LinearLayout.LayoutParams(-1,-2));
+            LinearLayout.LayoutParams nameSpacing=new LinearLayout.LayoutParams(-1,-2); nameSpacing.topMargin=dp(context,8);
+            root.addView(nameField,nameSpacing);
+            nameInput.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence text,int start,int count,int after) { }
+                @Override public void onTextChanged(CharSequence text,int start,int before,int count) {
+                    if (!binding) listener.onChanged(request.named(text.toString()));
+                }
+                @Override public void afterTextChanged(Editable text) { }
+            });
+            rules = text(context); rules.setId(R.id.strategy_rules);
             custom = new LinearLayout(context); custom.setOrientation(LinearLayout.VERTICAL); root.addView(custom);
             int[] labels = {R.string.strategy_zero_reward,R.string.strategy_base_reward,R.string.strategy_per_trick};
             int[] inputIds = {R.id.strategy_zero,R.id.strategy_base,R.id.strategy_per_trick};
@@ -170,6 +189,7 @@ final class StrategyEditor extends RecyclerView.Adapter<StrategyEditor.Holder> {
             bonus.setMinHeight(dp(context,48)); custom.addView(bonus);
             bonus.setOnCheckedChangeListener((button,checked) -> changed());
             TextView bonusExplanation = text(context); bonusExplanation.setText(R.string.strategy_bonus_rules); custom.addView(bonusExplanation);
+            root.addView(rules);
             error=text(context); error.setId(R.id.strategy_error); error.setTextColor(com.google.android.material.color.MaterialColors.getColor(root,androidx.appcompat.R.attr.colorError));
             ViewCompat.setAccessibilityLiveRegion(error,ViewCompat.ACCESSIBILITY_LIVE_REGION_POLITE); root.addView(error);
             MaterialButton help = new MaterialButton(context,null,com.google.android.material.R.attr.materialButtonOutlinedStyle);
@@ -185,16 +205,27 @@ final class StrategyEditor extends RecyclerView.Adapter<StrategyEditor.Holder> {
         }
         void bind(StrategyRequest next) {
             binding=true;
-            for (int i=0;i<presets.length;i++) {
-                boolean selected = next.preset.ordinal()==i;
-                presets[i].setChecked(selected); ViewCompat.setStateDescription(presets[i],itemView.getContext().getString(selected?R.string.strategy_selected:R.string.strategy_not_selected));
+            choices.setVisibility(next.customEditor?View.GONE:View.VISIBLE);
+            nameField.setVisibility(next.customEditor?View.VISIBLE:View.GONE);
+            if (!nameInput.getText().toString().equals(next.name)) nameInput.setText(next.name);
+            String nameError=null;
+            if (next.customEditor && next.validate) {
+                try { ScoringStrategy.custom(0,0,0,false).withName(next.name); }
+                catch (IllegalArgumentException invalid) { nameError=invalid.getMessage(); }
+                if (nameError == null && next.error != null && next.error.contains("name")) nameError=next.error;
             }
-            custom.setVisibility(next.preset==ScoringStrategy.Preset.CUSTOM?View.VISIBLE:View.GONE);
+            nameField.setError(nameError);
+            if (!next.customEditor) StrategyDropdown.bind(choices, next.strategy(), saved, new StrategyDropdown.Listener() {
+                @Override public void select(ScoringStrategy rules) { listener.onChanged(request.select(rules)); }
+                @Override public void create() { listener.onChanged(request.createCustom()); }
+                @Override public void modify(Records.SavedStrategy profile) { listener.onChanged(request.modify(profile)); }
+            });
+            custom.setVisibility(next.customEditor?View.VISIBLE:View.GONE);
             String[] values={next.zero,next.base,next.perTrick};
             for(int i=0;i<inputs.length;i++) {
                 if(!inputs[i].getText().toString().equals(values[i])) inputs[i].setText(values[i]);
                 String message=null;
-                if(next.validate && next.preset==ScoringStrategy.Preset.CUSTOM) {
+                if(next.validate && next.customEditor) {
                     try { StrategyRequest.points(values[i]); } catch(IllegalArgumentException invalid) { message=invalid.getMessage(); }
                 }
                 fields[i].setError(message);

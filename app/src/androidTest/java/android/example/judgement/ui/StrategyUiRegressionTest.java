@@ -72,7 +72,7 @@ public final class StrategyUiRegressionTest {
             assertNotNull(row); first.set(((TextView) row.itemView.findViewById(R.id.row_name)).getText().toString());
         });
         assertEquals(context.getString(R.string.scoring_selected, "Default"), first.get());
-        clickText(R.string.choose_scoring); clickId(R.id.strategy_aggressive);
+        clickText(R.string.choose_scoring); choosePreset(R.id.strategy_aggressive);
         await(() -> current() != null && current().preset == ScoringStrategy.Preset.AGGRESSIVE && hasAppearance(true));
         assertEquals(draft, current().targetId);
         assertEquals(ScoringStrategy.defaults().encode(), repository.snapshot().draft.scoringConfig);
@@ -92,7 +92,7 @@ public final class StrategyUiRegressionTest {
 
     @Test public void customLiveExamplesAndOverflowErrorSurviveRecreationBeforeSaving() {
         seed(false,ScoringStrategy.defaults()); launch("SETTINGS");
-        clickText(R.string.choose_scoring); clickId(R.id.strategy_custom);
+        clickText(R.string.choose_scoring); createCustom();
         enter(R.id.strategy_zero,"7"); enter(R.id.strategy_base,"10"); enter(R.id.strategy_per_trick,"2");
         clickId(R.id.strategy_bonus);
         assertTrue(text(R.id.strategy_examples).contains(context.getString(R.string.strategy_example,12,7,34L)));
@@ -108,13 +108,13 @@ public final class StrategyUiRegressionTest {
         assertEquals("9223372036854775807",text(R.id.strategy_per_trick));
         assertEquals(message,text(R.id.strategy_error));
         enter(R.id.strategy_per_trick,"2"); clickId(R.id.primary_action);
-        await(() -> repository.snapshot().draft.scoringConfig.equals(ScoringStrategy.custom(7,10,2,true).encode()));
+        await(() -> repository.snapshot().draft.scoringConfig.equals(ScoringStrategy.custom(7,10,2,true).withName("Custom rules").encode()));
         await(() -> screen().equals("SETTINGS"));
     }
 
     @Test public void scrolledCustomValidationRevealsWholeInvalidFieldAndRetainsInput() {
         seed(false, ScoringStrategy.defaults()); launch("SETTINGS");
-        clickText(R.string.choose_scoring); clickId(R.id.strategy_custom);
+        clickText(R.string.choose_scoring); createCustom();
         String invalid = "999999999999999999999999999";
         enter(R.id.strategy_zero, invalid);
         onView(withId(R.id.screen_list)).perform(new ViewAction() {
@@ -158,13 +158,13 @@ public final class StrategyUiRegressionTest {
 
     @Test public void strategyChangesImmediatelyBeforeBidsAndChangesAppearanceOnlyWhenPendingBecomesActive() {
         seed(true,ScoringStrategy.defaults()); launch("GAME");
-        option(R.string.change_scoring); clickId(R.id.strategy_aggressive); clickId(R.id.primary_action);
+        option(R.string.change_scoring); choosePreset(R.id.strategy_aggressive); clickId(R.id.primary_action);
         await(() -> repository.snapshot().round.scoringConfig.equals(ScoringStrategy.aggressive().encode()));
         await(() -> screen().equals("GAME") && hasAppearance(true));
         Snapshot initial=repository.snapshot();
         onView(withId(R.id.quick_bid_0)).perform(click());
         await(() -> uiSnapshot().roundPlayers.get(0).bid!=null);
-        option(R.string.change_scoring); clickId(R.id.strategy_default);
+        option(R.string.change_scoring); choosePreset(R.id.strategy_default);
         await(() -> hasAppearance(false)); // Chooser preview only.
         assertEquals(ScoringStrategy.aggressive().encode(),repository.snapshot().round.scoringConfig);
         clickId(R.id.primary_action);
@@ -190,7 +190,7 @@ public final class StrategyUiRegressionTest {
         repository.restartRound(original); long restarted=repository.snapshot().round.id;
         refreshUi();
         scenario.recreate(); await(() -> current()!=null && uiSnapshot().round.id==restarted);
-        clickId(R.id.strategy_aggressive); clickId(R.id.primary_action);
+        choosePreset(R.id.strategy_aggressive); clickId(R.id.primary_action);
         await(() -> current()!=null && current().error!=null);
         onView(withId(R.id.strategy_error)).check(androidx.test.espresso.assertion.ViewAssertions.matches(
                 androidx.test.espresso.matcher.ViewMatchers.isDisplayingAtLeast(90)));
@@ -357,8 +357,8 @@ public final class StrategyUiRegressionTest {
                 assertEquals(Configuration.UI_MODE_NIGHT_NO,activity.getResources().getConfiguration().uiMode&Configuration.UI_MODE_NIGHT_MASK);
             });
             clickText(R.string.choose_scoring); await(() -> current()!=null && hasAppearance(true));
-            clickId(R.id.strategy_aggressive);
-            onView(withId(R.id.strategy_aggressive)).check((view,noMatch) -> assertCompleteText((TextView)view));
+            clickId(R.id.setup_strategy_choices);
+            onView(withId(R.id.strategy_aggressive)).check((view,noMatch) -> assertCompleteText((TextView)view)).perform(click());
             scenario.onActivity(activity -> {
                 com.google.android.material.appbar.MaterialToolbar toolbar=activity.findViewById(R.id.toolbar);
                 assertNotNull(toolbar.getNavigationIconTint());
@@ -367,7 +367,7 @@ public final class StrategyUiRegressionTest {
             });
             device.executeShellCommand("mkdir -p /sdcard/judgement-test-evidence");
             device.executeShellCommand("screencap -p /sdcard/judgement-test-evidence/strategy-judgement-plus-light-320-font200.png");
-            clickId(R.id.strategy_custom); await(() -> hasAppearance(false));
+            createCustom(); clickId(R.id.strategy_bonus); await(() -> hasAppearance(false));
             for(int label:new int[]{R.string.strategy_zero_reward,R.string.strategy_base_reward,R.string.strategy_per_trick}) {
                 onView(withText(label)).perform(reveal()).check((view,noMatch) -> assertCompleteText((TextView)view));
             }
@@ -386,7 +386,7 @@ public final class StrategyUiRegressionTest {
             device.executeShellCommand("screencap -p /sdcard/judgement-test-evidence/strategy-custom-error-light-320-font200-ime.png");
             onView(withId(R.id.strategy_zero)).perform(reveal(),replaceText("7"));
             clickId(R.id.primary_action);
-            await(() -> repository.snapshot().draft.scoringConfig.equals(ScoringStrategy.custom(7,10,1,true).encode()));
+            await(() -> repository.snapshot().draft.scoringConfig.equals(ScoringStrategy.custom(7,10,1,true).withName("Custom rules").encode()));
         } catch(AssertionError | RuntimeException failure) {
             scenario.onActivity(activity -> {
                 android.util.Log.e("StrategyViewport","Configuration="+activity.getResources().getConfiguration());
@@ -609,6 +609,15 @@ public final class StrategyUiRegressionTest {
         onView(withText(R.string.options)).check(androidx.test.espresso.assertion.ViewAssertions.doesNotExist());
         onView(withText(label)).perform(click());
     }
+    private void choosePreset(int id) {
+        clickId(R.id.setup_strategy_choices);
+        onView(withId(id)).perform(click());
+    }
+    private void createCustom() {
+        clickId(R.id.setup_strategy_choices);
+        onView(withId(R.id.create_custom_strategy)).perform(click());
+        enter(R.id.strategy_name, "Custom rules");
+    }
     private void enter(int id,String value) { onView(withId(id)).perform(reveal(),replaceText(value),closeSoftKeyboard()); }
     private void clickId(int id) {
         Matcher<View> visible = org.hamcrest.Matchers.allOf(withId(id), androidx.test.espresso.matcher.ViewMatchers.isDisplayed());
@@ -640,7 +649,7 @@ public final class StrategyUiRegressionTest {
         };
     }
     private static View find(View view,Matcher<View> target){
-        if(target.matches(view)&&view.isClickable())return view;
+        if(target.matches(view)&&view.isClickable()&&view.isShown())return view;
         if(view instanceof ViewGroup)for(int i=0;i<((ViewGroup)view).getChildCount();i++){
             View found=find(((ViewGroup)view).getChildAt(i),target);if(found!=null)return found;
         }
@@ -650,7 +659,30 @@ public final class StrategyUiRegressionTest {
         @Override public Matcher<View> getConstraints(){return isAssignableFrom(View.class);}
         @Override public String getDescription(){return "scroll input or action above the keyboard";}
         @Override public void perform(UiController controller,View view){
-            view.requestRectangleOnScreen(new Rect(0,0,view.getWidth(),view.getHeight()),true);controller.loopMainThreadUntilIdle();
+            boolean scrolled = view.requestRectangleOnScreen(new Rect(0,0,view.getWidth(),view.getHeight()),true);
+            controller.loopMainThreadUntilIdle();
+            if (!androidx.test.espresso.matcher.ViewMatchers.isDisplayingAtLeast(90).matches(view)) {
+                String tag = "StrategyReveal";
+                android.util.Log.e(tag, "requestRectangleOnScreen returned " + scrolled);
+                for (View node = view; node != null; node = node.getParent() instanceof View ? (View) node.getParent() : null) {
+                    int[] location = new int[2]; node.getLocationOnScreen(location);
+                    Rect bounds = new Rect(); boolean visible = node.getGlobalVisibleRect(bounds);
+                    android.util.Log.e(tag, node.getClass().getName() + " id=" + node.getId() + " visibility=" + node.getVisibility()
+                            + " size=" + node.getWidth() + "x" + node.getHeight() + " location=" + Arrays.toString(location)
+                            + " globallyVisible=" + visible + " rect=" + bounds + " scrollY=" + node.getScrollY()
+                            + " pendingLayout=" + node.isLayoutRequested());
+                }
+                try {
+                    Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
+                    String evidence = "strategy-reveal-" + SystemClock.uptimeMillis();
+                    UiDevice device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+                    device.dumpWindowHierarchy(new java.io.File(target.getExternalFilesDir(null), evidence + ".xml"));
+                    device.executeShellCommand("mkdir -p /sdcard/judgement-test-evidence");
+                    device.executeShellCommand("screencap -p /sdcard/judgement-test-evidence/" + evidence + ".png");
+                } catch (java.io.IOException error) {
+                    android.util.Log.e(tag, "Could not save strategy reveal evidence", error);
+                }
+            }
             assertTrue("Control remains reachable",androidx.test.espresso.matcher.ViewMatchers.isDisplayingAtLeast(90).matches(view));
         }
     };}

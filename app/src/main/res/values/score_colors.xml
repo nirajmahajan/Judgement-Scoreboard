@@ -14,4 +14,5 @@
     <color name="score_inverse">#22324D</color><color name="score_on_inverse">#EEF3FC</color>
     <color name="result_won">#18733C</color>
     <color name="result_lost">#B42318</color>
+    <color name="strategy_delete">#FF8A80</color>
 </resources>

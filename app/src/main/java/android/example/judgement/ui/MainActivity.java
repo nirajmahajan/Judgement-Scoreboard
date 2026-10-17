@@ -563,7 +563,21 @@ public final class MainActivity extends AppCompatActivity {
                 } catch (IllegalArgumentException invalidCustom) { /* The form keeps its raw values. */ }
             }
         }
-        header(getString(R.string.choose_scoring), effect + "\n" + getString(R.string.strategy_preview));
+        header(request.customEditor ? getString(request.profileId == 0 ? R.string.create_custom_strategy : R.string.modify_strategy)
+                : getString(R.string.choose_scoring), effect);
+        if (request.customEditor && request.profileId != 0) {
+            android.view.MenuItem delete = toolbar.getMenu().add(0, R.id.delete_strategy, 0, R.string.delete_strategy);
+            android.graphics.drawable.Drawable icon = androidx.appcompat.content.res.AppCompatResources.getDrawable(this,R.drawable.ic_roster_remove).mutate();
+            icon.setTint(getColor(R.color.strategy_delete)); delete.setIcon(icon);
+            delete.setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_ALWAYS);
+            delete.setOnMenuItemClickListener(item -> {
+                new MaterialAlertDialogBuilder(this).setTitle(R.string.delete_strategy)
+                        .setMessage(getString(R.string.delete_strategy_message,request.name))
+                        .setNegativeButton(R.string.cancel,null).setPositiveButton(R.string.table_delete,
+                                (dialog,which) -> model.deleteStrategy(request)).show();
+                return true;
+            });
+        }
         if (strategyEditor == null) strategyEditor = new StrategyEditor(request, new StrategyEditor.Listener() {
             @Override public void onChanged(StrategyRequest changed) { model.editStrategy(changed); }
             @Override public void onHelp() {
@@ -574,11 +588,11 @@ public final class MainActivity extends AppCompatActivity {
                 model.scoringHelp(config, "SCORING"); open("SCORING_HELP");
             }
         });
-        strategyEditor.update(request); setContent(strategyEditor);
+        strategyEditor.savedStrategies(state.savedStrategies); strategyEditor.update(request); setContent(strategyEditor);
         action(R.string.save_scoring, R.id.primary_action, () -> {
             StrategyRequest current = model.strategyRequest();
             if (current == null) return;
-            try { model.saveStrategy(current, current.strategy()); }
+            try { model.saveStrategy(current, current.validatedStrategy()); }
             catch (IllegalArgumentException invalid) {
                 model.strategyError(current.token, invalid.getMessage());
                 if (strategyEditor != null) strategyEditor.focusFirstError();

@@ -61,7 +61,7 @@ public class LegacyMigrationTest {
                         ScoreDatabase.MIGRATION_2_3.migrate(database);
                         throw new IllegalStateException("Injected interruption before commit");
                     }
-                }, ScoreDatabase.MIGRATION_3_4).build();
+                }, ScoreDatabase.MIGRATION_3_4, ScoreDatabase.MIGRATION_4_5).build();
         try {
             try { failed.getOpenHelper().getWritableDatabase(); fail("Expected injected failure"); }
             catch (IllegalStateException expected) { assertTrue(expected.getMessage().contains("Injected interruption")); }
@@ -131,7 +131,7 @@ public class LegacyMigrationTest {
         helper.getWritableDatabase(); helper.close();
         try {
             ScoreDatabase db = ScoreDatabase.open(context, name);
-            assertEquals(4, db.getOpenHelper().getReadableDatabase().getVersion());
+            assertEquals(5, db.getOpenHelper().getReadableDatabase().getVersion());
             assertEquals("DESCENDING", db.dao().game(4).direction);
             assertEquals("CUSTOM", db.dao().game(4).trumpMode);
             assertEquals("Full old participant", db.dao().player(7).name);

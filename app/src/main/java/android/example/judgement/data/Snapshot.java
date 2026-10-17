@@ -18,6 +18,7 @@ public final class Snapshot {
     public final List<RoundHistory> history;
     public final List<Records.ScoreAdjustment> adjustments;
     public final List<Records.SavedPlayer> savedPlayers;
+    public final List<Records.SavedStrategy> savedStrategies;
     public final List<Records.RecoveryRow> recoveries;
     public final List<Records.RoundEdit> roundEdits;
 
@@ -27,6 +28,16 @@ public final class Snapshot {
              List<RoundHistory> history, List<Records.ScoreAdjustment> adjustments,
              List<Records.SavedPlayer> savedPlayers, List<Records.RecoveryRow> recoveries,
              List<Records.RoundEdit> roundEdits) {
+        this(draft, draftPlayers, game, players, inactivePlayers, totals, round, roundPlayers,
+                history, adjustments, savedPlayers, recoveries, roundEdits, Collections.emptyList());
+    }
+
+    Snapshot(Records.Game draft, List<Records.GamePlayer> draftPlayers, Records.Game game,
+             List<Records.GamePlayer> players, List<Records.GamePlayer> inactivePlayers,
+             Map<Long, Long> totals, Records.Round round, List<Records.RoundPlayer> roundPlayers,
+             List<RoundHistory> history, List<Records.ScoreAdjustment> adjustments,
+             List<Records.SavedPlayer> savedPlayers, List<Records.RecoveryRow> recoveries,
+             List<Records.RoundEdit> roundEdits, List<Records.SavedStrategy> savedStrategies) {
         this.draft = draft;
         this.draftPlayers = Collections.unmodifiableList(draftPlayers);
         this.game = game;
@@ -38,6 +49,7 @@ public final class Snapshot {
         this.history = Collections.unmodifiableList(history);
         this.adjustments = Collections.unmodifiableList(adjustments);
         this.savedPlayers = Collections.unmodifiableList(savedPlayers);
+        this.savedStrategies = Collections.unmodifiableList(savedStrategies);
         this.recoveries = Collections.unmodifiableList(recoveries);
         this.roundEdits = Collections.unmodifiableList(roundEdits);
     }

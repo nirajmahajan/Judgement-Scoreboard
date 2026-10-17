@@ -92,6 +92,14 @@ public final class Records {
         @NonNull public String nameKey = "";
     }
 
+    @Entity(tableName = "saved_strategies", indices = {@Index(value = "nameKey", unique = true)})
+    public static class SavedStrategy {
+        @PrimaryKey(autoGenerate = true) public long id;
+        @NonNull public String name = "";
+        @NonNull public String nameKey = "";
+        @NonNull public String scoringConfig = "";
+    }
+
     @Entity(tableName = "legacy_recovery")
     public static class RecoveryRow {
         @PrimaryKey(autoGenerate = true) public long id;

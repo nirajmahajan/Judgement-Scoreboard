@@ -161,6 +161,24 @@ public class ScoringStrategyTest {
         }
     }
 
+    @Test public void namedCustomStrategiesRoundTripUnicodeDelimitersAndKeepLegacyEncoding() {
+        String name = "Équipe | Weekend 🌟\nLeague";
+        ScoringStrategy strategy = ScoringStrategy.custom(name, 5, 8, 2, true);
+        assertEquals(name, strategy.name);
+        assertEquals(strategy, ScoringStrategy.decode(strategy.encode()));
+        assertEquals(name, ScoringStrategy.decode(strategy.encode()).name);
+        assertEquals(ScoringStrategy.custom(5, 8, 2, true).points(6, 4, Outcome.WON),
+                strategy.points(6, 4, Outcome.WON));
+        assertEquals("v1|CUSTOM|5|8|2|1", ScoringStrategy.custom(5, 8, 2, true).encode());
+        assertNotEquals(strategy, strategy.withName("Another"));
+        rejects(() -> ScoringStrategy.defaults().withName("New"));
+        rejects(() -> ScoringStrategy.custom("  DEFAULT  ", 0, 0, 0, false));
+        rejects(() -> ScoringStrategy.custom("Aggressive", 0, 0, 0, false));
+        rejects(() -> ScoringStrategy.custom("\u200B", 0, 0, 0, false));
+        rejects(() -> ScoringStrategy.decode("v2|CUSTOM|0|0|0|0|_w"));
+        rejects(() -> ScoringStrategy.decode("v2|DEFAULT|10|10|1|0|TmV3"));
+    }
+
     private static void rejects(Runnable command) {
         try {
             command.run();

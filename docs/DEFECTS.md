@@ -65,6 +65,12 @@ The broader CI suite also exposed D42: Aggressive secondary text had 4.29:1 cont
 
 The API 36 full-run exposed D43: concurrent lifecycle observers could create duplicate form windows before the asynchronous OnShow callback registered ownership. The Activity now owns its dialog before showing it, rejects stale callbacks, and dismisses only its own window. `replayingSnapshotBeforeFormOnShowKeepsOneWindowAndPreservesEdits` and `replacingFormBeforeOnShowKeepsTheNewOwnerAndClosesEveryOldWindow` both fail against the previous implementation and pass after the repair.
 
+## Named strategy library for v2.0.5
+
+The scoring selector is a dropdown with immutable Default/Aggressive choices, saved custom rules with independent Modify controls, and Create custom last. The custom-only editor requires a name and scoring parameters; persisted entries expose a red Delete action. Names and parameters survive Activity recreation, and custom rules persist in Room v5. Catalog changes never rewrite copied game/round rules. Saving a profile and applying it to the chosen setup/round commit atomically. Name validation rejects blank-looking, reserved and duplicate names without losing entered values.
+
+`CustomStrategyUiTest` covers dropdown order, immutable built-ins, name validation, recreate/reopen, modify/delete cancellation, and active-game isolation. `SavedStrategyRepositoryTest`, `ScoringMigrationTest`, and `ScoringStrategyTest` cover atomic rollback, durable catalog changes, legacy snapshots and safe named-rule encoding. Existing setup and strategy tests now use dropdown controls; the test helper skips hidden duplicate header controls.
+
 ## Accepted legacy limitation
 
 A malformed v1 database with mixed-case reserved table names such as `Game_Players` can fail recovery. The owner chose fresh installation over further migration edge-case work. The implemented and tested original 4/6/7-column recovery paths remain available.

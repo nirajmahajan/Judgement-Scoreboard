@@ -89,24 +89,26 @@ public final class SetupFlowRegressionTest {
 
     @Test public void playerStrategyChoicesShowDetailsPersistAndReturnFromCustomEditor() {
         newGame();
-        onView(withId(R.id.setup_strategy_default)).check(matches(isChecked()));
-        onView(withId(R.id.default_strategy_info)).perform(click());
+        onView(withId(R.id.setup_strategy_choices)).check(matches(withText(R.string.strategy_default))).perform(click());
+        onView(withContentDescription(R.string.default_strategy_info)).perform(click());
         awaitView(withText(org.hamcrest.Matchers.containsString(context.getString(R.string.strategy_default_rules))));
         androidx.test.espresso.Espresso.pressBack();
-        onView(withId(R.id.setup_strategy_aggressive)).perform(click());
+        onView(withId(R.id.setup_strategy_choices)).perform(click());
+        onView(withId(R.id.strategy_aggressive)).perform(click());
         awaitState(state -> ScoringStrategy.decode(state.draft.scoringConfig).preset == ScoringStrategy.Preset.AGGRESSIVE);
-        awaitView(allOf(withId(R.id.setup_strategy_aggressive), isChecked()));
+        awaitView(allOf(withId(R.id.setup_strategy_choices), withText(R.string.strategy_aggressive)));
         scenario.recreate();
-        awaitView(allOf(withId(R.id.setup_strategy_aggressive), isChecked()));
+        awaitView(allOf(withId(R.id.setup_strategy_choices), withText(R.string.strategy_aggressive)));
+        onView(withId(R.id.setup_strategy_choices)).perform(click());
         onView(withId(R.id.create_custom_strategy)).perform(click());
-        awaitView(allOf(withId(R.id.strategy_custom), isChecked()));
+        awaitView(withId(R.id.strategy_name));
+        onView(withId(R.id.strategy_name)).perform(replaceText("Evening rules"), closeSoftKeyboard());
         onView(withId(R.id.strategy_zero)).perform(replaceText("7"), closeSoftKeyboard());
         clickId(R.id.primary_action);
         awaitState(state -> ScoringStrategy.decode(state.draft.scoringConfig).preset == ScoringStrategy.Preset.CUSTOM);
         awaitView(allOf(withId(R.id.screen_title), withText(R.string.setup_players)));
         assertEquals(7L, ScoringStrategy.decode(repository.snapshot().draft.scoringConfig).zeroReward);
-        onView(withId(R.id.setup_strategy_default)).check(matches(org.hamcrest.Matchers.not(isChecked())));
-        onView(withId(R.id.setup_strategy_aggressive)).check(matches(org.hamcrest.Matchers.not(isChecked())));
+        onView(withId(R.id.setup_strategy_choices)).check(matches(withText("Evening rules")));
     }
 
     @Test public void savedPlayerPlusCreatesProfileWithoutAddingItToTheGame() {

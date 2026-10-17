@@ -34,5 +34,11 @@ public interface ScoreDao {
     @Insert long insertSavedPlayer(Records.SavedPlayer player);
     @Update void updateSavedPlayer(Records.SavedPlayer player);
     @Query("DELETE FROM saved_players WHERE id=:id") void deleteSavedPlayer(long id);
+    @Query("SELECT * FROM saved_strategies ORDER BY nameKey,id") List<Records.SavedStrategy> savedStrategies();
+    @Query("SELECT * FROM saved_strategies WHERE id=:id") Records.SavedStrategy savedStrategy(long id);
+    @Query("SELECT * FROM saved_strategies WHERE nameKey=:key LIMIT 1") Records.SavedStrategy savedStrategyByKey(String key);
+    @Insert long insertSavedStrategy(Records.SavedStrategy strategy);
+    @Update void updateSavedStrategy(Records.SavedStrategy strategy);
+    @Query("DELETE FROM saved_strategies WHERE id=:id") void deleteSavedStrategy(long id);
     @Query("SELECT * FROM legacy_recovery ORDER BY id") List<Records.RecoveryRow> recovery();
 }

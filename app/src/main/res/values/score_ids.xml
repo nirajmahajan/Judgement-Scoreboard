@@ -12,4 +12,6 @@
     <item name="round_scoring_help" type="id"/><item name="play_again" type="id"/>
     <item name="delete_saved_players" type="id"/>
     <item name="resume_game" type="id"/>
+    <item name="strategy_name" type="id"/><item name="delete_strategy" type="id"/>
+    <item name="create_custom_strategy" type="id"/>
 </resources>

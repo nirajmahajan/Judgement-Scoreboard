@@ -23,3 +23,7 @@ The AndroidX foundation repaired blocking legacy Back callback and icon-tint err
 Debug Lint passed with zero errors and 83 warnings, without a baseline. Current detector counts replace the older foundation counts above: AndroidGradlePluginVersion 1, GradleDependency 14, UnusedAttribute 2, PluralsCandidate 5, DrawAllocation 2, UnusedResources 51, SetTextI18n 3, RtlSymmetry 2, NotifyDataSetChanged 1, Overdraw 1, AlwaysShowAction 1.
 
 Version advisories, upgrade attributes, English arithmetic templates and bounded graph allocations retain the dispositions above. Unused resources are retained historical labels/icons/layouts; removing them is outside this UX repair. SetTextI18n covers bounded numeric/score labels in this English app. RtlSymmetry concerns existing compact name-column end padding; RTL layout/name cases remain covered. The remaining full-list notification is a bounded roster snapshot replacement, not a selection update. The screen's background draw and always-visible replay action are deliberate. No detector is suppressed to hide these findings. New row-delete controls have static and player-specific runtime accessibility labels.
+
+## v2.0.5 strategy library
+
+Debug Lint passed with zero errors and 85 warnings. The detector counts are unchanged from the focused UX pass except UnusedResources 53, SetTextI18n 2, and AlwaysShowAction 2. The added always-visible action is the requested red Delete button for persisted custom strategies. Unused historical radio/info resources remain harmless; no baseline or detector suppression was added.

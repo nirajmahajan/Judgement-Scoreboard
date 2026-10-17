@@ -44,4 +44,10 @@
     <string name="edit_custom_strategy">Custom · Edit</string>
     <string name="default_strategy_info">Default scoring details</string>
     <string name="aggressive_strategy_info">Aggressive scoring details</string>
+    <string name="strategy_dropdown_description">Scoring strategy: %1$s. Show choices</string>
+    <string name="strategy_name">Strategy name</string>
+    <string name="modify_strategy">Modify</string>
+    <string name="modify_named_strategy">Modify %1$s</string>
+    <string name="delete_strategy">Delete strategy</string>
+    <string name="delete_strategy_message">Remove %1$s from saved strategies? Existing games and completed rounds keep their scoring rules.</string>
 </resources>

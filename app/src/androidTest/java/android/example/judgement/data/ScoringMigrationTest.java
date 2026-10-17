@@ -12,6 +12,38 @@ import org.junit.runner.RunWith;
 
 @RunWith(AndroidJUnit4.class)
 public class ScoringMigrationTest {
+    @Test public void versionFourUpgradePreservesUnnamedCustomSnapshotsAndStartsWithEmptyCatalog() {
+        Context context = ApplicationProvider.getApplicationContext();
+        String name = "named-scoring-migration-" + System.nanoTime();
+        SupportSQLiteOpenHelper helper = new FrameworkSQLiteOpenHelperFactory().create(
+                SupportSQLiteOpenHelper.Configuration.builder(context).name(name)
+                        .callback(new SupportSQLiteOpenHelper.Callback(4) {
+                            @Override public void onCreate(SupportSQLiteDatabase db) {
+                                ScoreDatabase.MIGRATION_1_2.migrate(db);
+                                ScoreDatabase.MIGRATION_2_3.migrate(db);
+                                ScoreDatabase.MIGRATION_3_4.migrate(db);
+                                db.execSQL("INSERT INTO games(id,status,direction,trumpMode,maximumCards,dealerId,createdAt,scoringConfig) VALUES(1,'DRAFT','ASCENDING','CUSTOM',0,NULL,100,'v1|CUSTOM|7|11|2|1')");
+                                db.execSQL("INSERT INTO saved_players VALUES(41,'Alpha','alpha')");
+                            }
+                            @Override public void onUpgrade(SupportSQLiteDatabase db, int old, int target) { throw new AssertionError(); }
+                        }).build());
+        helper.getWritableDatabase(); helper.close();
+        ScoreDatabase database = ScoreDatabase.open(context, name);
+        ScoreRepository repository = new ScoreRepository(database);
+        try {
+            Snapshot snapshot = repository.snapshot();
+            assertEquals(5, database.getOpenHelper().getReadableDatabase().getVersion());
+            assertEquals("v1|CUSTOM|7|11|2|1", snapshot.draft.scoringConfig);
+            assertTrue(snapshot.savedStrategies.isEmpty());
+            assertEquals("Alpha", snapshot.savedPlayers.get(0).name);
+            long savedId = repository.saveCustomStrategy(0, "New table",
+                    android.example.judgement.domain.ScoringStrategy.custom(1, 2, 3, false));
+            assertTrue(savedId > 0);
+            assertEquals(1, repository.snapshot().savedStrategies.size());
+            assertEquals("v1|CUSTOM|7|11|2|1", repository.snapshot().draft.scoringConfig);
+        } finally { repository.close(); context.deleteDatabase(name); }
+    }
+
     @Test public void versionThreeUpgradeKeepsCompletedDefaultScoresManualAdjustmentsAndPartialCurrentRound() {
         Context context = ApplicationProvider.getApplicationContext();
         String name = "scoring-migration-" + System.nanoTime();
@@ -43,7 +75,7 @@ public class ScoringMigrationTest {
         ScoreRepository repository = new ScoreRepository(database);
         try {
             Snapshot snapshot = repository.snapshot();
-            assertEquals(4, database.getOpenHelper().getReadableDatabase().getVersion());
+            assertEquals(5, database.getOpenHelper().getReadableDatabase().getVersion());
             assertEquals(15, snapshot.total(12)); assertEquals(0, snapshot.total(11));
             assertEquals(Records.DEFAULT_SCORING, snapshot.game.scoringConfig);
             assertNull(snapshot.game.pendingScoringConfig);

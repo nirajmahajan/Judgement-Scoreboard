@@ -17,7 +17,7 @@ import java.util.List;
 
 @Database(entities = {Records.Game.class, Records.GamePlayer.class, Records.Round.class,
         Records.RoundPlayer.class, Records.ScoreAdjustment.class, Records.SavedPlayer.class,
-        Records.RecoveryRow.class, Records.RoundEdit.class}, version = 4, exportSchema = true)
+        Records.RecoveryRow.class, Records.RoundEdit.class, Records.SavedStrategy.class}, version = 5, exportSchema = true)
 public abstract class ScoreDatabase extends RoomDatabase {
     public static final String NAME = "player-database";
     public abstract ScoreDao dao();
@@ -25,7 +25,7 @@ public abstract class ScoreDatabase extends RoomDatabase {
     public static ScoreDatabase open(Context context) { return open(context, NAME); }
     public static ScoreDatabase open(Context context, String name) {
         return Room.databaseBuilder(context.getApplicationContext(), ScoreDatabase.class, name)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build();
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build();
     }
 
     public static final Migration MIGRATION_1_2 = new Migration(1, 2) {
@@ -54,12 +54,19 @@ public abstract class ScoreDatabase extends RoomDatabase {
         }
     };
 
+    public static final Migration MIGRATION_4_5 = new Migration(4, 5) {
+        @Override public void migrate(@NonNull SupportSQLiteDatabase db) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS saved_strategies (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, nameKey TEXT NOT NULL, scoringConfig TEXT NOT NULL)");
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_saved_strategies_nameKey ON saved_strategies(nameKey)");
+        }
+    };
+
     private static void isolateConflictingLegacyTables(SupportSQLiteDatabase db) {
         List<String> names = new ArrayList<>();
         try (Cursor cursor = db.query("SELECT name FROM sqlite_master WHERE type='table'")) {
             while (cursor.moveToNext()) names.add(cursor.getString(0));
         }
-        String[] reserved = {"games", "game_players", "rounds", "round_players", "score_adjustments", "saved_players", "legacy_recovery", "round_edits"};
+        String[] reserved = {"games", "game_players", "rounds", "round_players", "score_adjustments", "saved_players", "legacy_recovery", "round_edits", "saved_strategies"};
         for (String original : reserved) {
             if (!names.contains(original)) continue;
             String destination = "legacy_source_" + original;
