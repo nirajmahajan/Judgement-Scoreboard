@@ -35,6 +35,8 @@ public class ReviewFlowRegressionTest {
     }
     @After public void cleanup() throws Exception {
         if (controller != null) controller.pause().stop().destroy();
+        for (android.app.Dialog dialog : org.robolectric.shadows.ShadowDialog.getShownDialogs())
+            if (dialog.isShowing()) dialog.dismiss();
         worker.shutdown(); worker.awaitTermination(10, TimeUnit.SECONDS);
     }
     void launch() throws Exception {
@@ -66,6 +68,66 @@ public class ReviewFlowRegressionTest {
     RecyclerView.Adapter content() {
         return ((ConcatAdapter)((RecyclerView)activity.findViewById(R.id.screen_list)).getAdapter()).getAdapters().get(1);
     }
+    @Test public void replayingSnapshotBeforeFormOnShowKeepsOneWindowAndPreservesEdits() throws Exception {
+        launch();
+        org.robolectric.shadows.ShadowDialog.reset();
+        FormRequest request = new FormRequest(FormRequest.Kind.ADD_SAVED,
+                "Alexandra Catherine Montgomery", false, 0, 0, 0, 0, 0);
+        model.beginForm(request);
+        android.app.Dialog original = org.robolectric.shadows.ShadowDialog.getLatestDialog();
+        assertNotNull(original);
+        // No looper drain here: Dialog.OnShow is still queued while the second observer runs.
+        replaySnapshot(); replaySnapshot();
+        assertEquals("Concurrent observers share one form window", 1, showingDialogCount());
+        assertSame(original, org.robolectric.shadows.ShadowDialog.getLatestDialog());
+        layout();
+        EditText input = original.findViewById(R.id.edit_value);
+        assertEquals(request.text, input.getText().toString());
+        input.setText("Alexandra updated before saving");
+        replaySnapshot(); layout();
+        assertEquals(1, showingDialogCount());
+        assertEquals("Alexandra updated before saving", input.getText().toString());
+        assertEquals("Alexandra updated before saving", model.form().text);
+        controller.pause().stop().destroy(); controller = null;
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        assertEquals("Activity destruction dismisses every form window", 0, showingDialogCount());
+    }
+
+    @Test public void replacingFormBeforeOnShowKeepsTheNewOwnerAndClosesEveryOldWindow() throws Exception {
+        launch();
+        org.robolectric.shadows.ShadowDialog.reset();
+        FormRequest old = new FormRequest(FormRequest.Kind.ADD_SAVED, "First request", false, 0, 0, 0, 0, 0);
+        FormRequest replacement = new FormRequest(FormRequest.Kind.SEARCH, "Second request", false, 0, 0, 0, 0, 0);
+        model.beginForm(old);
+        android.app.Dialog previous = org.robolectric.shadows.ShadowDialog.getLatestDialog();
+        model.beginForm(replacement); replaySnapshot();
+        android.app.Dialog current = org.robolectric.shadows.ShadowDialog.getLatestDialog();
+        assertNotSame(previous, current);
+        assertFalse("The old form closes before its queued OnShow callback", previous.isShowing());
+        assertEquals(1, showingDialogCount());
+        layout();
+        assertEquals(replacement.token, model.form().token);
+        EditText input = current.findViewById(R.id.edit_value);
+        assertEquals(replacement.text, input.getText().toString());
+        input.setText("New owner keeps this query");
+        replaySnapshot(); layout();
+        assertEquals(replacement.token, model.form().token);
+        assertEquals("New owner keeps this query", model.form().text);
+        assertEquals(1, showingDialogCount());
+        controller.pause().stop().destroy(); controller = null;
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        assertEquals(0, showingDialogCount());
+    }
+
+    @SuppressWarnings("unchecked")
+    private void replaySnapshot() {
+        ((androidx.lifecycle.MutableLiveData<Snapshot>) model.state).setValue(model.state.getValue());
+    }
+    private static long showingDialogCount() {
+        return org.robolectric.shadows.ShadowDialog.getShownDialogs().stream()
+                .filter(android.app.Dialog::isShowing).count();
+    }
+
     @Test public void newGameCompletionNavigatesTheRecreatedActivity() throws Exception {
         launch();
         completeAfterRecreation(() -> clickFooter(R.id.primary_action));

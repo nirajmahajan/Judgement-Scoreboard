@@ -548,6 +548,9 @@ public class FeatureUiRegressionTest {
     }
     private void searchSaved(String query) {
         Espresso.openActionBarOverflowOrOptionsMenu(context);
+        // API 36 can attach the popup root after the overflow action has returned.
+        // Wait for that one opening; do not tap again or retry a failed selection.
+        awaitView(withText(R.string.search_saved));
         onView(withText(R.string.search_saved)).perform(click()); enter(query); save();
     }
     private static void toggleSaved(String name) {

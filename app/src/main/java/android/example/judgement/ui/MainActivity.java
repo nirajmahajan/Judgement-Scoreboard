@@ -1089,14 +1089,14 @@ public final class MainActivity extends AppCompatActivity {
             if (previous != null) previous.dismiss();
             return;
         }
+        if (destroyingForms || isFinishing() || isDestroyed()) return;
         if (inputDialog != null && request.token.equals(activeFormToken)) {
             updateFormControls(request);
             return;
         }
-        if (inputDialog != null) {
-            activeFormToken = null;
-            inputDialog.dismiss();
-        }
+        AlertDialog previous = inputDialog;
+        inputDialog = null; inputError = null; activeFormToken = null;
+        if (previous != null) previous.dismiss();
         activeFormToken = request.token;
         String heading = getString(formHeading(request.kind));
         boolean number = request.kind == FormRequest.Kind.BID || request.kind == FormRequest.Kind.SCORE;
@@ -1121,9 +1121,15 @@ public final class MainActivity extends AppCompatActivity {
         scrollingForm.addOnLayoutChangeListener(revealError);
         input.setMaxLines(number ? 1 : 6);
         AlertDialog dialog = new MaterialAlertDialogBuilder(this).setTitle(heading).setView(scrollingForm).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, null).setNeutralButton(R.string.use_saved_player, null).create();
+        // Register ownership before show(): several lifecycle observers can restore the
+        // same form before Android delivers the asynchronous OnShow callback.
+        inputDialog = dialog; inputError = field;
         dialog.setOnShowListener(ignored -> {
-            inputError = field;
-            inputDialog = dialog;
+            FormRequest shown = model.form();
+            if (inputDialog != dialog || destroyingForms || shown == null
+                    || !request.token.equals(shown.token)) {
+                dialog.dismiss(); return;
+            }
             input.addTextChangedListener(new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) { }
                 @Override public void onTextChanged(CharSequence text, int start, int before, int count) {
@@ -1142,14 +1148,15 @@ public final class MainActivity extends AppCompatActivity {
                     input.requestFocus();
                 }
             });
-            updateFormControls(request);
+            updateFormControls(shown);
         });
         dialog.setOnDismissListener(ignored -> {
             field.removeOnLayoutChangeListener(revealError);
             scrollingForm.removeOnLayoutChangeListener(revealError);
-            if (!destroyingForms && !isChangingConfigurations()
-                    && request.token.equals(activeFormToken)) model.finishForm(request.token);
-            if (inputDialog == dialog) { inputError = null; inputDialog = null; activeFormToken = null; }
+            if (inputDialog != dialog) return;
+            boolean owned = request.token.equals(activeFormToken);
+            inputError = null; inputDialog = null; activeFormToken = null;
+            if (owned && !destroyingForms && !isChangingConfigurations()) model.finishForm(request.token);
         });
         dialog.show();
         if (dialog.getWindow() != null) dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
@@ -1167,7 +1174,8 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void updateFormControls(FormRequest request) {
-        if (inputDialog == null || !request.token.equals(activeFormToken)) return;
+        if (inputDialog == null || !inputDialog.isShowing() || inputError == null
+                || !request.token.equals(activeFormToken)) return;
         inputError.setError(request.error);
         if (request.error != null) revealFormError(inputError);
         inputDialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(!model.submittingForm(request.token));

@@ -169,7 +169,9 @@ public class FormLifecycleTest {
 
     private void awaitForm() {
         await(() -> currentForm() != null);
-        onView(withId(R.id.edit_value)).check(matches(isDisplayed()));
+        // The form state is ready before Android finishes attaching/focusing its window.
+        onView(withId(R.id.edit_value)).inRoot(androidx.test.espresso.matcher.RootMatchers.isDialog())
+                .check(matches(isDisplayed()));
         assertNotNull(currentForm());
     }
 

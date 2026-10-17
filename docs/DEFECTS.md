@@ -63,6 +63,8 @@ Saved players now have independent per-row delete buttons, including already-add
 
 The broader CI suite also exposed D42: Aggressive secondary text had 4.29:1 contrast on its darkest light-theme container. v2.0.4 darkens that text slightly to meet the existing 4.5:1 minimum. `StrategyAppearanceTest` checks the actual text/container roles in both themes.
 
+The API 36 full-run exposed D43: concurrent lifecycle observers could create duplicate form windows before the asynchronous OnShow callback registered ownership. The Activity now owns its dialog before showing it, rejects stale callbacks, and dismisses only its own window. `replayingSnapshotBeforeFormOnShowKeepsOneWindowAndPreservesEdits` and `replacingFormBeforeOnShowKeepsTheNewOwnerAndClosesEveryOldWindow` both fail against the previous implementation and pass after the repair.
+
 ## Accepted legacy limitation
 
 A malformed v1 database with mixed-case reserved table names such as `Game_Players` can fail recovery. The owner chose fresh installation over further migration edge-case work. The implemented and tested original 4/6/7-column recovery paths remain available.

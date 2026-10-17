@@ -612,9 +612,12 @@ public final class StrategyUiRegressionTest {
     private void enter(int id,String value) { onView(withId(id)).perform(reveal(),replaceText(value),closeSoftKeyboard()); }
     private void clickId(int id) {
         Matcher<View> visible = org.hamcrest.Matchers.allOf(withId(id), androidx.test.espresso.matcher.ViewMatchers.isDisplayed());
-        try { onView(visible).check(androidx.test.espresso.assertion.ViewAssertions.matches(
-                androidx.test.espresso.matcher.ViewMatchers.isDisplayed())); }
-        catch (androidx.test.espresso.NoMatchingViewException missing) {
+        AtomicReference<Boolean> attached = new AtomicReference<>(false);
+        scenario.onActivity(activity -> {
+            View target = activity.findViewById(id);
+            attached.set(target != null && androidx.test.espresso.matcher.ViewMatchers.isDisplayed().matches(target));
+        });
+        if (!attached.get()) {
             onView(withId(R.id.screen_list)).perform(findAndClick(withId(id))); return;
         }
         onView(visible).perform(reveal(), click());

@@ -42,6 +42,7 @@ if new_key:
 - Saved-player selection stays in place; each saved name has its own delete button. Removing a saved name preserves game participants and scores.
 - Dealer and result selections stay in place; taps on names work.
 - Prediction keyboards keep the player list usable; Aggressive text meets the contrast check.
+- Restored forms keep one dialog window and preserve edits during rotation.
 - Clearer scoring validation and consistent rounds, cards, hands, and prediction wording.
 
 Download **judgement-scoreboard.apk** below. Requires Android 8 or later.
