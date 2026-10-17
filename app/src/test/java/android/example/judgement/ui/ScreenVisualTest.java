@@ -302,17 +302,59 @@ public class ScreenVisualTest {
         capture("scoreboard_navigation_font_200_320");
     }
 
+    @Test public void requiredSetupPromptsKeepSixNamesTogether() throws Exception {
+        seedEnglishSetup(false); launch(false, false, false); open("PLAYERS", "ROUND");
+        showFooter(); activity.findViewById(R.id.primary_action).performClick(); layout();
+        assertEquals("SETUP_DIRECTION", model.screen()); capture("setup_deal_order_320");
+        activity.findViewById(R.id.deal_order_descending).performClick();
+        await(() -> "SETUP_DEALER".equals(model.screen())); layout();
+        RecyclerView list = activity.findViewById(R.id.screen_list);
+        assertEquals(6, contentAdapter(list).getItemCount());
+        for (int index = 0; index < 6; index++) {
+            View row = list.findViewHolderForAdapterPosition(contentOffset(list) + index).itemView;
+            android.widget.RadioButton choice = row.findViewById(R.id.dealer_choice_radio);
+            assertFalse("A dealer must be chosen explicitly", choice.isChecked()); assertFullyVisible(choice);
+        }
+        capture("setup_dealer_320");
+    }
+
+    @Test public void savedPlayersShowOnlyCompactCheckboxRowsAndBottomAddAction() throws Exception {
+        seedEnglishSetup(true); launch(false, false, false); open("SAVED", "ROUND");
+        RecyclerView list = activity.findViewById(R.id.screen_list);
+        for (int index : new int[]{0, 2}) {
+            View row = list.findViewHolderForAdapterPosition(contentOffset(list) + index).itemView;
+            row.findViewById(R.id.saved_player_checkbox).performClick(); layout();
+        }
+        View add = activity.findViewById(R.id.primary_action);
+        assertTrue(add.isEnabled()); assertFullyVisible(add);
+        assertEquals(6, contentAdapter(list).getItemCount());
+        assertEquals(0, model.state.getValue().draftPlayers.size());
+        capture("saved_players_picker_320");
+    }
+
+    private void seedEnglishSetup(boolean profiles) throws Exception {
+        databaseWorker.submit(() -> {
+            try (ScoreRepository repository = new ScoreRepository(context)) {
+                List<PlayerSpec> players = new ArrayList<>();
+                for (String name : Arrays.asList("Alice", "Benjamin Alexander", "Charlie", "David", "Emma", "Frank")) {
+                    if (profiles) repository.addSavedPlayer(name); else players.add(new PlayerSpec(name));
+                }
+                repository.saveDraft(new DraftSpec(0, players, "ASCENDING", "CUSTOM", null));
+            }
+        }).get(10, TimeUnit.SECONDS);
+    }
+
     @Test public void savedLibraryPreservesCommonPrefixesAndUnicode() throws Exception {
         launch(true, false, false);
         open("SAVED", "ROUND");
         RecyclerView list = activity.findViewById(R.id.screen_list);
-        assertEquals(4, contentAdapter(list).getItemCount());
-        for (int row = 1; row < 4; row++) {
+        assertEquals(3, contentAdapter(list).getItemCount());
+        for (int row = 0; row < 3; row++) {
             scrollTo(row);
             RecyclerView.ViewHolder holder = list.findViewHolderForAdapterPosition(row + contentOffset(list));
             assertNotNull(holder);
-            assertCompleteText(holder.itemView.findViewById(R.id.row_name));
-            assertRowLayout(holder.itemView);
+            assertSingleLineNameData(holder.itemView.findViewById(R.id.row_name));
+            assertFullyVisible(holder.itemView.findViewById(R.id.saved_player_checkbox));
         }
         capture("saved_players_common_prefix_320");
     }
@@ -345,7 +387,7 @@ public class ScreenVisualTest {
 
     @Test public void keyboardSizedDialogKeepsErrorTextAndSaveReachable() throws Exception {
         launch(true, false, false);
-        open("SAVED", "ROUND");
+        open("SAVED_MANAGE", "ROUND");
         showFooter();
         activity.findViewById(R.id.primary_action).performClick();
         Shadows.shadowOf(Looper.getMainLooper()).idle();

@@ -12,6 +12,9 @@ import static androidx.test.espresso.matcher.ViewMatchers.isChecked;
 import static androidx.test.espresso.matcher.ViewMatchers.isClickable;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
+import static androidx.test.espresso.matcher.ViewMatchers.withContentDescription;
+import static androidx.test.espresso.matcher.ViewMatchers.hasSibling;
+import static androidx.test.espresso.matcher.ViewMatchers.isEnabled;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.*;
@@ -77,7 +80,7 @@ public class FeatureUiRegressionTest {
     }
 
     @Test public void savedLibraryCrudRejectsCanonicalDuplicateAndKeepsInvalidText() {
-        launch(); clickLabel(R.string.saved_players);
+        launch(); openSavedManagement();
         addSaved("Élodie");
         long profileId = inspector.snapshot().savedPlayers.get(0).id;
         clickId(R.id.primary_action);
@@ -88,13 +91,13 @@ public class FeatureUiRegressionTest {
         awaitView(withText("This name already has a saved player. Use the existing profile."));
         assertEquals(1, inspector.snapshot().savedPlayers.size());
         clickLabel(R.string.cancel);
-        rowAction(1, text(R.string.rename));
+        rowAction(0, text(R.string.rename));
         enter("Élodie with a longer complete name"); save();
         awaitState(s -> s.savedPlayers.get(0).name.equals("Élodie with a longer complete name"));
         assertEquals(profileId, inspector.snapshot().savedPlayers.get(0).id);
-        rowAction(1, text(R.string.remove)); clickLabel(R.string.cancel);
+        rowAction(0, text(R.string.remove)); clickLabel(R.string.cancel);
         assertEquals(1, inspector.snapshot().savedPlayers.size());
-        rowAction(1, text(R.string.remove)); clickDialogPositive();
+        rowAction(0, text(R.string.remove)); clickDialogPositive();
         awaitState(s -> s.savedPlayers.isEmpty());
         try (ScoreRepository reopened = new ScoreRepository(context)) {
             assertTrue(reopened.snapshot().savedPlayers.isEmpty());
@@ -132,7 +135,7 @@ public class FeatureUiRegressionTest {
         assertNull(inspector.snapshot().draftPlayers.get(0).savedPlayerId);
         assertEquals(Long.valueOf(inspector.snapshot().savedPlayers.get(0).id),
                 inspector.snapshot().draftPlayers.get(1).savedPlayerId);
-        clickId(R.id.primary_action); awaitView(withText(R.string.setup_settings)); assertScreenStartsAtTop();
+        completeSetupChoices(); assertScreenStartsAtTop();
         clickId(R.id.primary_action); awaitView(withId(R.id.bottom_navigation));
         option(R.string.new_game);
         awaitState(s -> s.draft != null);
@@ -178,15 +181,18 @@ public class FeatureUiRegressionTest {
         launch(); clickLabel(R.string.continue_setup);
         awaitView(withText(R.string.setup_players));
         clickId(R.id.quick_add);
-        awaitView(withText(R.string.already_added));
-        assertRowActionEnabled(1, text(R.string.add_selected), false);
-        assertRowActionEnabled(4, text(R.string.add_selected), false);
-        rowAction(0, text(R.string.search_saved)); enter("car"); save();
-        awaitRowCount(2);
-        rowAction(1, text(R.string.add_selected));
-        rowAction(0, text(R.string.search_saved)); enter(""); save();
-        awaitRowCount(5);
-        rowAction(2, text(R.string.add_selected));
+        awaitView(allOf(withId(R.id.saved_player_checkbox), hasSibling(withText("Alice"))));
+        onView(allOf(withId(R.id.saved_player_checkbox), hasSibling(withText("Alice"))))
+                .check(matches(allOf(not(isEnabled()), withContentDescription("Alice, " + text(R.string.already_added)))));
+        onView(allOf(withId(R.id.saved_player_checkbox), hasSibling(withText("Table conflict"))))
+                .check(matches(allOf(not(isEnabled()), withContentDescription("Table conflict, " + text(R.string.name_conflict)))));
+        searchSaved("car");
+        awaitRowCount(1);
+        toggleSaved("Carol");
+        searchSaved("");
+        awaitRowCount(4);
+        onView(allOf(withId(R.id.saved_player_checkbox), hasSibling(withText("Carol")))).check(matches(isChecked()));
+        toggleSaved("Bob");
         clickId(R.id.primary_action);
         awaitState(s -> s.draftPlayers.size() == 4);
         List<Long> linked = new ArrayList<>();
@@ -279,12 +285,11 @@ public class FeatureUiRegressionTest {
         option(R.string.manage_players);
         rowAction(1, text(R.string.remove));
         awaitRowCount(2);
-        assertRowText(1, context.getString(R.string.seat_dealer_format, 2));
         assertEquals(removed, inspector.snapshot().round.dealerId);
         clickLabel(R.string.choose_dealer);
-        rowAction(0, text(R.string.choose_dealer));
+        onView(allOf(withId(R.id.dealer_choice_radio), hasSibling(withText("Player C")))).check(matches(isChecked()));
+        onView(allOf(withId(R.id.dealer_choice_radio), hasSibling(withText("Player A")))).perform(click());
         awaitView(withText(R.string.manage_players));
-        assertRowText(0, context.getString(R.string.seat_dealer_format, 1));
         clickId(R.id.primary_action); clickDialogPositive();
         awaitState(s -> s.round.id != original.round.id && s.players.size() == 2);
         Snapshot applied = inspector.snapshot();
@@ -302,8 +307,7 @@ public class FeatureUiRegressionTest {
         assertUnchangedRound(original);
         addGamePlayer("New player A"); awaitState(s -> s.draftPlayers.size() == 1);
         addGamePlayer("New player B"); awaitState(s -> s.draftPlayers.size() == 2);
-        clickId(R.id.primary_action);
-        awaitView(withText(R.string.setup_settings)); assertScreenStartsAtTop();
+        completeSetupChoices(); assertScreenStartsAtTop();
         clickId(R.id.primary_action);
         awaitView(withText(R.string.replace_game_title)); clickLabel(R.string.cancel);
         assertUnchangedRound(original);
@@ -324,7 +328,7 @@ public class FeatureUiRegressionTest {
                 new PlayerSpec("Original setup A"), new PlayerSpec("Original setup B")),
                 "ASCENDING", "FIXED", null));
         launch(); clickLabel(R.string.continue_setup);
-        clickId(R.id.primary_action); awaitView(withText(R.string.setup_settings)); assertScreenStartsAtTop();
+        completeSetupChoices(); assertScreenStartsAtTop();
         clickId(R.id.primary_action); awaitView(withText(R.string.replace_game_title));
         ScoreViewModel model = activityModel();
         AtomicLong replacementDraft = new AtomicLong();
@@ -353,7 +357,7 @@ public class FeatureUiRegressionTest {
         inspector.addSavedPlayer("Selected saved profile");
         inspector.saveDraft(new DraftSpec(0, new ArrayList<>(), "ASCENDING", "FIXED", null));
         launch(); clickLabel(R.string.continue_setup); clickId(R.id.quick_add);
-        rowAction(1, text(R.string.add_selected));
+        toggleSaved("Selected saved profile");
         ScoreViewModel model = activityModel();
         CountDownLatch blocked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -389,10 +393,10 @@ public class FeatureUiRegressionTest {
                 "ASCENDING", "FIXED", null));
         inspector.startGame(draft); completeRound();
         Snapshot original = inspector.snapshot();
-        launch(); clickLabel(R.string.saved_players);
-        rowAction(1, text(R.string.rename)); enter("Renamed saved profile"); save();
+        launch(); openSavedManagement();
+        rowAction(0, text(R.string.rename)); enter("Renamed saved profile"); save();
         awaitState(s -> s.savedPlayers.get(0).name.equals("Renamed saved profile"));
-        rowAction(1, text(R.string.remove)); clickDialogPositive();
+        rowAction(0, text(R.string.remove)); clickDialogPositive();
         awaitState(s -> s.savedPlayers.isEmpty());
         Snapshot after = inspector.snapshot();
         assertEquals(original.players.get(0).id, after.players.get(0).id);
@@ -506,7 +510,34 @@ public class FeatureUiRegressionTest {
         }
     }
     private static void clickId(int id) {
-        onView(withId(R.id.screen_list)).perform(clickInList(withId(id)));
+        Matcher<View> visible = allOf(withId(id), isDisplayed());
+        try { onView(visible).check(matches(isDisplayed())); }
+        catch (androidx.test.espresso.NoMatchingViewException missing) {
+            onView(withId(R.id.screen_list)).perform(clickInList(withId(id))); return;
+        }
+        onView(visible).perform(click());
+    }
+    private void openSavedManagement() {
+        clickLabel(R.string.saved_players);
+        Espresso.openActionBarOverflowOrOptionsMenu(context);
+        onView(withText(R.string.manage_saved_players)).perform(click());
+    }
+    private void searchSaved(String query) {
+        Espresso.openActionBarOverflowOrOptionsMenu(context);
+        onView(withText(R.string.search_saved)).perform(click()); enter(query); save();
+    }
+    private static void toggleSaved(String name) {
+        onView(allOf(withId(R.id.saved_player_checkbox), hasSibling(withText(name)))).perform(click());
+    }
+    private void completeSetupChoices() {
+        clickId(R.id.primary_action);
+        awaitView(allOf(withId(R.id.screen_title), withText(R.string.choose_deal_order)));
+        clickId(R.id.deal_order_ascending);
+        awaitView(allOf(withId(R.id.screen_title), withText(R.string.choose_dealer)));
+        List<Records.GamePlayer> players = inspector.snapshot().draftPlayers;
+        onView(allOf(withId(R.id.dealer_choice_radio), hasSibling(withText(players.get(players.size() - 1).name))))
+                .perform(click());
+        awaitView(allOf(withId(R.id.screen_title), withText(R.string.setup_settings)));
     }
     private static ViewAction clickInList(Matcher<View> target) {
         return new ViewAction() {
@@ -628,16 +659,6 @@ public class FeatureUiRegressionTest {
             }
         }));
     }
-    private static void assertRowActionEnabled(int position, String label, boolean enabled) {
-        onView(withId(R.id.screen_list)).perform(RecyclerViewActions.actionOnItemAtPosition(position + 1, new ViewAction() {
-            @Override public Matcher<View> getConstraints() { return isAssignableFrom(View.class); }
-            @Override public String getDescription() { return "check selectable row action " + label; }
-            @Override public void perform(UiController controller, View row) {
-                View button = findText(row, label, true); assertNotNull(button);
-                assertEquals(enabled, button.isEnabled());
-            }
-        }));
-    }
     private static void assertRowText(int position, String label) {
         onView(withId(R.id.screen_list)).perform(RecyclerViewActions.actionOnItemAtPosition(position + 1, new ViewAction() {
             @Override public Matcher<View> getConstraints() { return isAssignableFrom(View.class); }
@@ -697,6 +718,8 @@ public class FeatureUiRegressionTest {
     }
     private static View findText(View view, String label, boolean clickable) {
         if (view instanceof TextView && (!clickable || view.isClickable()) && label.contentEquals(((TextView) view).getText())) return view;
+        if (clickable && view.isClickable() && view.getContentDescription() != null
+                && view.getContentDescription().toString().startsWith(label + " ")) return view;
         if (view instanceof ViewGroup) {
             ViewGroup group = (ViewGroup) view;
             for (int i = 0; i < group.getChildCount(); i++) {

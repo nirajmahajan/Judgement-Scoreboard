@@ -134,6 +134,8 @@ public class ScoringHistoryRepositoryTest {
         Snapshot replay = repository.snapshot();
         assertEquals(draftId, replay.draft.id);
         assertEquals(ScoringStrategy.aggressive().encode(), replay.draft.scoringConfig);
+        assertEquals("CUSTOM", replay.draft.trumpMode);
+        assertEquals("FIXED", replay.game.trumpMode);
         assertNull(replay.draft.pendingScoringConfig);
         assertEquals(finished.game.id, replay.game.id);
         assertEquals(1, replay.history.size());
@@ -156,9 +158,10 @@ public class ScoringHistoryRepositoryTest {
         assertEquals(2, replay.draftPlayers.size()); assertEquals("Second renamed", replay.draftPlayers.get(0).name);
         assertEquals("Linked", replay.draftPlayers.get(1).name);
         assertNull(replay.draftPlayers.get(1).savedPlayerId);
-        assertEquals(Long.valueOf(replay.draftPlayers.get(0).id), replay.draft.dealerId);
+        assertNull("Play again requires a fresh dealer choice", replay.draft.dealerId);
         for (Records.GamePlayer player : replay.draftPlayers) for (Records.GamePlayer old : active.players) assertNotEquals(old.id, player.id);
         assertTrue(replay.savedPlayers.isEmpty());
+        repository.chooseDraftDealer(replayId, replay.draftPlayers.get(0).id);
         repository.startGame(replayId);
         assertEquals(1, repository.snapshot().round.number);
         assertTrue(repository.snapshot().history.isEmpty());

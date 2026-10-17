@@ -169,7 +169,7 @@ public final class StrategyUiRegressionTest {
         launch("GAME");
         assertTrue(text(R.id.screen_description).contains("game ended"));
         clickId(R.id.play_again);
-        await(() -> repository.snapshot().draft!=null && screen().equals("SETTINGS"));
+        await(() -> repository.snapshot().draft!=null && screen().equals("PLAYERS"));
         Snapshot replay=repository.snapshot();
         assertEquals(completed.game.id,replay.game.id); assertEquals(completed.totals,replay.totals);
         assertEquals(completed.history.size(),replay.history.size());
@@ -178,6 +178,12 @@ public final class StrategyUiRegressionTest {
         assertEquals(26,replay.draftPlayers.size());
         for(int i=0;i<26;i++) assertEquals(completed.players.get(i).name,replay.draftPlayers.get(i).name);
         assertTrue(hasAppearance(true));
+        clickId(R.id.primary_action); await(() -> screen().equals("SETUP_DIRECTION"));
+        clickId(R.id.deal_order_descending); await(() -> screen().equals("SETUP_DEALER"));
+        onView(withId(R.id.screen_list)).perform(findAndClick(org.hamcrest.Matchers.allOf(
+                withId(R.id.dealer_choice_radio), androidx.test.espresso.matcher.ViewMatchers.hasSibling(
+                        withText(replay.draftPlayers.get(replay.draftPlayers.size()-1).name)))));
+        await(() -> screen().equals("SETTINGS"));
         clickId(R.id.primary_action); onView(withText(R.string.cancel)).perform(click());
         assertEquals(completed.game.id,repository.snapshot().game.id);
     }

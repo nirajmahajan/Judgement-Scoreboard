@@ -155,7 +155,7 @@ public final class ScoreRepository implements AutoCloseable {
                 if ("DRAFT".equals(other.status)) { other.status = "DISCARDED"; dao.updateGame(other); }
             }
             Records.Game draft = new Records.Game();
-            draft.direction = source.direction; draft.trumpMode = source.trumpMode;
+            draft.direction = source.direction; draft.trumpMode = "CUSTOM";
             draft.scoringConfig = source.scoringConfig; draft.createdAt = System.currentTimeMillis();
             draft.id = dao.insertGame(draft);
             List<PlayerSpec> specs = new ArrayList<>();
@@ -164,8 +164,8 @@ public final class ScoreRepository implements AutoCloseable {
                         ? player.savedPlayerId : null;
                 specs.add(new PlayerSpec(-player.id, player.name, profile));
             }
-            List<Records.GamePlayer> stored = applyPlayers(draft.id, specs);
-            draft.dealerId = source.dealerId == null ? null : resolveDealer(specs, stored, -source.dealerId);
+            applyPlayers(draft.id, specs);
+            draft.dealerId = null;
             dao.updateGame(draft);
             return draft.id;
         });

@@ -1,0 +1,21 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical">
+    <LinearLayout android:id="@+id/saved_player_picker_body"
+        android:layout_width="match_parent" android:layout_height="48dp"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:background="?attr/selectableItemBackground"
+        android:importantForAccessibility="no">
+        <CheckBox android:id="@+id/saved_player_checkbox"
+            android:layout_width="48dp" android:layout_height="48dp"
+            android:gravity="center" android:padding="0dp" />
+        <TextView android:id="@id/row_name"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="match_parent" android:gravity="center_vertical"
+            android:paddingEnd="8dp" android:singleLine="true" android:ellipsize="end"
+            android:textAppearance="?attr/textAppearanceBodyLarge"
+            android:importantForAccessibility="no" />
+    </LinearLayout>
+    <View android:layout_width="match_parent" android:layout_height="1dp"
+        android:background="?attr/colorOutlineVariant" />
+</LinearLayout>

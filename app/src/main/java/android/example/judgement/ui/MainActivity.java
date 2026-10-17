@@ -53,7 +53,7 @@ public final class MainActivity extends AppCompatActivity {
     private BottomNavigationView navigation;
     private ScoreAdapter adapter;
     private BidAdapter bids;
-    private LinearLayout bidShortcuts;
+    private LinearLayout fixedActions;
     private boolean biddingColumns;
     private RosterAdapter roster;
     private StrategyEditor strategyEditor;
@@ -69,6 +69,7 @@ public final class MainActivity extends AppCompatActivity {
     private final List<FooterAction> footerActions = new ArrayList<>();
     private String renderedScreen = "";
     private String pickerReturn = "SETTINGS";
+    private String savedManageReturn = "SAVED";
     private TextInputLayout inputError;
     private AlertDialog inputDialog;
     private String activeFormToken;
@@ -83,6 +84,7 @@ public final class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         if (savedInstanceState != null) {
             pickerReturn = savedInstanceState.getString("pickerReturn", "SETTINGS");
+            savedManageReturn = savedInstanceState.getString("savedManageReturn", "SAVED");
             search = savedInstanceState.getString("search", "");
             long[] selected = savedInstanceState.getLongArray("selectedProfiles");
             if (selected != null) for (long id : selected) selectedProfiles.add(id);
@@ -117,7 +119,7 @@ public final class MainActivity extends AppCompatActivity {
             toolbar.setOverflowIcon(overflow);
         }
         navigation = findViewById(R.id.bottom_navigation);
-        bidShortcuts = findViewById(R.id.bid_shortcuts);
+        fixedActions = findViewById(R.id.fixed_actions);
         adapter = new ScoreAdapter(); setContent(adapter);
         model = new ViewModelProvider(this).get(ScoreViewModel.class);
         navigation.setOnItemSelectedListener(item -> {
@@ -154,7 +156,7 @@ public final class MainActivity extends AppCompatActivity {
     }
     @Override protected void onSaveInstanceState(Bundle outState) {
         outState.putBoolean("aggressiveAppearance", aggressiveAppearance);
-        outState.putString("pickerReturn", pickerReturn); outState.putString("search", search);
+        outState.putString("savedManageReturn", savedManageReturn); outState.putString("pickerReturn", pickerReturn); outState.putString("search", search);
         long[] selected = new long[selectedProfiles.size()]; int i = 0; for (long id : selectedProfiles) selected[i++] = id;
         outState.putLongArray("selectedProfiles", selected);
         super.onSaveInstanceState(outState);
@@ -179,7 +181,9 @@ public final class MainActivity extends AppCompatActivity {
         else if ("SCORING_HELP".equals(screen)) open(model.scoringHelpReturn());
         else if ("MANAGE".equals(screen)) {
             confirm(R.string.discard_title, R.string.discard_message, R.string.discard, () -> open("GAME"));
-        } else if ("SETTINGS".equals(screen)) open("PLAYERS");
+        } else if ("SETTINGS".equals(screen) || "SETUP_DIRECTION".equals(screen)) open("PLAYERS");
+        else if ("SETUP_DEALER".equals(screen)) open("SETUP_DIRECTION");
+        else if ("SAVED_MANAGE".equals(screen)) open(savedManageReturn);
         else if ("PICK_DEALER".equals(screen)) open(pickerReturn);
         else if ("QUICK_ADD".equals(screen)) open(pickerReturn);
         else if ("RESTORE".equals(screen)) open("MANAGE");
@@ -202,7 +206,7 @@ public final class MainActivity extends AppCompatActivity {
         }
         footerActions.clear();
         tableDetailLabel = 0; rosterColumns = false; biddingColumns = false;
-        bidShortcuts.setVisibility(View.GONE);
+        fixedActions.setVisibility(View.GONE);
         boolean game = "GAME".equals(screen);
         navigation.setVisibility(game ? View.VISIBLE : View.GONE);
         toolbar.getMenu().clear();
@@ -217,16 +221,19 @@ public final class MainActivity extends AppCompatActivity {
         switch (screen) {
             case "PLAYERS": players(false); break;
             case "MANAGE": players(true); break;
+            case "SETUP_DIRECTION": setupDirection(); break;
+            case "SETUP_DEALER": pickDealer(true); break;
             case "SETTINGS": settings(); break;
             case "SCORING": scoring(); break;
             case "SCORING_HELP": scoringHelp(); break;
             case "ROUND_DETAILS": roundDetails(); break;
             case "ROUND_EDIT": editHistoricalRound(); break;
             case "STATISTICS": statistics(); break;
-            case "PICK_DEALER": pickDealer(); break;
+            case "PICK_DEALER": pickDealer(false); break;
             case "PICK_SCORE": pickScore(); break;
             case "RESTORE": restorePlayers(); break;
             case "SAVED": savedPlayers(false); break;
+            case "SAVED_MANAGE": manageSavedPlayers(); break;
             case "QUICK_ADD": savedPlayers(true); break;
             case "HELP": header(getString(R.string.help_title), ""); rows(new ScoreAdapter.Row(1, getString(R.string.help_title), getString(R.string.help_body))); break;
             case "RECOVERY": recovery(); break;
@@ -345,13 +352,13 @@ public final class MainActivity extends AppCompatActivity {
         if (state.game != null) rows.add(new ScoreAdapter.Row(1, getString("COMPLETE".equals(state.game.status) ? R.string.completed_results : R.string.resume_game), "")
                 .action(getString("COMPLETE".equals(state.game.status) ? R.string.completed_results : R.string.resume_game), () -> open("GAME")));
         if (state.draft != null) rows.add(new ScoreAdapter.Row(2, getString(R.string.continue_setup), "").action(getString(R.string.continue_setup), () -> open("PLAYERS")));
-        rows.add(new ScoreAdapter.Row(3, getString(R.string.saved_players), "").action(getString(R.string.saved_players), () -> open("SAVED")));
+        rows.add(new ScoreAdapter.Row(3, getString(R.string.saved_players), "").action(getString(R.string.saved_players), () -> { selectedProfiles.clear(); search = ""; open("SAVED"); }));
         rows.add(new ScoreAdapter.Row(4, getString(R.string.help), "").action(getString(R.string.help), () -> open("HELP")));
         if (!state.recoveries.isEmpty()) rows.add(new ScoreAdapter.Row(5, getString(R.string.recovery_title), "").action(getString(R.string.recovery_title), () -> open("RECOVERY")));
         rows(rows);
         action(R.string.new_game, R.id.primary_action, () -> {
             if (state.draft != null) { open("PLAYERS"); return; }
-            model.run(() -> model.repository.saveDraft(new DraftSpec(0, new ArrayList<>(), "ASCENDING", "FIXED", null)), "PLAYERS");
+            model.run(() -> model.repository.saveDraft(new DraftSpec(0, new ArrayList<>(), "ASCENDING", "CUSTOM", null)), "PLAYERS");
         });
     }
     private List<PlayerSpec> draftPlayers() {
@@ -406,10 +413,7 @@ public final class MainActivity extends AppCompatActivity {
         } else action(R.string.next_settings, R.id.primary_action, () -> {
             try {
                 GameRules.validatePlayerCount(state.draftPlayers.size());
-                if (state.draft.dealerId == null) {
-                    long draftId = state.draft.id, dealerId = state.draftPlayers.get(state.draftPlayers.size() - 1).id;
-                    model.run(() -> model.repository.chooseDraftDealer(draftId, dealerId), "SETTINGS");
-                } else open("SETTINGS");
+                model.beginSetup(state.draft.id, setupRosterSignature());
             }
             catch (IllegalArgumentException exception) { model.error.setValue(exception.getMessage()); }
         });
@@ -448,6 +452,9 @@ public final class MainActivity extends AppCompatActivity {
                         .action(getString(R.string.choose_dealer), () -> { pickerReturn = "SETTINGS"; open("PICK_DEALER"); }));
         action(R.string.start_game, R.id.primary_action, () -> {
             long draftId = state.draft.id;
+            if (!model.setupConfirmed(draftId, setupRosterSignature())) {
+                model.beginSetup(draftId, setupRosterSignature()); return;
+            }
             Runnable start = () -> model.run(() -> model.repository.startGame(draftId), "GAME", "ROUND");
             if (state.game != null) confirm(R.string.replace_game_title, R.string.replace_game_message, R.string.start_game, start); else start.run();
         });
@@ -516,7 +523,7 @@ public final class MainActivity extends AppCompatActivity {
         if (("SCORING".equals(screen) || ("SCORING_HELP".equals(screen) && "SCORING".equals(model.scoringHelpReturn()))) && editing != null) {
             if (editing.preset == ScoringStrategy.Preset.AGGRESSIVE) strategy = ScoringStrategy.aggressive();
         } else if ("SCORING_HELP".equals(screen) && model.scoringHelpConfig() != null) strategy = ScoringStrategy.decode(model.scoringHelpConfig());
-        else if (state.draft != null && ("PLAYERS".equals(screen) || "SETTINGS".equals(screen)
+        else if (state.draft != null && ("PLAYERS".equals(screen) || "SETTINGS".equals(screen) || "SETUP_DIRECTION".equals(screen) || "SETUP_DEALER".equals(screen)
                 || (("PICK_DEALER".equals(screen) || "QUICK_ADD".equals(screen)) && !"MANAGE".equals(pickerReturn)))) {
             strategy = ScoringStrategy.decode(state.draft.scoringConfig);
         } else if (state.game != null && ("GAME".equals(screen) || "MANAGE".equals(screen)
@@ -533,26 +540,37 @@ public final class MainActivity extends AppCompatActivity {
         long draftId = state.draft.id;
         model.run(() -> model.repository.updateDraftSettings(draftId, direction, trump));
     }
-    private void pickDealer() {
+    private String setupRosterSignature() {
+        StringBuilder signature = new StringBuilder();
+        for (Records.GamePlayer player : state.draftPlayers) signature.append(player.id).append(',');
+        return signature.toString();
+    }
+    private void setupDirection() {
+        if (state.draft == null) { open("PLAYERS"); return; }
+        header(getString(R.string.choose_deal_order), ""); rows(new ArrayList<ScoreAdapter.Row>());
+        long draftId = state.draft.id; String signature = setupRosterSignature();
+        action(R.string.start_one_card, R.id.deal_order_ascending,
+                () -> model.chooseSetupDirection(draftId, signature, "ASCENDING"));
+        action(R.string.start_max_cards, R.id.deal_order_descending,
+                () -> model.chooseSetupDirection(draftId, signature, "DESCENDING"));
+    }
+    private void pickDealer(boolean required) {
         header(getString(R.string.choose_dealer), "");
-        boolean manage = "MANAGE".equals(pickerReturn);
+        boolean manage = !required && "MANAGE".equals(pickerReturn);
+        if (!manage && state.draft == null) { open("PLAYERS"); return; }
         List<PlayerSpec> players = manage ? model.staged() : draftPlayers();
-        List<ScoreAdapter.Row> rows = new ArrayList<>();
-        for (int i = 0; i < players.size(); i++) {
-            PlayerSpec player = players.get(i);
-            rows.add(new ScoreAdapter.Row(player.id, player.name, getString(R.string.seat_format, i + 1)).action(getString(R.string.choose_dealer), () -> {
-                if (manage) { model.stagedDealer(player.id); open("MANAGE"); }
-                else {
-                    long draftId = state.draft.id;
-                    model.run(() -> model.repository.chooseDraftDealer(draftId, player.id), "SETTINGS");
-                }
-            }));
-        }
-        rows(rows);
+        Long selected = required ? null : manage ? model.stagedDealer() : state.draft.dealerId;
+        long draftId = manage ? 0 : state.draft.id;
+        String signature = manage ? "" : setupRosterSignature();
+        setContent(new DealerChoiceAdapter(players, selected, playerId -> {
+            if (manage) { model.stagedDealer(playerId); open("MANAGE"); }
+            else if (required) model.chooseSetupDealer(draftId, signature, playerId);
+            else model.run(() -> model.repository.chooseDraftDealer(draftId, playerId), "SETTINGS");
+        }));
     }
     private String playerName(List<Records.GamePlayer> players, Long id) {
         if (id != null) for (Records.GamePlayer player : players) if (player.id == id) return player.name;
-        return players.isEmpty() ? "" : players.get(players.size() - 1).name;
+        return getString(R.string.dealer_not_selected);
     }
     private void game() {
         boolean completed = "COMPLETE".equals(state.game.status);
@@ -560,7 +578,7 @@ public final class MainActivity extends AppCompatActivity {
             action(R.string.statistics_title, R.id.final_statistics, () -> open("STATISTICS"));
             long gameId = state.game.id;
             action(R.string.play_again, R.id.play_again, () -> model.run(
-                    () -> model.repository.playAgain(gameId), "SETTINGS"));
+                    () -> model.repository.playAgain(gameId), "PLAYERS"));
         }
         if ("SCOREBOARD".equals(model.tab())) { scoreboard(); return; }
         if ("HISTORY".equals(model.tab())) { history(); return; }
@@ -587,7 +605,7 @@ public final class MainActivity extends AppCompatActivity {
         }
         if (bids == null) bids = new BidAdapter(model, this::render);
         bids.submit(round.id, round.dealerId, state.roundPlayers, firstMissing); setContent(bids);
-        bidShortcuts.removeAllViews(); bidShortcuts.setVisibility(View.VISIBLE);
+        fixedActions.removeAllViews(); fixedActions.setVisibility(View.VISIBLE);
         Records.RoundPlayer current = firstMissing < state.roundPlayers.size() ? state.roundPlayers.get(firstMissing) : null;
         int[] ids = {R.id.quick_bid_0, R.id.quick_bid_1, R.id.quick_bid_2, R.id.quick_bid_3};
         for (int value = 0; current != null && value <= 3; value++) {
@@ -602,13 +620,13 @@ public final class MainActivity extends AppCompatActivity {
             if (current != null) button.setOnClickListener(view -> model.submitInlineBid(round.id, current.playerId, Integer.toString(bid)));
             LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(0, dp(56), 1);
             if (value < 3) layout.setMarginEnd(dp(6));
-            bidShortcuts.addView(button, layout);
+            fixedActions.addView(button, layout);
         }
         if (current == null) {
             MaterialButton record = new MaterialButton(this);
             record.setId(R.id.primary_action); record.setText(R.string.record_bids);
             record.setOnClickListener(view -> model.run(() -> model.repository.recordBids(round.id)));
-            bidShortcuts.addView(record, new LinearLayout.LayoutParams(-1, dp(56)));
+            fixedActions.addView(record, new LinearLayout.LayoutParams(-1, dp(56)));
         }
     }
     private void bidDialog(Records.Round round, Records.RoundPlayer player) {
@@ -784,7 +802,7 @@ public final class MainActivity extends AppCompatActivity {
         }).show();
     }
     private void newSetup() {
-        if (state.draft == null) model.run(() -> model.repository.saveDraft(new DraftSpec(0, new ArrayList<>(), "ASCENDING", "FIXED", null)), "PLAYERS");
+        if (state.draft == null) model.run(() -> model.repository.saveDraft(new DraftSpec(0, new ArrayList<>(), "ASCENDING", "CUSTOM", null)), "PLAYERS");
         else open("PLAYERS");
     }
     private void applyRoster() {
@@ -837,50 +855,78 @@ public final class MainActivity extends AppCompatActivity {
         rows(rows);
     }
     private void savedPlayers(boolean picker) {
-        header(getString(picker ? R.string.quick_add : R.string.saved_players), state.savedPlayers.isEmpty() ? getString(R.string.no_saved_players) : "");
-        List<ScoreAdapter.Row> rows = new ArrayList<>();
-        rows.add(new ScoreAdapter.Row(Long.MIN_VALUE, getString(R.string.search_saved), search)
-                .action(getString(R.string.search_saved), () -> model.beginForm(new FormRequest(
-                        FormRequest.Kind.SEARCH, search, false, 0, 0, 0, 0, 0))));
-        String query;
-        try { query = Names.key(search); } catch (IllegalArgumentException blankQuery) { query = ""; }
+        header(getString(R.string.saved_players), state.savedPlayers.isEmpty() ? getString(R.string.no_saved_players) : "");
         boolean stagedPicker = picker && "MANAGE".equals(pickerReturn);
         List<PlayerSpec> currentPlayers = stagedPicker ? model.staged() : draftPlayers();
-        for (Records.SavedPlayer player : state.savedPlayers) {
-            if (!player.nameKey.contains(query)) continue;
+        String query;
+        try { query = Names.key(search); } catch (IllegalArgumentException blank) { query = ""; }
+        List<SavedPlayerPickerAdapter.Item> items = new ArrayList<>();
+        Set<Long> eligible = new HashSet<>();
+        for (Records.SavedPlayer profile : state.savedPlayers) {
             boolean present = false, conflict = false;
             for (PlayerSpec current : currentPlayers) {
-                present |= current.savedPlayerId != null && current.savedPlayerId == player.id;
-                conflict |= Names.key(current.name).equals(player.nameKey);
+                present |= current.savedPlayerId != null && current.savedPlayerId == profile.id;
+                conflict |= Names.key(current.name).equals(profile.nameKey);
             }
-            ScoreAdapter.Row row = new ScoreAdapter.Row(player.id, player.name, picker && (present || conflict) ? getString(present ? R.string.already_added : R.string.name_conflict) : "");
-            if (picker) {
-                boolean selected = selectedProfiles.contains(player.id);
-                row.action((selected ? "✓ " : "") + getString(R.string.add_selected), !present && !conflict, () -> {
-                    if (!selectedProfiles.add(player.id)) selectedProfiles.remove(player.id); render();
-                });
-            } else {
-                row.action(getString(R.string.rename), () -> model.beginForm(new FormRequest(
-                        FormRequest.Kind.RENAME_SAVED, player.name, false, 0, player.id, 0, 0, 0)));
-                row.action(getString(R.string.remove), () -> confirm(R.string.delete_profile_title, R.string.delete_profile_message, R.string.remove,
-                        () -> model.run(() -> model.repository.removeSavedPlayer(player.id))));
-            }
-            rows.add(row);
+            boolean enabled = !present && !conflict;
+            if (enabled) eligible.add(profile.id);
+            if (profile.nameKey.contains(query)) items.add(new SavedPlayerPickerAdapter.Item(profile.id, profile.name,
+                    selectedProfiles.contains(profile.id) && enabled, enabled,
+                    enabled ? "" : getString(present ? R.string.already_added : R.string.name_conflict)));
         }
-        rows(rows);
-        if (picker) action(R.string.add_selected, R.id.primary_action, () -> {
+        selectedProfiles.retainAll(eligible);
+        SavedPlayerPickerAdapter pickerAdapter = new SavedPlayerPickerAdapter(profileId -> {
+            if (!selectedProfiles.add(profileId)) selectedProfiles.remove(profileId); render();
+        });
+        pickerAdapter.submit(items); setContent(pickerAdapter);
+        toolbar.getMenu().add(android.view.Menu.NONE, R.id.search_saved_action, 0, R.string.search_saved)
+                .setOnMenuItemClickListener(item -> {
+                    model.beginForm(new FormRequest(FormRequest.Kind.SEARCH, search, false, 0, 0, 0, 0, 0)); return true;
+                });
+        toolbar.getMenu().add(android.view.Menu.NONE, R.id.manage_saved_action, 1, R.string.manage_saved_players)
+                .setOnMenuItemClickListener(item -> { savedManageReturn = picker ? "QUICK_ADD" : "SAVED"; open("SAVED_MANAGE"); return true; });
+        fixedActions.removeAllViews(); fixedActions.setVisibility(View.VISIBLE);
+        MaterialButton add = new MaterialButton(this); add.setId(R.id.primary_action); add.setText(R.string.add_selected);
+        add.setEnabled(!selectedProfiles.isEmpty());
+        add.setOnClickListener(view -> {
             List<Long> selected = new ArrayList<>(selectedProfiles);
             if (stagedPicker) {
                 List<PlayerSpec> players = model.staged();
-                for (Records.SavedPlayer profile : state.savedPlayers) if (selectedProfiles.contains(profile.id)) players.add(new PlayerSpec(-System.nanoTime(), profile.name, profile.id));
+                for (Records.SavedPlayer profile : state.savedPlayers) if (selectedProfiles.contains(profile.id))
+                    players.add(new PlayerSpec(-System.nanoTime(), profile.name, profile.id));
                 if (players.size() > 52) { model.error.setValue("A game supports at most 52 players."); return; }
                 model.stage(players); open("MANAGE");
-            } else {
+            } else if (state.draft != null) {
                 long draftId = state.draft.id;
                 model.run(() -> model.repository.addSavedPlayersToDraft(draftId, selected), "PLAYERS");
+            } else {
+                List<PlayerSpec> players = new ArrayList<>();
+                for (Records.SavedPlayer profile : state.savedPlayers) if (selectedProfiles.contains(profile.id))
+                    players.add(new PlayerSpec(0, profile.name, profile.id));
+                model.run(() -> model.repository.saveDraft(new DraftSpec(0, players, "ASCENDING", "CUSTOM", null)), "PLAYERS");
             }
-        }).setEnabled(!selectedProfiles.isEmpty());
-        else action(R.string.add_saved, R.id.primary_action, () -> model.beginForm(new FormRequest(
+        });
+        fixedActions.addView(add, new LinearLayout.LayoutParams(-1, dp(56)));
+    }
+    private void manageSavedPlayers() {
+        header(getString(R.string.manage_saved_players), state.savedPlayers.isEmpty() ? getString(R.string.no_saved_players) : "");
+        toolbar.getMenu().add(android.view.Menu.NONE, R.id.search_saved_action, 0, R.string.search_saved)
+                .setOnMenuItemClickListener(item -> {
+                    model.beginForm(new FormRequest(FormRequest.Kind.SEARCH, search, false, 0, 0, 0, 0, 0)); return true;
+                });
+        String query;
+        try { query = Names.key(search); } catch (IllegalArgumentException blank) { query = ""; }
+        List<ScoreAdapter.Row> profiles = new ArrayList<>();
+        for (Records.SavedPlayer profile : state.savedPlayers) {
+            if (!profile.nameKey.contains(query)) continue;
+            profiles.add(new ScoreAdapter.Row(profile.id, profile.name, "")
+                    .action(getString(R.string.rename), () -> model.beginForm(new FormRequest(
+                            FormRequest.Kind.RENAME_SAVED, profile.name, false, 0, profile.id, 0, 0, 0)))
+                    .action(getString(R.string.remove), () -> confirm(R.string.delete_profile_title, R.string.delete_profile_message,
+                            R.string.remove, () -> model.run(() -> model.repository.removeSavedPlayer(profile.id)))));
+        }
+        rows(profiles);
+        action(R.string.add_saved, R.id.primary_action, () -> model.beginForm(new FormRequest(
                 FormRequest.Kind.ADD_SAVED, "", false, 0, 0, 0, 0, 0)));
     }
     private void recovery() {

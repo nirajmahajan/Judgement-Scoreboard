@@ -35,6 +35,47 @@ public final class ScoreViewModel extends AndroidViewModel {
         state = repository.observe();
     }
     public interface Command { void run(); }
+    void beginSetup(long draftId, String roster) {
+        saved.set("setupDraft", draftId); saved.set("setupRoster", roster);
+        saved.set("setupDirectionChosen", false); saved.set("setupConfirmed", false);
+        screen("SETUP_DIRECTION");
+    }
+    boolean setupConfirmed(long draftId, String roster) {
+        Long owner = saved.get("setupDraft");
+        return owner != null && owner == draftId && roster.equals(saved.get("setupRoster"))
+                && Boolean.TRUE.equals(saved.get("setupConfirmed"));
+    }
+    void chooseSetupDirection(long draftId, String roster, String direction) {
+        setupChoice(draftId, roster, () -> repository.updateDraftSettings(draftId, direction, null), false);
+    }
+    void chooseSetupDealer(long draftId, String roster, long dealerId) {
+        if (!Boolean.TRUE.equals(saved.get("setupDirectionChosen"))) { screen("SETUP_DIRECTION"); return; }
+        setupChoice(draftId, roster, () -> repository.chooseDraftDealer(draftId, dealerId), true);
+    }
+    private void setupChoice(long draftId, String roster, Command command, boolean dealer) {
+        Long owner = saved.get("setupDraft");
+        if (owner == null || owner != draftId || !roster.equals(saved.get("setupRoster"))) {
+            screen("PLAYERS"); error.setValue("The players changed. Finalize the player list again."); return;
+        }
+        String token = "setup:" + draftId;
+        if (!submittingForms.add(token)) return;
+        error.setValue(null);
+        repository.execute(() -> {
+            try {
+                command.run();
+                main.post(() -> {
+                    submittingForms.remove(token);
+                    Long currentOwner = saved.get("setupDraft");
+                    if (currentOwner == null || currentOwner != draftId || !roster.equals(saved.get("setupRoster"))
+                            || !(dealer ? "SETUP_DEALER" : "SETUP_DIRECTION").equals(screen())) return;
+                    saved.set(dealer ? "setupConfirmed" : "setupDirectionChosen", true);
+                    screen(dealer ? "SETTINGS" : "SETUP_DEALER");
+                });
+            } catch (RuntimeException exception) {
+                main.post(() -> { submittingForms.remove(token); error.setValue(exception.getMessage() == null ? "Could not save this choice. Try again." : exception.getMessage()); });
+            }
+        });
+    }
     private Bundle bidInputs(long roundId) {
         Bundle inputs = saved.get("bidInputs");
         if (inputs == null || inputs.getLong("roundId") != roundId) {

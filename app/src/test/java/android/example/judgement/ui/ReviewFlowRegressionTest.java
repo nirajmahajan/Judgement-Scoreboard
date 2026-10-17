@@ -103,7 +103,13 @@ public class ReviewFlowRegressionTest {
 
     @Test public void startingGameNavigatesTheRecreatedActivity() throws Exception {
         prepareGame(false, false);
-        launch(); invoke("open", "SETTINGS");
+        launch(); invoke("open", "PLAYERS");
+        clickFooter(R.id.primary_action); layout();
+        clickFooter(R.id.deal_order_ascending);
+        await(() -> "SETUP_DEALER".equals(model.screen())); layout();
+        RecyclerView list = activity.findViewById(R.id.screen_list);
+        list.findViewHolderForAdapterPosition(2).itemView.findViewById(R.id.dealer_choice_radio).performClick();
+        await(() -> "SETTINGS".equals(model.screen())); layout();
         model.tab("HISTORY");
         completeAfterRecreation(() -> clickFooter(R.id.primary_action));
         assertNotNull(model.state.getValue().game);
@@ -130,7 +136,7 @@ public class ReviewFlowRegressionTest {
         launch(); long completedGame = model.state.getValue().game.id;
         invoke("open", "GAME");
         completeAfterRecreation(() -> clickFooter(R.id.play_again));
-        assertEquals("SETTINGS", field("renderedScreen"));
+        assertEquals("PLAYERS", field("renderedScreen"));
         assertEquals(completedGame, model.state.getValue().game.id);
         assertEquals("COMPLETE", model.state.getValue().game.status);
         assertEquals(2, model.state.getValue().draftPlayers.size());

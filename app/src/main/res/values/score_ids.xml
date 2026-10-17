@@ -1,4 +1,6 @@
 <resources>
+    <item name="deal_order_ascending" type="id"/><item name="deal_order_descending" type="id"/>
+    <item name="search_saved_action" type="id"/><item name="manage_saved_action" type="id"/>
     <item name="quick_bid_0" type="id"/><item name="quick_bid_1" type="id"/>
     <item name="quick_bid_2" type="id"/><item name="quick_bid_3" type="id"/>
     <item name="primary_action" type="id"/><item name="add_player" type="id"/><item name="quick_add" type="id"/>

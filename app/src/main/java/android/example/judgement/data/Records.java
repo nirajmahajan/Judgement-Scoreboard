@@ -16,7 +16,7 @@ public final class Records {
         @PrimaryKey(autoGenerate = true) public long id;
         @NonNull public String status = "DRAFT";
         @NonNull public String direction = "ASCENDING";
-        @NonNull public String trumpMode = "FIXED";
+        @NonNull public String trumpMode = "CUSTOM";
         public int maximumCards;
         public Long dealerId;
         public long createdAt;

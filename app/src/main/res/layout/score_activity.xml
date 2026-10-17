@@ -15,7 +15,7 @@
         android:layout_weight="1" android:clipToPadding="false"
         android:paddingHorizontal="16dp" android:paddingBottom="16dp"
         android:scrollbars="vertical" />
-    <LinearLayout android:id="@+id/bid_shortcuts"
+    <LinearLayout android:id="@+id/fixed_actions"
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="horizontal" android:gravity="center_vertical"
         android:paddingHorizontal="16dp" android:paddingVertical="4dp"
