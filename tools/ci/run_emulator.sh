@@ -25,6 +25,7 @@ cleanup() {
   adb pull /sdcard/final-hierarchy.xml ci-artifacts/device/final-hierarchy.xml >/dev/null 2>&1 || true
   adb exec-out screencap -p > ci-artifacts/device/final-screen.png 2>/dev/null || true
   adb pull /sdcard/judgement-test-evidence ci-artifacts/device/test-evidence >/dev/null 2>&1 || true
+  adb pull /sdcard/Android/data/android.example.judgement.debug/files ci-artifacts/device/app-evidence >/dev/null 2>&1 || true
   adb emu kill >/dev/null 2>&1 || true
   kill "$emulator_pid" >/dev/null 2>&1 || true
 }
