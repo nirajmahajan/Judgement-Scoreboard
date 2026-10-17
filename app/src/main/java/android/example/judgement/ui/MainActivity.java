@@ -268,7 +268,7 @@ public final class MainActivity extends AppCompatActivity {
     }
     private int dp(int value) { return Math.round(getResources().getDisplayMetrics().density * value); }
     private void home() {
-        header(getString(R.string.home_title), getString(R.string.home_description));
+        header(getString(R.string.home_title), "");
         List<ScoreAdapter.Row> rows = new ArrayList<>();
         if (state.game != null) rows.add(new ScoreAdapter.Row(1, getString("COMPLETE".equals(state.game.status) ? R.string.completed_results : R.string.resume_game), "")
                 .action(getString("COMPLETE".equals(state.game.status) ? R.string.completed_results : R.string.resume_game), () -> open("GAME")));
