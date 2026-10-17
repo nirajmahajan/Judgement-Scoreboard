@@ -324,18 +324,6 @@ public final class ScoreViewModel extends AndroidViewModel {
     }
     Long historyRoundId() { return saved.get("historyRoundId"); }
     String historyReturn() { String value = saved.get("historyReturn"); return value == null ? "GAME" : value; }
-    Set<Long> comparedPlayers(long gameId, List<Long> defaults) {
-        long[] ids = saved.get("comparedPlayers"); Set<Long> result = new HashSet<>();
-        Long owner = saved.get("comparedGameId");
-        if (ids == null || owner == null || owner != gameId) result.addAll(defaults);
-        else for (long id : ids) result.add(id);
-        return result;
-    }
-    void comparedPlayers(long gameId, Set<Long> selected) {
-        long[] values = new long[selected.size()]; int index = 0;
-        for (long id : selected) values[index++] = id;
-        saved.set("comparedGameId", gameId); saved.set("comparedPlayers", values);
-    }
     Long stagedDealer() { return saved.get("stagedDealer"); }
     void stagedDealer(Long id) { saved.set("stagedDealer", id); }
     Long stagedRoundId() { return saved.get("stagedRoundId"); }

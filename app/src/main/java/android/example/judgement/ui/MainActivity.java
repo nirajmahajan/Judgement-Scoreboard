@@ -60,8 +60,8 @@ public final class MainActivity extends AppCompatActivity {
     private RosterAdapter roster;
     private StrategyEditor strategyEditor;
     private RoundEditorAdapter roundEditor;
-    private StatisticsContentAdapter statisticsAdapter;
-    private Snapshot statisticsSource;
+    private ConcatAdapter finalResultsContent;
+    private ChromeAdapter finalGraphAdapter;
     private boolean aggressiveAppearance, changingAppearance;
     private ChromeAdapter headerAdapter, footerAdapter;
     private RecyclerView.Adapter<?> contentAdapter;
@@ -184,7 +184,6 @@ public final class MainActivity extends AppCompatActivity {
         } else if ("ROUND_EDIT".equals(screen)) {
             confirm(R.string.discard_title, R.string.discard_message, R.string.discard, model::finishRoundEditor);
         } else if ("ROUND_DETAILS".equals(screen)) open(model.historyReturn());
-        else if ("STATISTICS".equals(screen)) open("GAME");
         else if ("SCORING_HELP".equals(screen)) open(model.scoringHelpReturn());
         else if ("MANAGE".equals(screen)) {
             confirm(R.string.discard_title, R.string.discard_message, R.string.discard, () -> open("GAME"));
@@ -201,6 +200,7 @@ public final class MainActivity extends AppCompatActivity {
     }
     private void render() {
         if (state == null || changingAppearance) return;
+        if ("STATISTICS".equals(model.screen())) model.screen("GAME");
         if (updateAppearance()) return;
         String screen = model.screen();
         if ("GAME".equals(screen) && state.game == null) { model.screen("HOME"); screen = "HOME"; }
@@ -209,7 +209,7 @@ public final class MainActivity extends AppCompatActivity {
         if (changed) {
             if (roster != null) { roster.detach(); roster = null; }
             strategyEditor = null;
-            roundEditor = null; statisticsAdapter = null; statisticsSource = null;
+            roundEditor = null; finalResultsContent = null; finalGraphAdapter = null;
             adapter = new ScoreAdapter(); setContent(adapter); renderedScreen = screen;
         }
         footerActions.clear();
@@ -241,7 +241,6 @@ public final class MainActivity extends AppCompatActivity {
             case "SCORING_HELP": scoringHelp(); break;
             case "ROUND_DETAILS": roundDetails(); break;
             case "ROUND_EDIT": editHistoricalRound(); break;
-            case "STATISTICS": statistics(); break;
             case "PICK_DEALER": pickDealer(false); break;
             case "PICK_SCORE": pickScore(); break;
             case "RESTORE": restorePlayers(); break;
@@ -556,7 +555,7 @@ public final class MainActivity extends AppCompatActivity {
                 || (("PICK_DEALER".equals(screen) || "QUICK_ADD".equals(screen)) && !"MANAGE".equals(pickerReturn)))) {
             strategy = ScoringStrategy.decode(state.draft.scoringConfig);
         } else if (state.game != null && ("GAME".equals(screen) || "MANAGE".equals(screen)
-                || "ROUND_DETAILS".equals(screen) || "ROUND_EDIT".equals(screen) || "STATISTICS".equals(screen)
+                || "ROUND_DETAILS".equals(screen) || "ROUND_EDIT".equals(screen)
                 || "PICK_SCORE".equals(screen) || "RESTORE".equals(screen) || "PICK_DEALER".equals(screen)
                 || ("QUICK_ADD".equals(screen) && "MANAGE".equals(pickerReturn)))) {
             strategy = ScoringStrategy.decode(state.round == null ? state.game.scoringConfig : state.round.scoringConfig);
@@ -628,18 +627,22 @@ public final class MainActivity extends AppCompatActivity {
     private void game() {
         boolean completed = "COMPLETE".equals(state.game.status);
         if (completed) {
-            action(R.string.statistics_title, R.id.final_statistics, () -> open("STATISTICS"));
             long gameId = state.game.id;
-            action(R.string.play_again, R.id.play_again, () -> model.run(
-                    () -> model.repository.playAgain(gameId), "PLAYERS"));
+            android.view.MenuItem replay = toolbar.getMenu().add(android.view.Menu.NONE,
+                    R.id.play_again, 0, R.string.play_again);
+            android.text.SpannableString replayLabel = new android.text.SpannableString(getString(R.string.play_again));
+            replayLabel.setSpan(new android.text.style.ForegroundColorSpan(getColor(R.color.score_table_on_header)),
+                    0, replayLabel.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            replay.setTitle(replayLabel);
+            replay.setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_ALWAYS);
+            replay.setOnMenuItemClickListener(item -> {
+                model.run(() -> model.repository.playAgain(gameId), "PLAYERS"); return true;
+            });
         }
         if ("SCOREBOARD".equals(model.tab())) { scoreboard(); return; }
         if ("HISTORY".equals(model.tab())) { history(); return; }
         if (state.round == null || "COMPLETE".equals(state.game.status)) {
-            String detail = getString(R.string.complete_description);
-            if (state.game.pendingScoringConfig != null) detail += "\n\n" + getString(R.string.strategy_pending_ended,
-                    StrategyEditor.label(this, ScoringStrategy.decode(state.game.pendingScoringConfig)));
-            header(getString(R.string.game_complete), detail); scoreboardRows(); return;
+            header(getString(R.string.game_complete), ""); scoreboardRows(); return;
         }
         Records.Round round = state.round;
         String trump = "CUSTOM".equals(state.game.trumpMode) ? "" : getString(R.string.trump_format, getString(new int[]{R.string.spades, R.string.diamonds, R.string.clubs, R.string.hearts}[(round.number - 1) % 4]));
@@ -710,9 +713,27 @@ public final class MainActivity extends AppCompatActivity {
         for (Records.GamePlayer player : players) {
             long total = state.total(player.id); if (previous == null || previous != total) rank++;
             previous = total;
-            rows.add(new ScoreAdapter.Row(player.id, getString(R.string.ranking_format, rank, player.name), player.active ? points(total) : getString(R.string.removed_player_score, points(total))).compactName());
+            rows.add(new ScoreAdapter.Row(player.id, getString(R.string.ranking_format, rank, player.name), player.active ? points(total) : getString(R.string.removed_player_score, points(total))).compactName().legend("COMPLETE".equals(state.game.status)));
         }
-        rows(rows);
+        adapter.submit(rows);
+        if (!"COMPLETE".equals(state.game.status)) { setContent(adapter); return; }
+        if (finalResultsContent == null) {
+            finalGraphAdapter = new ChromeAdapter(R.layout.final_score_graph, this::bindFinalGraph);
+            ConcatAdapter.Config config = new ConcatAdapter.Config.Builder()
+                    .setStableIdMode(ConcatAdapter.Config.StableIdMode.ISOLATED_STABLE_IDS).build();
+            finalResultsContent = new ConcatAdapter(config, adapter, finalGraphAdapter);
+        }
+        setContent(finalResultsContent);
+        finalGraphAdapter.notifyItemChanged(0);
+    }
+    private void bindFinalGraph(View view) {
+        GameStatistics report = GameStatistics.from(state);
+        Set<Long> players = new HashSet<>();
+        for (GameStatistics.PlayerStatistics player : report.players) players.add(player.playerId);
+        ScoreGraphView graph = view.findViewById(R.id.final_score_graph);
+        graph.setData(report, players, ScoreGraphView.Mode.CUMULATIVE, event -> {
+            if (event.kind == GameStatistics.EventKind.ROUND) inspectRound(event.round.roundId, "GAME");
+        });
     }
     private void history() {
         header(getString(R.string.history_tab), state.history.isEmpty() ? getString(R.string.no_history) : "");
@@ -781,32 +802,6 @@ public final class MainActivity extends AppCompatActivity {
             if (current != null && model.previewFor(current) != null) model.previewRound(current, true);
         }).setEnabled(!busy && preview != null);
         action(R.string.cancel, R.id.cancel_historical_round, this::back).setEnabled(!busy);
-    }
-    private void statistics() {
-        if (state.game == null || !"COMPLETE".equals(state.game.status)) {
-            model.screen(state.game == null ? "HOME" : "GAME"); render(); return;
-        }
-        header(getString(R.string.statistics_title), getString(R.string.statistics_round_help));
-        if (statisticsAdapter == null || statisticsSource != state) {
-            statisticsSource = state;
-            GameStatistics report = GameStatistics.from(state);
-            List<Long> defaults = new ArrayList<>();
-            for (GameStatistics.PlayerStatistics player : report.players) if (defaults.size() < 3) defaults.add(player.playerId);
-            long gameId = state.game.id;
-            statisticsAdapter = new StatisticsContentAdapter(this, report, model.comparedPlayers(gameId, defaults),
-                    selected -> model.comparedPlayers(gameId, selected), event -> {
-                        if (event.kind == GameStatistics.EventKind.ROUND) inspectRound(event.round.roundId, "STATISTICS");
-                        else new MaterialAlertDialogBuilder(this).setTitle(R.string.statistics_manual_adjustment)
-                                .setMessage(getString(R.string.adjustment_title, event.adjustment.name) + "\n"
-                                        + getResources().getQuantityString(R.plurals.adjustment_detail,
-                                                Math.addExact(event.adjustment.previousTotal, event.adjustment.delta) == 1 ? 1 : 2,
-                                                event.adjustment.previousTotal,
-                                                Math.addExact(event.adjustment.previousTotal, event.adjustment.delta)))
-                                .setPositiveButton(android.R.string.ok, null).show();
-                    });
-        }
-        setContent(statisticsAdapter);
-        action(R.string.back, R.id.primary_action, () -> open("GAME"));
     }
     private static final class HistoryEntry {
         final long time; final ScoreAdapter.Row row;

@@ -10,7 +10,6 @@ import android.os.SystemClock;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityNodeInfo;
-import androidx.core.view.ViewCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.test.core.app.ActivityScenario;
@@ -29,7 +28,7 @@ import static androidx.test.espresso.action.ViewActions.*;
 import static androidx.test.espresso.matcher.ViewMatchers.*;
 import static org.junit.Assert.*;
 
-/** Native regressions for complete historical proposals, live progress and final graph navigation. */
+/** Native regressions for historical corrections and the combined final table and graph. */
 @RunWith(AndroidJUnit4.class)
 public final class HistoryStatisticsUiRegressionTest {
     private Context context;
@@ -94,50 +93,97 @@ public final class HistoryStatisticsUiRegressionTest {
         assertEquals(1,repository.snapshot().roundEdits.size());
         assertEquals(1,repository.snapshot().history.get(0).round.revision); assertNull(preview());
     }
-    @Test public void denseFinalGraphsKeepSelectionAndOpenEditableRecordedRound() {
+    @Test public void finalTableAndSingleCumulativeGraphKeepAllPlayersAndOpenEditableRound() {
         start(2);
         while(repository.snapshot().round!=null) {
             Snapshot s=repository.snapshot();
             if(s.round.number==14) repository.changeScoringStrategy(s.round.id,ScoringStrategy.aggressive());
             complete();
         }
-        Snapshot complete=repository.snapshot(); assertEquals(26,complete.history.size());
-        launch(true); clickId(R.id.final_statistics); await(() -> screen().equals("STATISTICS"));
-        String excluded=complete.players.get(0).name;
-        clickDescription(context.getString(R.string.statistics_compare_player,excluded));
-        long excludedId=complete.players.get(0).id;
-        scenario.recreate(); await(() -> screen().equals("STATISTICS"));
-        scenario.onActivity(activity -> {
-            ScoreViewModel model=new ViewModelProvider(activity).get(ScoreViewModel.class);
-            assertFalse(model.comparedPlayers(complete.game.id,new ArrayList<>()).contains(excludedId));
-        });
-        // A screen-reader click on the final timeline point uses the same round-inspection path as touch.
+        Snapshot completed=repository.snapshot(); assertEquals(26,completed.history.size());
+        launch(true); assertFinalTableAndGraph(completed);
+        scenario.recreate(); await(() -> screen().equals("GAME"));
+        assertFinalTableAndGraph(completed);
+        // A screen-reader click on the final point opens that recorded round directly from the final screen.
         onView(withId(R.id.screen_list)).perform(findAndAct(isAssignableFrom(ScoreGraphView.class),new ViewAction(){
             public Matcher<View> getConstraints(){return isAssignableFrom(ScoreGraphView.class);}
             public String getDescription(){return "inspect final round through its accessible graph point";}
             public void perform(UiController controller,View view){
+                AccessibilityNodeInfo point=view.getAccessibilityNodeProvider().createAccessibilityNodeInfo(25);
+                assertNotNull(point);
+                String description=point.getContentDescription().toString();
+                assertTrue(description.contains("Round 26"));
+                for(Records.GamePlayer player:completed.players) {
+                    assertTrue("Every player is included in the cumulative graph",description.contains(player.name));
+                    assertTrue(description.contains("cumulative "+completed.total(player.id)+" points"));
+                }
                 assertTrue(view.getAccessibilityNodeProvider().performAction(25,
                         AccessibilityNodeInfo.ACTION_CLICK,null)); controller.loopMainThreadUntilIdle();
             }
         }));
         await(() -> screen().equals("ROUND_DETAILS"));
-        Snapshot.RoundHistory last=complete.history.get(25);
+        Snapshot.RoundHistory last=completed.history.get(25);
         assertEquals(ScoringStrategy.aggressive().encode(),last.round.scoringConfig);
         clickId(R.id.edit_historical_round);
         outcome(last.players.get(0).nameSnapshot,Outcome.WON);
         outcome(last.players.get(1).nameSnapshot,Outcome.LOST);
         clickId(R.id.preview_historical_round); await(() -> preview()!=null);
         clickId(R.id.save_historical_round); await(() -> screen().equals("ROUND_DETAILS"));
-        clickId(R.id.history_back); await(() -> screen().equals("STATISTICS"));
-        GameStatistics report=GameStatistics.from(repository.snapshot());
-        GameStatistics beforeReport=GameStatistics.from(complete);
-        assertEquals(beforeReport.player(last.players.get(0).playerId).exactPredictions+1,
-                report.player(last.players.get(0).playerId).exactPredictions);
-        assertEquals(beforeReport.player(last.players.get(1).playerId).exactPredictions-1,
-                report.player(last.players.get(1).playerId).exactPredictions);
-        assertEquals(1,repository.snapshot().roundEdits.size());
-        scenario.onActivity(activity -> assertFalse(new ViewModelProvider(activity).get(ScoreViewModel.class)
-                .comparedPlayers(complete.game.id,new ArrayList<>()).contains(excludedId)));
+        clickId(R.id.history_back); await(() -> screen().equals("GAME"));
+        Snapshot corrected=repository.snapshot();
+        assertEquals(1,corrected.roundEdits.size());
+        assertEquals(completed.total(last.players.get(0).playerId)+ScoringStrategy.aggressive().points(
+                last.round.cards,0,Outcome.WON),corrected.total(last.players.get(0).playerId));
+        assertEquals(completed.total(last.players.get(1).playerId)-ScoringStrategy.aggressive().points(
+                last.round.cards,0,Outcome.WON),corrected.total(last.players.get(1).playerId));
+        assertFinalTableAndGraph(corrected);
+        scenario.recreate(); await(() -> screen().equals("GAME"));
+        assertFinalTableAndGraph(corrected);
+        onView(withId(R.id.play_again)).perform(click());
+        await(() -> screen().equals("PLAYERS"));
+        assertEquals(completed.players.size(),repository.snapshot().draftPlayers.size());
+        assertEquals("COMPLETE",repository.snapshot().game.status);
+    }
+    private void assertFinalTableAndGraph(Snapshot completed) {
+        scenario.onActivity(activity -> {
+            com.google.android.material.appbar.MaterialToolbar toolbar=activity.findViewById(R.id.toolbar);
+            assertNotNull(toolbar.getMenu().findItem(R.id.play_again));
+            assertTrue(toolbar.getMenu().findItem(R.id.play_again).isVisible());
+        });
+        GameStatistics report=GameStatistics.from(completed);
+        onView(withId(R.id.screen_list)).perform(new ViewAction(){
+            public Matcher<View> getConstraints(){return isAssignableFrom(RecyclerView.class);}
+            public String getDescription(){return "verify final ranking legends followed by one cumulative graph";}
+            public void perform(UiController c,View view){
+                RecyclerView list=(RecyclerView)view;
+                int graphs=0,players=0;
+                for(int i=0;i<list.getAdapter().getItemCount();i++) {
+                    list.scrollToPosition(i); c.loopMainThreadUntilIdle();
+                    RecyclerView.ViewHolder holder=list.findViewHolderForAdapterPosition(i);
+                    assertNotNull(holder);
+                    View root=holder.itemView;
+                    assertNull("No player-selection controls on final results",find(root,isAssignableFrom(
+                            com.google.android.material.checkbox.MaterialCheckBox.class)));
+                    View graph=find(root,isAssignableFrom(ScoreGraphView.class));
+                    if(graph!=null) {
+                        assertEquals("Graph follows every player's final score",report.players.size(),players);
+                        assertTrue(graph.getContentDescription().toString().startsWith("Cumulative score graph"));
+                        graphs++;
+                    }
+                    android.widget.TextView name=root.findViewById(R.id.row_name);
+                    if(name!=null) {
+                        GameStatistics.PlayerStatistics expected=report.players.get(players++);
+                        assertEquals(context.getString(R.string.ranking_format,expected.rank,expected.name),name.getText().toString());
+                        assertNotNull("Each player has a graph color legend",name.getCompoundDrawablesRelative()[0]);
+                        android.widget.TextView score=root.findViewById(R.id.row_detail);
+                        assertEquals(context.getResources().getQuantityString(R.plurals.score_points,
+                                expected.total==1?1:2,expected.total),score.getText().toString());
+                    }
+                }
+                assertEquals(report.players.size(),players);
+                assertEquals("Only the cumulative graph remains",1,graphs);
+            }
+        });
     }
     private void start(int count) {
         List<PlayerSpec> players=new ArrayList<>();

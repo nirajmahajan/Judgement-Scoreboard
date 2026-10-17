@@ -566,36 +566,70 @@ public class ScreenVisualTest {
         assertFixedControlsReachable(); capture("history_editor_font_200_320");
     }
 
-    @Test public void finalStatisticsKeepNamesAndBothGraphsReachable() throws Exception {
-        launch(true, true, false);
+    @Test public void finalTableShowsPlayerLegendsAndOneCumulativeGraph() throws Exception {
+        seedEnglishSetup(false);
         databaseWorker.submit(() -> {
-            while (model.repository.snapshot().round != null) {
-                Snapshot state = model.repository.snapshot();
-                for (Records.RoundPlayer player : state.roundPlayers)
-                    model.repository.submitBid(state.round.id, player.playerId, 0);
-                model.repository.recordBids(state.round.id);
-                for (int i=0;i<state.roundPlayers.size();i++) model.repository.setOutcome(state.round.id,
-                        state.roundPlayers.get(i).playerId, i==0 ? Outcome.LOST : Outcome.WON);
-                model.repository.completeRound(state.round.id);
+            try (ScoreRepository repository = new ScoreRepository(context)) {
+                repository.startGame(repository.snapshot().draft.id);
+                while (repository.snapshot().round != null) {
+                    Snapshot snapshot = repository.snapshot();
+                    int[] actual = new int[snapshot.roundPlayers.size()];
+                    for (int hand = 0; hand < snapshot.round.cards; hand++)
+                        actual[(hand + snapshot.round.number) % actual.length]++;
+                    int missed = 0;
+                    while (actual[missed] == 0) missed++;
+                    for (int index = 0; index < actual.length; index++) repository.submitBid(
+                            snapshot.round.id, snapshot.roundPlayers.get(index).playerId,
+                            actual[index] - (index == missed ? 1 : 0));
+                    repository.recordBids(snapshot.round.id);
+                    for (int index = 0; index < actual.length; index++) repository.setOutcome(
+                            snapshot.round.id, snapshot.roundPlayers.get(index).playerId,
+                            index == missed ? Outcome.LOST : Outcome.WON);
+                    if (snapshot.round.cards == 8) break;
+                    repository.completeRound(snapshot.round.id);
+                }
             }
         }).get(10, TimeUnit.SECONDS);
-        open("STATISTICS", "ROUND");
+        launch(false, false, false); open("GAME", "ROUND");
+        assertEquals("Deal 8 cards", ((TextView) activity.findViewById(R.id.screen_title)).getText().toString());
+        activity.findViewById(R.id.primary_action).performClick();
+        await(() -> "COMPLETE".equals(model.state.getValue().game.status)); layout();
+        assertNull(model.state.getValue().round);
+        assertEquals(8, model.state.getValue().history.size());
+        assertEquals("Game complete", ((TextView) activity.findViewById(R.id.screen_title)).getText().toString());
+        assertNull(model.error.getValue());
+        View replay = activity.findViewById(R.id.play_again);
+        assertFullyVisible(replay);
+        com.google.android.material.appbar.MaterialToolbar toolbar = activity.findViewById(R.id.toolbar);
+        assertNotNull(toolbar.getMenu().findItem(R.id.play_again));
+        android.text.Spanned replayLabel = (android.text.Spanned) toolbar.getMenu().findItem(R.id.play_again).getTitle();
+        android.text.style.ForegroundColorSpan replayColor = replayLabel.getSpans(0, replayLabel.length(),
+                android.text.style.ForegroundColorSpan.class)[0];
+        assertTrue("Top-right action remains readable on the dark header",
+                androidx.core.graphics.ColorUtils.calculateContrast(replayColor.getForegroundColor(),
+                        activity.getColor(R.color.score_table_header)) >= 4.5);
         RecyclerView list = activity.findViewById(R.id.screen_list);
-        int graphs = 0;
-        for (int i=0;i<contentAdapter(list).getItemCount();i++) {
-            scrollTo(i);
-            RecyclerView.ViewHolder holder = list.findViewHolderForAdapterPosition(i+contentOffset(list));
-            assertNotNull(holder);
-            TextView name = holder.itemView.findViewById(R.id.row_name);
-            if (name != null) { assertCompleteText(name); assertRowLayout(holder.itemView); }
-            ScoreGraphView graph = graphIn(holder.itemView);
-            if (graph != null) {
-                graphs++; assertTrue(graph.getHeight() >= dp(280));
-                assertTrue(graph.getAccessibilityNodeProvider().createAccessibilityNodeInfo(-1).getChildCount() > 0);
-                if (graphs==1) capture("final_cumulative_graph_320", activity.getWindow().getDecorView());
-            }
+        ConcatAdapter finalContent = (ConcatAdapter) contentAdapter(list);
+        RecyclerView.Adapter<?> table = finalContent.getAdapters().get(0);
+        assertEquals(6, table.getItemCount());
+        assertEquals(7, finalContent.getItemCount());
+        for (int index = 0; index < table.getItemCount(); index++) {
+            scrollTo(index);
+            TextView name = list.findViewHolderForAdapterPosition(index + contentOffset(list)).itemView.findViewById(R.id.row_name);
+            android.graphics.drawable.GradientDrawable marker = (android.graphics.drawable.GradientDrawable) name.getCompoundDrawablesRelative()[0];
+            assertNotNull(marker);
+            assertEquals(ScoreGraphView.colorForPlayer(table.getItemId(index)), marker.getColor().getDefaultColor());
         }
-        assertEquals(2, graphs); assertFixedControlsReachable(); capture("final_statistics_long_names_320");
+        capture("final_table_cumulative_320");
+        scrollTo(6);
+        RecyclerView.ViewHolder graphHolder = list.findViewHolderForAdapterPosition(6 + contentOffset(list));
+        ScoreGraphView graph = graphIn(graphHolder.itemView);
+        assertNotNull(graph);
+        assertEquals(R.id.final_score_graph, graph.getId());
+        assertTrue(graph.getAccessibilityNodeProvider().createAccessibilityNodeInfo(-1).getChildCount() > 0);
+        ((androidx.recyclerview.widget.LinearLayoutManager) list.getLayoutManager())
+                .scrollToPositionWithOffset(6 + contentOffset(list), 0); layout();
+        capture("final_cumulative_plot_320", activity.getWindow().getDecorView());
     }
 
     @Test public void aggressiveChooserLightUsesTheActualThemeRoles() throws Exception {

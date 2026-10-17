@@ -1,0 +1,10 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:paddingTop="20dp" android:paddingBottom="8dp">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:paddingHorizontal="8dp" android:paddingBottom="8dp"
+        android:text="@string/statistics_cumulative"
+        android:textAppearance="?attr/textAppearanceTitleMedium" android:accessibilityHeading="true" />
+    <android.example.judgement.ui.ScoreGraphView android:id="@+id/final_score_graph"
+        android:layout_width="match_parent" android:layout_height="wrap_content" />
+</LinearLayout>
