@@ -63,8 +63,17 @@ final class StrategyEditor extends RecyclerView.Adapter<StrategyEditor.Holder> {
         revealAfterLayout(bound.error);
     }
     private static void revealAfterLayout(View target) {
-        androidx.core.view.OneShotPreDrawListener.add(target, () -> target.post(() ->
-                target.requestRectangleOnScreen(new android.graphics.Rect(0, 0, target.getWidth(), target.getHeight()), true)));
+        androidx.core.view.OneShotPreDrawListener.add(target, () -> target.post(() -> {
+            android.view.ViewParent ancestor = target.getParent();
+            while (ancestor != null && !(ancestor instanceof RecyclerView)) ancestor = ancestor.getParent();
+            android.graphics.Rect rect = new android.graphics.Rect(); target.getDrawingRect(rect);
+            if (!(ancestor instanceof RecyclerView)) { target.requestRectangleOnScreen(rect, true); return; }
+            RecyclerView list = (RecyclerView) ancestor;
+            list.offsetDescendantRectToMyCoords(target, rect);
+            int top = list.getPaddingTop(), bottom = list.getHeight() - list.getPaddingBottom();
+            int distance = rect.bottom > bottom ? rect.bottom - bottom : rect.top < top ? rect.top - top : 0;
+            if (distance != 0) list.scrollBy(0, distance);
+        }));
     }
     static String label(Context context, ScoringStrategy strategy) {
         return context.getString(strategy.preset == ScoringStrategy.Preset.AGGRESSIVE
