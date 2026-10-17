@@ -8,7 +8,7 @@
     <string name="round_tab">Round</string><string name="scoreboard_tab">Scoreboard</string><string name="history_tab">History</string>
     <string name="table_player">Player</string><string name="table_bid">Prediction</string>
     <string name="table_move">Move</string><string name="table_edit">Edit</string><string name="table_delete">Delete</string>
-    <string name="table_result">Prediction / result</string><string name="table_score">Score</string>
+    <string name="table_result">Result</string><string name="table_score">Score</string>
     <string name="table_bidding">Predicting</string><string name="table_result_value">%1$d · %2$s</string>
     <string name="home_title">Judgement Scoreboard</string>
     <string name="new_game">New game</string><string name="resume_game">Resume game</string><string name="continue_setup">Continue setup</string>
@@ -64,4 +64,6 @@
         <item quantity="one">%d card</item>
         <item quantity="other">%d cards</item>
     </plurals>
+    <string name="result_prediction">Prediction %1$d</string>
+    <string name="result_choice_description">%1$s, %2$s, prediction %3$d</string>
 </resources>

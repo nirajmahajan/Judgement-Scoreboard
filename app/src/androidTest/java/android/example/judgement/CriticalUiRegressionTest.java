@@ -72,10 +72,10 @@ public class CriticalUiRegressionTest {
         awaitView(allOf(withId(R.id.screen_title), withText(R.string.scoreboard_tab)));
         onView(withId(R.id.tab_round)).perform(click());
         onView(withId(R.id.screen_list)).perform(RecyclerViewActions.scrollToPosition(1));
-        awaitView(withText("0 · Lost"));
+        awaitView(allOf(withId(R.id.result_lost), isChecked(), withContentDescription(org.hamcrest.Matchers.containsString("UI player 0"))));
         assertEquals("LOST", inspector.snapshot().roundPlayers.get(0).outcome);
         scenario.recreate();
-        awaitView(withText("0 · Lost"));
+        awaitView(allOf(withId(R.id.result_lost), isChecked(), withContentDescription(org.hamcrest.Matchers.containsString("UI player 0"))));
     }
 
     @Test public void inlineBidDraftSurvivesRecreationAndConfirmAdvancesCurrentPlayer() {

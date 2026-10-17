@@ -324,6 +324,34 @@ public class ScreenVisualTest {
         capture("players_strategy_320");
     }
 
+    @Test public void resultsUseOneCompactRowPerPlayerWithStackedRadioButtons() throws Exception {
+        seedEnglishSetup(false);
+        databaseWorker.submit(() -> {
+            try (ScoreRepository repository = new ScoreRepository(context)) {
+                repository.startGame(repository.snapshot().draft.id);
+                Snapshot snapshot = repository.snapshot();
+                for (Records.RoundPlayer player : snapshot.roundPlayers) repository.submitBid(snapshot.round.id, player.playerId, 0);
+                repository.recordBids(snapshot.round.id);
+                repository.setOutcome(snapshot.round.id, snapshot.roundPlayers.get(0).playerId, Outcome.LOST);
+            }
+        }).get(10, TimeUnit.SECONDS);
+        launch(false, false, false); open("GAME", "ROUND");
+        RecyclerView list = activity.findViewById(R.id.screen_list);
+        assertEquals(6, contentAdapter(list).getItemCount());
+        for (int index = 0; index < 6; index++) {
+            View row = list.findViewHolderForAdapterPosition(contentOffset(list) + index).itemView;
+            TextView name = row.findViewById(R.id.row_name);
+            View won = row.findViewById(R.id.result_won), lost = row.findViewById(R.id.result_lost);
+            assertSingleLineNameData(name); assertFullyVisible(name); assertFullyVisible(won); assertFullyVisible(lost);
+            assertTrue("Won is above Lost", won.getBottom() <= lost.getTop());
+            assertTrue("Result choices stay beside the name", row.findViewById(R.id.result_choices).getLeft() >= name.getWidth());
+            assertEquals(index == 0, ((android.widget.RadioButton) lost).isChecked());
+            assertFalse(((android.widget.RadioButton) won).isChecked());
+        }
+        assertFullyVisible(activity.findViewById(R.id.primary_action));
+        capture("results_compact_320");
+    }
+
     @Test public void requiredSetupPromptsKeepSixNamesTogether() throws Exception {
         seedEnglishSetup(false); launch(false, false, false); open("PLAYERS", "ROUND");
         showFooter(); activity.findViewById(R.id.primary_action).performClick(); layout();

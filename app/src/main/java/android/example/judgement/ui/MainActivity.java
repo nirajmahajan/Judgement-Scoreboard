@@ -53,6 +53,7 @@ public final class MainActivity extends AppCompatActivity {
     private BottomNavigationView navigation;
     private ScoreAdapter adapter;
     private BidAdapter bids;
+    private ResultAdapter outcomes;
     private LinearLayout fixedActions;
     private View addSavedPlayer;
     private boolean biddingColumns;
@@ -672,16 +673,13 @@ public final class MainActivity extends AppCompatActivity {
     }
     private void results(Records.Round round) {
         tableDetailLabel = R.string.table_result;
-        List<ScoreAdapter.Row> rows = new ArrayList<>();
-        for (Records.RoundPlayer player : state.roundPlayers) {
-            String selection = player.outcome == null ? getString(R.string.outcome_pending) : getString("WON".equals(player.outcome) ? R.string.won : R.string.lost);
-            rows.add(new ScoreAdapter.Row(player.playerId, player.nameSnapshot, getString(R.string.table_result_value, player.bid, selection))
-                    .compactName().dealer(player.playerId == round.dealerId)
-                    .action(getString(R.string.won), !"WON".equals(player.outcome), () -> model.run(() -> model.repository.setOutcome(round.id, player.playerId, Outcome.WON)))
-                    .action(getString(R.string.lost), !"LOST".equals(player.outcome), () -> model.run(() -> model.repository.setOutcome(round.id, player.playerId, Outcome.LOST))));
-        }
-        rows(rows);
-        action(R.string.finish_round, R.id.primary_action, () -> model.run(() -> model.repository.completeRound(round.id)));
+        if (outcomes == null) outcomes = new ResultAdapter(model);
+        outcomes.submit(round.id, round.dealerId, state.roundPlayers); setContent(outcomes);
+        fixedActions.removeAllViews(); fixedActions.setVisibility(View.VISIBLE);
+        MaterialButton finish = new MaterialButton(this);
+        finish.setId(R.id.primary_action); finish.setText(R.string.finish_round);
+        finish.setOnClickListener(view -> model.run(() -> model.repository.completeRound(round.id)));
+        fixedActions.addView(finish, new LinearLayout.LayoutParams(-1, dp(56)));
     }
     private String points(long total) { return getResources().getQuantityString(R.plurals.score_points, total == 1 ? 1 : 2, total); }
     private String roundHeading(int number, int cards) { return getResources().getQuantityString(R.plurals.round_heading, cards, number, cards); }

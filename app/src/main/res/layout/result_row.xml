@@ -1,0 +1,32 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:minHeight="64dp" android:gravity="center_vertical" android:paddingHorizontal="8dp">
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:orientation="vertical" android:paddingEnd="8dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:gravity="center_vertical">
+                <TextView android:id="@id/dealer_tag" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp" android:paddingHorizontal="4dp" android:paddingVertical="2dp"
+                    android:text="@string/dealer_tag" android:textSize="11sp" android:textStyle="bold"
+                    android:textColor="?attr/colorOnPrimaryContainer" android:background="@drawable/dealer_tag_background"
+                    android:importantForAccessibility="no" android:visibility="gone" />
+                <TextView android:id="@id/row_name" android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content" android:singleLine="true" android:ellipsize="end"
+                    android:textAppearance="?attr/textAppearanceBodyLarge" />
+            </LinearLayout>
+            <TextView android:id="@id/row_detail" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:textAppearance="?attr/textAppearanceBodySmall" android:textColor="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+        <RadioGroup android:id="@+id/result_choices" android:layout_width="88dp" android:layout_height="wrap_content"
+            android:orientation="vertical">
+            <com.google.android.material.radiobutton.MaterialRadioButton android:id="@+id/result_won"
+                android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="32dp"
+                android:padding="0dp" android:text="@string/won" android:textSize="14sp" />
+            <com.google.android.material.radiobutton.MaterialRadioButton android:id="@+id/result_lost"
+                android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="32dp"
+                android:padding="0dp" android:text="@string/lost" android:textSize="14sp" />
+        </RadioGroup>
+    </LinearLayout>
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="?attr/colorOutlineVariant" />
+</LinearLayout>
