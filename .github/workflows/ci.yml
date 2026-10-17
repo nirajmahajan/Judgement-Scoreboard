@@ -16,6 +16,9 @@ on:
         default: 14
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 concurrency:
   group: android-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -68,6 +71,7 @@ jobs:
         with:
           name: build-and-unit-evidence
           path: |
+            ci-artifacts/
             app/build/outputs/
             app/build/reports/
             app/build/test-results/
@@ -96,6 +100,7 @@ jobs:
         with:
           name: screenshot-evidence
           path: |
+            ci-artifacts/
             app/build/outputs/roborazzi/
             app/build/reports/
             app/build/test-results/
