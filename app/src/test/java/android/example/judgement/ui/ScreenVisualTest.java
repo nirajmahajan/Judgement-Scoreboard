@@ -196,10 +196,32 @@ public class ScreenVisualTest {
 
     @Test @Config(qualifiers = "w320dp-h740dp-night-mdpi")
     public void roundDarkShowsNamedTrumpAndDealer() throws Exception {
-        launch(true, true, false);
+        List<String> names = Arrays.asList("Alice", "Ben", "Charlie", "David", "Emma");
+        databaseWorker.submit(() -> {
+            try (ScoreRepository repository = new ScoreRepository(context)) {
+                List<PlayerSpec> players = new ArrayList<>();
+                for (String name : names) players.add(new PlayerSpec(name));
+                long draft = repository.saveDraft(new DraftSpec(0, players, "ASCENDING", "FIXED", null));
+                repository.startGame(draft);
+                Snapshot round = repository.snapshot();
+                repository.submitBid(round.round.id, round.roundPlayers.get(0).playerId, 0);
+                repository.submitBid(round.round.id, round.roundPlayers.get(1).playerId, 1);
+            }
+        }).get(10, TimeUnit.SECONDS);
+        launch(false, false, false);
         open("GAME", "ROUND");
+        RecyclerView list = activity.findViewById(R.id.screen_list);
+        List<String> bids = Arrays.asList("0", "1", context.getString(R.string.table_bidding), "—", "—");
+        for (int index = 0; index < names.size(); index++) {
+            RecyclerView.ViewHolder holder = list.findViewHolderForAdapterPosition(index + contentOffset(list));
+            assertNotNull("All five players stay visible while predicting", holder);
+            TextView name = holder.itemView.findViewById(R.id.row_name);
+            assertEquals(names.get(index), name.getText().toString());
+            assertFullyVisible(name);
+            assertEquals(bids.get(index), ((TextView) holder.itemView.findViewById(R.id.row_detail)).getText().toString());
+        }
         assertFixedControlsReachable();
-        assertEachNameAndRowLayout(Arrays.asList(LONG_NAME, UNBROKEN_NAME, "محمد नीरज 🙂"), true);
+        assertEachNameAndRowLayout(names, true);
         capture("round_dark_320");
     }
 
