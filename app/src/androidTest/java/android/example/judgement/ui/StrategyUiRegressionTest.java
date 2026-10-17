@@ -180,7 +180,7 @@ public final class StrategyUiRegressionTest {
         assertEquals(completed.game.id,repository.snapshot().game.id);
     }
 
-    @Test public void darkNarrowCustomFormAtTwoHundredPercentKeepsLabelsErrorsAndSaveReachableWithKeyboard() throws Exception {
+    @Test public void darkNarrowCustomFormAtTwoHundredPercentKeepsLabelsAndErrorsReachableWithKeyboard() throws Exception {
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         String font=device.executeShellCommand("settings get system font_scale").trim();
         String hardwareIme=device.executeShellCommand("settings get secure show_ime_with_hard_keyboard").trim();
@@ -220,17 +220,11 @@ public final class StrategyUiRegressionTest {
             for(int label:new int[]{R.string.strategy_zero_reward,R.string.strategy_base_reward,R.string.strategy_per_trick}) {
                 onView(withText(label)).perform(reveal()).check((view,noMatch) -> assertCompleteText((TextView)view));
             }
-            onView(withId(R.id.strategy_zero)).perform(reveal(),replaceText(""),new ViewAction() {
-                @Override public Matcher<View> getConstraints(){return isAssignableFrom(TextView.class);}
-                @Override public String getDescription(){return "focus the points field and display the software keyboard";}
-                @Override public void perform(UiController controller,View view){
-                    view.requestFocus(); ((InputMethodManager)view.getContext().getSystemService(Context.INPUT_METHOD_SERVICE))
-                            .showSoftInput(view,InputMethodManager.SHOW_IMPLICIT);controller.loopMainThreadUntilIdle();
-                }
-            });
+            onView(withId(R.id.strategy_zero)).perform(reveal(),replaceText(""),showKeyboard());
             awaitKeyboard(); clickId(R.id.primary_action);
             await(() -> current()!=null && current().error!=null);
-            device.executeShellCommand("screencap -p /sdcard/judgement-test-evidence/strategy-custom-error-dark-320-font200-ime.png");
+            onView(withId(R.id.strategy_zero)).perform(reveal(),showKeyboard());
+            awaitKeyboard();
             onView(withId(com.google.android.material.R.id.textinput_error)).perform(reveal());
             onView(withId(com.google.android.material.R.id.textinput_error)).check((view,noMatch) -> {
                 assertNotNull(view); assertCompleteText((TextView)view);
@@ -242,6 +236,33 @@ public final class StrategyUiRegressionTest {
             onView(withId(R.id.strategy_zero)).perform(reveal(),replaceText("7"));
             clickId(R.id.primary_action);
             await(() -> repository.snapshot().draft.scoringConfig.equals(ScoringStrategy.custom(7,10,1,true).encode()));
+        } catch(AssertionError | RuntimeException failure) {
+            scenario.onActivity(activity -> {
+                android.util.Log.e("StrategyViewport","Configuration="+activity.getResources().getConfiguration());
+                for(int id:new int[]{R.id.screen_list,R.id.strategy_zero,com.google.android.material.R.id.textinput_error,R.id.strategy_error}) {
+                    View view=activity.findViewById(id); Rect rect=new Rect(); int[] position=new int[2];
+                    if(view==null){android.util.Log.e("StrategyViewport","Detached "+id);continue;}
+                    view.getLocationOnScreen(position); boolean visible=view.getGlobalVisibleRect(rect);
+                    android.util.Log.e("StrategyViewport",activity.getResources().getResourceEntryName(id)+" size="+
+                            view.getWidth()+"x"+view.getHeight()+" screen="+java.util.Arrays.toString(position)+
+                            " visible="+visible+" rect="+rect+" focused="+view.hasFocus()+" layoutPending="+view.isLayoutRequested());
+                }
+            });
+            SystemClock.sleep(24);
+            scenario.onActivity(activity -> {
+                for(int id:new int[]{R.id.strategy_zero,com.google.android.material.R.id.textinput_error}) {
+                    View view=activity.findViewById(id); Rect rect=new Rect(); int[] position=new int[2];
+                    if(view==null)continue;
+                    view.getLocationOnScreen(position); view.getGlobalVisibleRect(rect);
+                    android.util.Log.e("StrategyViewport","After24ms "+activity.getResources().getResourceEntryName(id)+
+                            " screen="+java.util.Arrays.toString(position)+" visible="+rect+" layoutPending="+view.isLayoutRequested());
+                }
+            });
+            try {
+                device.dumpWindowHierarchy(new java.io.File(context.getExternalFilesDir(null),"strategy-viewport-failure.xml"));
+                device.executeShellCommand("screencap -p /sdcard/judgement-test-evidence/strategy-viewport-failure.png");
+            } catch(java.io.IOException evidenceFailure) {failure.addSuppressed(evidenceFailure);}
+            throw failure;
         } finally {
             if(scenario!=null){scenario.close();scenario=null;}
             device.executeShellCommand("settings put system font_scale "+("null".equals(font)?"1.0":font));
@@ -258,6 +279,16 @@ public final class StrategyUiRegressionTest {
                 view.getLayout().getLineEnd(view.getLayout().getLineCount()-1));
         for(int i=0;i<view.getLayout().getLineCount();i++)assertEquals("No label is ellipsized",0,view.getLayout().getEllipsisCount(i));
         assertTrue("All wrapped lines fit vertically",view.getHeight()-view.getCompoundPaddingTop()-view.getCompoundPaddingBottom()>=view.getLayout().getHeight());
+    }
+    private static ViewAction showKeyboard() {
+        return new ViewAction() {
+            @Override public Matcher<View> getConstraints(){return isAssignableFrom(TextView.class);}
+            @Override public String getDescription(){return "focus the points field and display the software keyboard";}
+            @Override public void perform(UiController controller,View view){
+                view.requestFocus(); ((InputMethodManager)view.getContext().getSystemService(Context.INPUT_METHOD_SERVICE))
+                        .showSoftInput(view,InputMethodManager.SHOW_IMPLICIT);controller.loopMainThreadUntilIdle();
+            }
+        };
     }
     private static void awaitKeyboard() {
         UiAutomation automation=InstrumentationRegistry.getInstrumentation().getUiAutomation();
@@ -278,18 +309,54 @@ public final class StrategyUiRegressionTest {
         if(active) repository.startGame(id); return id;
     }
     private void launch(String target) {
+        Snapshot expected=repository.snapshot();
         scenario=ActivityScenario.launch(MainActivity.class);
-        await(() -> uiSnapshot()!=null);
+        await(() -> {
+            Snapshot actual=uiSnapshot();
+            return actual!=null && (expected.game==null?actual.game==null:actual.game!=null&&actual.game.id==expected.game.id)
+                    && (expected.draft==null?actual.draft==null:actual.draft!=null&&actual.draft.id==expected.draft.id);
+        });
+        recordLaunch(target,"before-target");
         scenario.onActivity(activity -> {
             ScoreViewModel model=new ViewModelProvider(activity).get(ScoreViewModel.class);
             model.screen(target); model.repository.execute(model.repository::refresh);
         });
+        recordLaunch(target,"before-scroll");
         Snapshot snapshot = repository.snapshot();
         String heading = "SETTINGS".equals(target) ? context.getString(R.string.setup_settings)
                 : snapshot.round == null ? context.getString(R.string.game_complete)
                 : context.getResources().getQuantityString(R.plurals.round_heading,
                         snapshot.round.cards,snapshot.round.number,snapshot.round.cards);
-        await(() -> screen().equals(target) && text(R.id.screen_title).equals(heading));
+        onView(withId(R.id.screen_list)).perform(new ViewAction() {
+            @Override public Matcher<View> getConstraints(){return isAssignableFrom(RecyclerView.class);}
+            @Override public String getDescription(){return "show the initial screen heading";}
+            @Override public void perform(UiController controller,View view){
+                ((RecyclerView)view).scrollToPosition(0);controller.loopMainThreadUntilIdle();
+            }
+        });
+        try { await(() -> screen().equals(target) && text(R.id.screen_title).equals(heading)); }
+        catch(AssertionError timeout) {
+            recordLaunch(target,"failed");
+            throw new AssertionError("Expected "+target+" / "+heading+
+                    "; displayed "+screen()+" / "+text(R.id.screen_title),timeout);
+        }
+    }
+    private void recordLaunch(String target,String phase) {
+        scenario.onActivity(activity -> {
+            RecyclerView list=activity.findViewById(R.id.screen_list);
+            int first=((androidx.recyclerview.widget.LinearLayoutManager)list.getLayoutManager()).findFirstVisibleItemPosition();
+            TextView title=activity.findViewById(R.id.screen_title);
+            android.util.Log.i("StrategyLaunch",phase+" target="+target+" actualScreen="+
+                    new ViewModelProvider(activity).get(ScoreViewModel.class).screen()+
+                    " header="+(title==null?"DETACHED":title.getText())+" firstVisible="+first);
+        });
+        try {
+            UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+            java.io.File hierarchy=new java.io.File(context.getExternalFilesDir(null),"strategy-launch-"+target+"-"+phase+".xml");
+            device.dumpWindowHierarchy(hierarchy);
+            device.executeShellCommand("mkdir -p /sdcard/judgement-test-evidence");
+            device.executeShellCommand("screencap -p /sdcard/judgement-test-evidence/strategy-launch-"+target+"-"+phase+".png");
+        } catch(java.io.IOException error) { throw new AssertionError("Could not retain launch evidence",error); }
     }
     private void completeRound() {
         Snapshot snapshot=repository.snapshot();

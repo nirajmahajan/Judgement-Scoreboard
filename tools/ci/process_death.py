@@ -64,7 +64,8 @@ def background_with_saved_state(label):
     while time.monotonic() < deadline:
         task, record = target_activity(label)
         if (re.search(r"\bstate=STOPPED\b", record)
-                and "mHaveState=true" in record and "mIcicle=Bundle[" in record):
+                and re.search(r"\b(?:mHaveState|haveState)=true\b", record)
+                and re.search(r"\b(?:mIcicle|icicle)=Bundle\[", record)):
             return task
         time.sleep(0.25)
     raise AssertionError(f"Android did not acknowledge stopped activity with saved state: {label}")

@@ -44,7 +44,7 @@ The named tests below exercise the repaired behavior. JVM tests are under `app/s
 | D30 | Narrow large-font roster actions split their final letters | Stack actions when space is constrained; assert complete single-line labels in visual layout tests |
 | D31 | Deferred Start and Quick-add commands read a replacement draft from mutable screen state | Capture the original draft ID; `oldStartConfirmationCannotStartAReplacementDraft`; `queuedQuickAddCannotRetargetAReplacementDraft` |
 | D32 | Command completion navigates a destroyed Activity after rotation | Observable ViewModel navigation; five `ReviewFlowRegressionTest` cases cover New game, Start, Apply, replay and restore |
-| D33 | Restoring an inactive participant twice creates duplicate staged IDs | Filter and guard stable IDs; `restoringTheSameParticipantTwiceDoesNotDuplicateTheStagedRoster` |
+| D33 | Restoring an inactive participant twice creates duplicate staged IDs | Filter and guard stable IDs; `restoredPlayerIsNotOfferedAgainInTheStagedRoster` |
 | D34 | Scoring validation scroll restoration hides numeric errors; dark Back icon lacks contrast | Preserve reachable input errors and use `colorOnSurface`; native 320dp/200% font/dark/keyboard strategy regression |
 
 ## Accepted legacy limitation
