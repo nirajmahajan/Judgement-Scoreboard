@@ -47,7 +47,7 @@ jobs:
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
-          java-version: 21.0.8+9
+          java-version: 21.0.8+9.0.LTS
       - run: tools/ci/setup_android.sh
       - uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
         with:
@@ -107,7 +107,7 @@ jobs:
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
-          java-version: 21.0.8+9
+          java-version: 21.0.8+9.0.LTS
       - run: tools/ci/setup_android.sh
       - name: Enable KVM
         run: |
