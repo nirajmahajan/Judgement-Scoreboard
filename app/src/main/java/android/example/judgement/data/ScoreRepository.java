@@ -7,6 +7,10 @@ import android.example.judgement.domain.Direction;
 import android.example.judgement.domain.GameRules;
 import android.example.judgement.domain.Names;
 import android.example.judgement.domain.Outcome;
+import android.example.judgement.domain.ScoringStrategy;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -81,6 +85,7 @@ public final class ScoreRepository implements AutoCloseable {
             List<Records.GamePlayer> stored = applyPlayers(draft.id, spec.players);
             draft.direction = spec.direction;
             draft.trumpMode = spec.trumpMode;
+            if (spec.scoringStrategy != null) draft.scoringConfig = spec.scoringStrategy.encode();
             draft.dealerId = resolveDealer(spec.players, stored, requestedDealer);
             dao.updateGame(draft);
             return draft.id;
@@ -106,6 +111,63 @@ public final class ScoreRepository implements AutoCloseable {
             if (player.gameId != draftId || !player.active) fail("Choose a dealer from the current setup players.");
             draft.dealerId = playerId; dao.updateGame(draft);
             return null;
+        });
+    }
+
+    public void updateDraftScoring(long draftId, ScoringStrategy strategy) {
+        String config = requireStrategy(strategy).encode();
+        write(() -> {
+            Records.Game draft = requireDraft(draftId);
+            draft.scoringConfig = config; draft.pendingScoringConfig = null; dao.updateGame(draft);
+            return null;
+        });
+    }
+
+    /** Only a genuinely new chronological round consumes a scheduled strategy change. */
+    public void changeScoringStrategy(long roundId, ScoringStrategy strategy) {
+        String config = requireStrategy(strategy).encode();
+        write(() -> {
+            Records.Round round = requireOpenRound(roundId, null);
+            Records.Game game = requireGame(round.gameId);
+            if ("BIDDING".equals(round.phase) && bids(dao.roundPlayers(roundId)).isEmpty()) {
+                round.scoringConfig = config; dao.updateRound(round);
+                game.scoringConfig = config; game.pendingScoringConfig = null;
+            } else {
+                game.pendingScoringConfig = config.equals(round.scoringConfig) ? null : config;
+            }
+            dao.updateGame(game);
+            return null;
+        });
+    }
+
+    /** Reuse the table explicitly, while keeping the existing scorecard until Start is confirmed. */
+    public long playAgain(long gameId) {
+        return write(() -> {
+            Records.Game source = requireGame(gameId);
+            if (!"ACTIVE".equals(source.status) && !"COMPLETE".equals(source.status)) {
+                fail("This scorecard is no longer current. Open the current results.");
+            }
+            ScoringStrategy.decode(source.scoringConfig);
+            List<Records.GamePlayer> previous = activePlayers(gameId);
+            validateConfiguration(source.direction, source.trumpMode);
+            GameRules.validatePlayerCount(previous.size());
+            for (Records.Game other : dao.games()) {
+                if ("DRAFT".equals(other.status)) { other.status = "DISCARDED"; dao.updateGame(other); }
+            }
+            Records.Game draft = new Records.Game();
+            draft.direction = source.direction; draft.trumpMode = source.trumpMode;
+            draft.scoringConfig = source.scoringConfig; draft.createdAt = System.currentTimeMillis();
+            draft.id = dao.insertGame(draft);
+            List<PlayerSpec> specs = new ArrayList<>();
+            for (Records.GamePlayer player : previous) {
+                Long profile = player.savedPlayerId != null && dao.savedPlayer(player.savedPlayerId) != null
+                        ? player.savedPlayerId : null;
+                specs.add(new PlayerSpec(-player.id, player.name, profile));
+            }
+            List<Records.GamePlayer> stored = applyPlayers(draft.id, specs);
+            draft.dealerId = source.dealerId == null ? null : resolveDealer(specs, stored, -source.dealerId);
+            dao.updateGame(draft);
+            return draft.id;
         });
     }
 
@@ -169,6 +231,7 @@ public final class ScoreRepository implements AutoCloseable {
             List<Records.GamePlayer> players = activePlayers(draft.id);
             GameRules.validatePlayerCount(players.size());
             validateConfiguration(draft.direction, draft.trumpMode);
+            ScoringStrategy.decode(draft.scoringConfig);
             long dealer = draft.dealerId == null ? players.get(players.size() - 1).id : draft.dealerId;
             GameRules.bidOrder(ids(players), dealer);
             for (Records.Game game : dao.games()) {
@@ -183,7 +246,7 @@ public final class ScoreRepository implements AutoCloseable {
             draft.maximumCards = GameRules.maximumCards(players.size());
             draft.dealerId = dealer;
             dao.updateGame(draft);
-            createRound(draft.id, 1, GameRules.firstCards(players.size(), Direction.valueOf(draft.direction)), dealer, players);
+            createRound(draft.id, 1, GameRules.firstCards(players.size(), Direction.valueOf(draft.direction)), dealer, players, draft.scoringConfig);
             return draft.id;
         });
     }
@@ -234,13 +297,14 @@ public final class ScoreRepository implements AutoCloseable {
             List<Records.RoundPlayer> rows = dao.roundPlayers(roundId);
             int[] bids = new int[rows.size()];
             Outcome[] outcomes = new Outcome[rows.size()];
+            ScoringStrategy strategy = ScoringStrategy.decode(round.scoringConfig);
             Map<Long, Long> totals = totals(round.gameId);
             for (int index = 0; index < rows.size(); index++) {
                 Records.RoundPlayer row = rows.get(index);
                 if (row.bid == null || row.outcome == null) fail("Choose Won or Lost for every player.");
                 bids[index] = row.bid;
                 outcomes[index] = Outcome.valueOf(row.outcome);
-                GameRules.addScore(totals.get(row.playerId), GameRules.score(row.bid, outcomes[index]));
+                GameRules.addScore(totals.get(row.playerId), strategy.points(round.cards, row.bid, outcomes[index]));
             }
             if (!GameRules.areOutcomesFeasible(round.cards, bids, outcomes)) {
                 fail("These results are impossible for " + round.cards + " tricks. Check the Won/Lost choices.");
@@ -254,7 +318,13 @@ public final class ScoreRepository implements AutoCloseable {
             dao.updateRound(round);
             game.dealerId = nextDealer;
             if (nextCards == null) game.status = "COMPLETE";
-            else createRound(game.id, round.number + 1, nextCards, nextDealer, players);
+            else {
+                if (game.pendingScoringConfig != null) {
+                    ScoringStrategy.decode(game.pendingScoringConfig);
+                    game.scoringConfig = game.pendingScoringConfig; game.pendingScoringConfig = null;
+                }
+                createRound(game.id, round.number + 1, nextCards, nextDealer, players, game.scoringConfig);
+            }
             dao.updateGame(game);
             return null;
         });
@@ -265,6 +335,97 @@ public final class ScoreRepository implements AutoCloseable {
             Records.Round round = requireOpenRound(roundId, null);
             return replaceRound(round, round.dealerId, activePlayers(round.gameId));
         });
+    }
+
+    public RoundEditPreview previewRoundEdit(long roundId, long expectedRevision, List<RoundPlayerEdit> edits) {
+        return database.runInTransaction(() -> validateRoundEdit(roundId, expectedRevision, edits).preview);
+    }
+
+    public void editRound(long roundId, long expectedRevision, List<RoundPlayerEdit> edits) {
+        write(() -> {
+            ValidatedEdit validated = validateRoundEdit(roundId, expectedRevision, edits);
+            if (!validated.preview.changed) return null;
+            Records.Round round = validated.round;
+            Records.RoundEdit audit = new Records.RoundEdit();
+            audit.gameId = round.gameId; audit.roundId = round.id;
+            audit.previousRevision = round.revision; audit.revision = Math.addExact(round.revision, 1);
+            audit.previousValues = auditValues(round, validated.before);
+            audit.newValues = auditValues(round, validated.after);
+            audit.createdAt = System.currentTimeMillis();
+            for (Records.RoundPlayer row : validated.after) dao.updateRoundPlayer(row);
+            round.revision = audit.revision; dao.updateRound(round);
+            dao.insertRoundEdit(audit);
+            return null;
+        });
+    }
+
+    private ValidatedEdit validateRoundEdit(long roundId, long expectedRevision, List<RoundPlayerEdit> edits) {
+        Records.Round round = dao.round(roundId);
+        if (round == null || !"COMPLETE".equals(round.phase)) fail("Choose a completed round to edit.");
+        Records.Game game = requireGame(round.gameId);
+        if (!"ACTIVE".equals(game.status) && !"COMPLETE".equals(game.status)) fail("This scorecard is no longer current.");
+        if (round.revision != expectedRevision) fail("This round was edited. Reopen it before saving another correction.");
+        List<Records.RoundPlayer> before = dao.roundPlayers(roundId), after = new ArrayList<>();
+        if (edits == null || edits.size() != before.size()) fail("Enter a bid and result for every recorded participant.");
+        Map<Long, RoundPlayerEdit> requested = new HashMap<>();
+        for (RoundPlayerEdit edit : edits) {
+            if (edit == null || requested.put(edit.playerId, edit) != null) fail("Each recorded participant must appear once.");
+        }
+        ScoringStrategy strategy = ScoringStrategy.decode(round.scoringConfig);
+        List<RoundEditPreview.PlayerChange> changes = new ArrayList<>();
+        Map<Long, Long> deltas = new LinkedHashMap<>();
+        int[] correctedBids = new int[before.size()];
+        Outcome[] correctedOutcomes = new Outcome[before.size()];
+        boolean changed = false;
+        for (int index = 0; index < before.size(); index++) {
+            Records.RoundPlayer original = before.get(index);
+            RoundPlayerEdit edit = requested.get(original.playerId);
+            if (edit == null) fail("A corrected result belongs to another participant.");
+            GameRules.validateBid(round.cards, edit.bid);
+            if (edit.outcome == null) fail("Choose Won or Lost for every participant.");
+            Records.RoundPlayer row = new Records.RoundPlayer();
+            row.roundId = original.roundId; row.playerId = original.playerId;
+            row.bidPosition = original.bidPosition; row.nameSnapshot = original.nameSnapshot;
+            row.bid = edit.bid; row.outcome = edit.outcome.name(); after.add(row);
+            correctedBids[index] = edit.bid; correctedOutcomes[index] = edit.outcome;
+            RoundEditPreview.PlayerChange change = new RoundEditPreview.PlayerChange(row.playerId,
+                    row.nameSnapshot, original.bid, edit.bid, Outcome.valueOf(original.outcome), edit.outcome,
+                    strategy.points(round.cards, original.bid, Outcome.valueOf(original.outcome)),
+                    strategy.points(round.cards, edit.bid, edit.outcome));
+            changes.add(change); deltas.put(row.playerId, change.delta);
+            changed |= original.bid != edit.bid || !original.outcome.equals(row.outcome);
+        }
+        GameRules.validateBidsComplete(round.cards, roundIds(after), round.dealerId, bids(after));
+        if (!GameRules.areOutcomesFeasible(round.cards, correctedBids, correctedOutcomes)) {
+            fail("These results are impossible for " + round.cards + " tricks. Check the bids and Won/Lost choices.");
+        }
+        return new ValidatedEdit(round, before, after, new RoundEditPreview(round.id, expectedRevision,
+                changes, totals(round.gameId, round.id, after), deltas, changed));
+    }
+
+    private static String auditValues(Records.Round round, List<Records.RoundPlayer> rows) {
+        JSONArray values = new JSONArray();
+        ScoringStrategy strategy = ScoringStrategy.decode(round.scoringConfig);
+        try {
+            for (Records.RoundPlayer row : rows) {
+                JSONObject value = new JSONObject();
+                value.put("playerId", row.playerId); value.put("name", row.nameSnapshot);
+                value.put("bid", row.bid); value.put("outcome", row.outcome);
+                value.put("points", strategy.points(round.cards, row.bid, Outcome.valueOf(row.outcome)));
+                values.put(value);
+            }
+        } catch (JSONException error) { throw new IllegalStateException("Cannot record the round correction.", error); }
+        return values.toString();
+    }
+
+    private static final class ValidatedEdit {
+        final Records.Round round;
+        final List<Records.RoundPlayer> before, after;
+        final RoundEditPreview preview;
+        ValidatedEdit(Records.Round round, List<Records.RoundPlayer> before,
+                      List<Records.RoundPlayer> after, RoundEditPreview preview) {
+            this.round = round; this.before = before; this.after = after; this.preview = preview;
+        }
     }
 
     /** Validate the complete staged roster before writing any participant or round. */
@@ -495,14 +656,15 @@ public final class ScoreRepository implements AutoCloseable {
 
     private long replaceRound(Records.Round old, long dealer, List<Records.GamePlayer> players) {
         old.phase = "ABANDONED"; dao.updateRound(old);
-        return createRound(old.gameId, old.number, old.cards, dealer, players);
+        return createRound(old.gameId, old.number, old.cards, dealer, players, old.scoringConfig);
     }
 
-    private long createRound(long gameId, int number, int cards, long dealer, List<Records.GamePlayer> players) {
+    private long createRound(long gameId, int number, int cards, long dealer, List<Records.GamePlayer> players, String scoringConfig) {
         GameRules.validateCards(cards, players.size());
         long[] order = GameRules.bidOrder(ids(players), dealer);
         Records.Round round = new Records.Round();
         round.gameId = gameId; round.number = number; round.cards = cards; round.dealerId = dealer;
+        round.scoringConfig = scoringConfig;
         round.createdAt = System.currentTimeMillis(); round.id = dao.insertRound(round);
         for (int index = 0; index < order.length; index++) {
             Records.RoundPlayer row = new Records.RoundPlayer();
@@ -551,12 +713,16 @@ public final class ScoreRepository implements AutoCloseable {
         Map<Long, Integer> bids = new LinkedHashMap<>(); for (Records.RoundPlayer player : players) if (player.bid != null) bids.put(player.playerId, player.bid); return bids;
     }
     private Map<Long, Long> totals(long gameId) {
+        return totals(gameId, -1, null);
+    }
+    private Map<Long, Long> totals(long gameId, long replacementRoundId, List<Records.RoundPlayer> replacement) {
         Map<Long, BigInteger> exact = new LinkedHashMap<>();
         for (Records.GamePlayer player : dao.players(gameId)) exact.put(player.id, BigInteger.ZERO);
         for (Records.Round round : dao.rounds(gameId)) {
             if (!"COMPLETE".equals(round.phase)) continue;
-            for (Records.RoundPlayer player : dao.roundPlayers(round.id)) {
-                long award = GameRules.score(player.bid, Outcome.valueOf(player.outcome));
+            ScoringStrategy strategy = ScoringStrategy.decode(round.scoringConfig);
+            for (Records.RoundPlayer player : round.id == replacementRoundId ? replacement : dao.roundPlayers(round.id)) {
+                long award = strategy.points(round.cards, player.bid, Outcome.valueOf(player.outcome));
                 exact.put(player.playerId, exact.get(player.playerId).add(BigInteger.valueOf(award)));
             }
         }
@@ -599,7 +765,13 @@ public final class ScoreRepository implements AutoCloseable {
             if (open != null) roundPlayers = dao.roundPlayers(open.id);
         }
         return new Snapshot(draft, draft == null ? new ArrayList<>() : activePlayers(draft.id), current,
-                players, inactive, totals, open, roundPlayers, history, adjustments, dao.savedPlayers(), dao.recovery());
+                players, inactive, totals, open, roundPlayers, history, adjustments, dao.savedPlayers(), dao.recovery(),
+                current == null ? new ArrayList<>() : dao.roundEdits(current.id));
+    }
+
+    private static ScoringStrategy requireStrategy(ScoringStrategy strategy) {
+        if (strategy == null) fail("Choose a scoring strategy.");
+        return strategy;
     }
 
     private <T> T write(Callable<T> action) {

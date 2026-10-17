@@ -123,7 +123,7 @@ with tempfile.TemporaryDirectory(prefix="judgement-upgrade-") as temp:
             pass
     upgraded = sqlite3.connect(temp / "upgraded.db")
     version = upgraded.execute("PRAGMA user_version").fetchone()[0]
-    assert version == 3, f"Expected database version3, found {version}"
+    assert version == 4, f"Expected database version4, found {version}"
     recovered = upgraded.execute("SELECT rawValues FROM legacy_recovery ORDER BY sourceRow").fetchall()
     assert len(recovered) == len(fixtures)
     for actual, expected in zip(recovered, fixtures):

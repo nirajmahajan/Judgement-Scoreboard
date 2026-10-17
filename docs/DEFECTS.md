@@ -43,6 +43,13 @@ The named tests below exercise the repaired behavior. JVM tests are under `app/s
 | D29 | Removed setup entries become inactive game participants | Exclude draft-only removals at Start; `startingGameExcludesRemovedSetupEntriesButKeepsTheirSavedProfiles` |
 | D30 | Narrow large-font roster actions split their final letters | Stack actions when space is constrained; assert complete single-line labels in visual layout tests |
 | D31 | Deferred Start and Quick-add commands read a replacement draft from mutable screen state | Capture the original draft ID; `oldStartConfirmationCannotStartAReplacementDraft`; `queuedQuickAddCannotRetargetAReplacementDraft` |
+| D32 | Command completion navigates a destroyed Activity after rotation | Observable ViewModel navigation; five `ReviewFlowRegressionTest` cases cover New game, Start, Apply, replay and restore |
+| D33 | Restoring an inactive participant twice creates duplicate staged IDs | Filter and guard stable IDs; `restoringTheSameParticipantTwiceDoesNotDuplicateTheStagedRoster` |
+| D34 | Scoring validation scroll restoration hides numeric errors; dark Back icon lacks contrast | Preserve reachable input errors and use `colorOnSurface`; native 320dp/200% font/dark/keyboard strategy regression |
+
+## Accepted legacy limitation
+
+A malformed v1 database with mixed-case reserved table names such as `Game_Players` can fail recovery. The owner chose fresh installation over further migration edge-case work. The implemented and tested original 4/6/7-column recovery paths remain available.
 
 ## Delivery gates
 

@@ -1,0 +1,16 @@
+<resources>
+    <string name="history_inspect_round">Inspect round</string>
+    <string name="history_edit_round">Edit round</string>
+    <string name="history_recorded_performance">Bid: %1$d · %2$s\nEarned: %3$s</string>
+    <string name="history_edit_record">Correction %1$d · %2$s</string>
+    <string name="history_before">Before correction</string>
+    <string name="history_after">After correction</string>
+    <string name="history_detail_description">%1$s\nThese are the rules recorded for this round.</string>
+    <string name="history_preview">Preview changes</string>
+    <string name="history_save">Save corrections</string>
+    <string name="history_back_to_round">Back to round details</string>
+    <string name="history_edit_description">Correct every participant as needed, then preview the complete round. Current bidding and dealer stay in place.</string>
+    <string name="history_preview_ready">Preview validated. Saving recalculates the scores and statistics together.</string>
+    <string name="history_missing_round">This completed round is no longer in the current game.</string>
+    <string name="history_working">Checking the complete round…</string>
+</resources>

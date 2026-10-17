@@ -1,0 +1,32 @@
+<resources>
+    <string name="statistics_title">Final statistics</string>
+    <string name="statistics_standings">Final standings</string>
+    <string name="statistics_awards">Table awards</string>
+    <string name="statistics_awards_rule">Unique leaders after at least five completed rounds. Count awards need at least three occurrences.</string>
+    <string name="statistics_largest_win">Largest round win</string>
+    <string name="statistics_largest_win_detail">%1$s\n%2$s · Round %3$d</string>
+    <string name="statistics_most_exact">Most rounds won</string>
+    <string name="statistics_zero_machine">0 ki machine</string>
+    <string name="statistics_count_award_detail">%1$s\nCount: %2$d</string>
+    <string name="statistics_compare">Compare players</string>
+    <string name="statistics_compare_help">Choose players below. Each player keeps the same color in both graphs, including when scoring strategies change.</string>
+    <string name="statistics_show_player">Show on graphs</string>
+    <string name="statistics_compare_player">Compare %1$s on both graphs</string>
+    <string name="statistics_cumulative">Cumulative scores</string>
+    <string name="statistics_per_round">Points per round</string>
+    <string name="statistics_cumulative_help">Includes separate manual score adjustments. Tap a round or use the inspect actions below. Historical edits retain the original adjustment amounts.</string>
+    <string name="statistics_per_round_help">Shows points earned only in rounds each player actually played. Gaps mean the player did not participate.</string>
+    <string name="statistics_select_prompt">Select a player to show their performance.</string>
+    <string name="statistics_round_details">Rounds and adjustments</string>
+    <string name="statistics_round_help">Inspect recorded cards, scoring rules, bids, outcomes and points. Strategy changes are marked on the timeline.</string>
+    <string name="statistics_not_played">No completed rounds played</string>
+    <string name="statistics_exact_rate">Exact predictions: %1$d / %2$d (%3$s)</string>
+    <string name="statistics_highest_bid">Highest successful bid: %1$s</string>
+    <string name="statistics_no_exact_bid">None</string>
+    <plurals name="statistics_streak"><item quantity="one">Longest exact streak: %1$d prediction</item><item quantity="other">Longest exact streak: %1$d predictions</item></plurals>
+    <string name="statistics_strategy_change">Scoring strategy changed</string>
+    <string name="statistics_manual_adjustment">Manual score adjustment</string>
+    <string name="statistics_adjustment_delta">Recorded change: %1$s</string>
+    <string name="statistics_inspect">Inspect details</string>
+    <string name="statistics_inspect_named">Inspect %1$s</string>
+</resources>

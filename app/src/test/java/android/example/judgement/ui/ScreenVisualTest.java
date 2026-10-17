@@ -10,6 +10,7 @@ import android.example.judgement.data.ScoreDatabase;
 import android.example.judgement.data.ScoreRepository;
 import android.example.judgement.data.Snapshot;
 import android.example.judgement.domain.Outcome;
+import android.example.judgement.domain.ScoringStrategy;
 import android.graphics.Rect;
 import android.os.Looper;
 import android.text.Layout;
@@ -252,6 +253,81 @@ public class ScreenVisualTest {
         decor.layout(0, 0, decor.getMeasuredWidth(), decor.getMeasuredHeight());
         capture("name_dialog_keyboard_error_320", decor);
         dialog.dismiss();
+    }
+
+    @Test public void historyEditorKeepsCompleteNamesAndControlsAtLargeFonts() throws Exception {
+        RuntimeEnvironment.setFontScale(2f);
+        launch(true, true, true);
+        Snapshot.RoundHistory history = model.state.getValue().history.get(0);
+        model.inspectRound(history.round.id, "GAME");
+        model.beginRoundEditor(history); layout();
+        assertEachNameAndRowLayout(Arrays.asList(LONG_NAME, UNBROKEN_NAME, "محمد नीरज 🙂"));
+        assertFixedControlsReachable(); capture("history_editor_font_200_320");
+    }
+
+    @Test public void finalStatisticsKeepNamesAndBothGraphsReachable() throws Exception {
+        launch(true, true, false);
+        databaseWorker.submit(() -> {
+            while (model.repository.snapshot().round != null) {
+                Snapshot state = model.repository.snapshot();
+                for (Records.RoundPlayer player : state.roundPlayers)
+                    model.repository.submitBid(state.round.id, player.playerId, 0);
+                model.repository.recordBids(state.round.id);
+                for (int i=0;i<state.roundPlayers.size();i++) model.repository.setOutcome(state.round.id,
+                        state.roundPlayers.get(i).playerId, i==0 ? Outcome.LOST : Outcome.WON);
+                model.repository.completeRound(state.round.id);
+            }
+        }).get(10, TimeUnit.SECONDS);
+        open("STATISTICS", "ROUND");
+        RecyclerView list = activity.findViewById(R.id.screen_list);
+        int graphs = 0;
+        for (int i=0;i<contentAdapter(list).getItemCount();i++) {
+            scrollTo(i);
+            RecyclerView.ViewHolder holder = list.findViewHolderForAdapterPosition(i+contentOffset(list));
+            assertNotNull(holder);
+            TextView name = holder.itemView.findViewById(R.id.row_name);
+            if (name != null) { assertCompleteText(name); assertRowLayout(holder.itemView); }
+            ScoreGraphView graph = graphIn(holder.itemView);
+            if (graph != null) {
+                graphs++; assertTrue(graph.getHeight() >= dp(280));
+                assertTrue(graph.getAccessibilityNodeProvider().createAccessibilityNodeInfo(-1).getChildCount() > 0);
+                if (graphs==1) capture("final_cumulative_graph_320", activity.getWindow().getDecorView());
+            }
+        }
+        assertEquals(2, graphs); assertFixedControlsReachable(); capture("final_statistics_long_names_320");
+    }
+
+    @Test public void aggressiveChooserLightUsesTheActualThemeRoles() throws Exception {
+        aggressiveChooser("aggressive_chooser_light_320");
+    }
+
+    @Test @Config(qualifiers = "w320dp-h740dp-night-mdpi")
+    public void aggressiveChooserDarkUsesTheActualThemeRoles() throws Exception {
+        aggressiveChooser("aggressive_chooser_dark_320");
+    }
+
+    private void aggressiveChooser(String name) throws Exception {
+        launch(false, false, false);
+        Context themed = new android.view.ContextThemeWrapper(activity, R.style.Theme_Score_Aggressive);
+        RecyclerView chooser = new RecyclerView(themed);
+        chooser.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(themed));
+        chooser.setBackgroundColor(com.google.android.material.color.MaterialColors.getColor(themed,
+                com.google.android.material.R.attr.colorSurface, "chooser"));
+        chooser.setAdapter(new StrategyEditor(new StrategyRequest(StrategyRequest.Target.DRAFT, 1,
+                "SETTINGS", ScoringStrategy.aggressive()), new StrategyEditor.Listener() {
+            @Override public void onChanged(StrategyRequest request) { }
+            @Override public void onHelp() { }
+        }));
+        activity.setContentView(chooser); layout();
+        assertButtons(chooser); capture(name, activity.getWindow().getDecorView());
+    }
+
+    private static ScoreGraphView graphIn(View view) {
+        if (view instanceof ScoreGraphView) return (ScoreGraphView) view;
+        if (view instanceof ViewGroup) for (int i=0;i<((ViewGroup)view).getChildCount();i++) {
+            ScoreGraphView found=graphIn(((ViewGroup)view).getChildAt(i)); if (found!=null) return found;
+        }
+        return null;
     }
 
     private void launch(boolean draft, boolean game, boolean completedRound) throws Exception {

@@ -1,0 +1,8 @@
+<resources>
+    <item name="edit_historical_round" type="id"/>
+    <item name="preview_historical_round" type="id"/>
+    <item name="save_historical_round" type="id"/>
+    <item name="cancel_historical_round" type="id"/>
+    <item name="history_back" type="id"/>
+    <item name="final_statistics" type="id"/>
+</resources>

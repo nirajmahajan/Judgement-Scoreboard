@@ -26,6 +26,8 @@ public interface ScoreDao {
     @Update void updateRoundPlayer(Records.RoundPlayer player);
     @Query("SELECT * FROM score_adjustments WHERE gameId=:gameId ORDER BY id") List<Records.ScoreAdjustment> adjustments(long gameId);
     @Insert long insertAdjustment(Records.ScoreAdjustment adjustment);
+    @Query("SELECT * FROM round_edits WHERE gameId=:gameId ORDER BY id") List<Records.RoundEdit> roundEdits(long gameId);
+    @Insert long insertRoundEdit(Records.RoundEdit edit);
     @Query("SELECT * FROM saved_players ORDER BY nameKey,id") List<Records.SavedPlayer> savedPlayers();
     @Query("SELECT * FROM saved_players WHERE id=:id") Records.SavedPlayer savedPlayer(long id);
     @Query("SELECT * FROM saved_players WHERE nameKey=:key LIMIT 1") Records.SavedPlayer savedPlayerByKey(String key);

@@ -12,6 +12,10 @@ Saved players form an optional library. Add, search and select profiles to quick
 
 Drag a player's handle to change seating, or use its accessible Move up / Move down actions. In-game changes are staged until Apply. Structural changes after bidding starts require restarting the current round; completed rounds stay intact.
 
+Choose **Default**, **Aggressive**, or **Custom** scoring before starting. Aggressive rewards an exact zero with 7 points and adds a majority bonus only for an exact bid strictly above half the hand. The bonus is capped at 10; total points are not capped. Custom scoring provides live examples. Strategy changes apply immediately before bidding or at the next round once bidding starts. Each completed round retains its own rules.
+
+Open a completed round from History to correct bids and outcomes, preview score changes, and save an audited correction. Final statistics include exact-bid rates, successful bids, streaks, significant table awards and selectable cumulative/per-round graphs. Play again prepares the same table and settings for review before starting a new game.
+
 ## Develop
 
 Use JDK 21, the committed Gradle wrapper and Android SDK 36/build tools 36.0.0. Set `ANDROID_HOME` to your SDK directory or create an untracked `local.properties` containing `sdk.dir=/absolute/sdk/path`.

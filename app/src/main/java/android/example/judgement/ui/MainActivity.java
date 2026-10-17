@@ -5,9 +5,12 @@ import android.example.judgement.data.DraftSpec;
 import android.example.judgement.data.PlayerSpec;
 import android.example.judgement.data.Records;
 import android.example.judgement.data.Snapshot;
+import android.example.judgement.data.GameStatistics;
+import android.example.judgement.data.RoundEditPreview;
 import android.example.judgement.domain.GameRules;
 import android.example.judgement.domain.Names;
 import android.example.judgement.domain.Outcome;
+import android.example.judgement.domain.ScoringStrategy;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.text.Editable;
@@ -50,6 +53,11 @@ public final class MainActivity extends AppCompatActivity {
     private BottomNavigationView navigation;
     private ScoreAdapter adapter;
     private RosterAdapter roster;
+    private StrategyEditor strategyEditor;
+    private RoundEditorAdapter roundEditor;
+    private StatisticsContentAdapter statisticsAdapter;
+    private Snapshot statisticsSource;
+    private boolean aggressiveAppearance, changingAppearance;
     private ChromeAdapter headerAdapter, footerAdapter;
     private RecyclerView.Adapter<?> contentAdapter;
     private String headingText = "", descriptionText = "", errorText;
@@ -64,6 +72,8 @@ public final class MainActivity extends AppCompatActivity {
     private String search = "";
 
     @Override protected void onCreate(Bundle savedInstanceState) {
+        aggressiveAppearance = savedInstanceState != null && savedInstanceState.getBoolean("aggressiveAppearance");
+        setTheme(aggressiveAppearance ? R.style.Theme_Score_Aggressive : R.style.Theme_Score);
         super.onCreate(savedInstanceState);
         if (savedInstanceState != null) {
             pickerReturn = savedInstanceState.getString("pickerReturn", "SETTINGS");
@@ -102,6 +112,18 @@ public final class MainActivity extends AppCompatActivity {
             @Override public void handleOnBackPressed() { back(); }
         });
         model.state.observe(this, snapshot -> { state = snapshot; render(); restoreForm(model.form()); });
+        model.screenState().observe(this, screen -> { if (state != null) render(); });
+        model.strategyState().observe(this, request -> { if (state != null) render(); });
+        model.roundEditorState().observe(this, request -> {
+            if (state != null) {
+                render();
+                RoundEditRequest current = model.roundEditor();
+                if (current != null && current.error != null) {
+                    list.smoothScrollToPosition(0); list.announceForAccessibility(current.error);
+                }
+            }
+        });
+        model.roundPreview.observe(this, preview -> { if (state != null) render(); });
         model.formState().observe(this, bundle -> {
             if (state != null) restoreForm(FormRequest.fromBundle(bundle));
         });
@@ -112,6 +134,7 @@ public final class MainActivity extends AppCompatActivity {
         model.repository.failures().observe(this, message -> { if (message != null) model.error.setValue(message); });
     }
     @Override protected void onSaveInstanceState(Bundle outState) {
+        outState.putBoolean("aggressiveAppearance", aggressiveAppearance);
         outState.putString("pickerReturn", pickerReturn); outState.putString("search", search);
         long[] selected = new long[selectedProfiles.size()]; int i = 0; for (long id : selectedProfiles) selected[i++] = id;
         outState.putLongArray("selectedProfiles", selected);
@@ -124,10 +147,18 @@ public final class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
-    private void open(String screen) { model.screen(screen); render(); }
+    private void open(String screen) { model.screen(screen); }
     private void back() {
         String screen = model.screen();
-        if ("MANAGE".equals(screen)) {
+        if ("SCORING".equals(screen)) {
+            StrategyRequest request = model.strategyRequest();
+            if (request != null) model.finishStrategy(request.token); else open("HOME");
+        } else if ("ROUND_EDIT".equals(screen)) {
+            confirm(R.string.discard_title, R.string.discard_message, R.string.discard, model::finishRoundEditor);
+        } else if ("ROUND_DETAILS".equals(screen)) open(model.historyReturn());
+        else if ("STATISTICS".equals(screen)) open("GAME");
+        else if ("SCORING_HELP".equals(screen)) open(model.scoringHelpReturn());
+        else if ("MANAGE".equals(screen)) {
             confirm(R.string.discard_title, R.string.discard_message, R.string.discard, () -> open("GAME"));
         } else if ("SETTINGS".equals(screen)) open("PLAYERS");
         else if ("PICK_DEALER".equals(screen)) open(pickerReturn);
@@ -138,13 +169,16 @@ public final class MainActivity extends AppCompatActivity {
         else open("HOME");
     }
     private void render() {
-        if (state == null) return;
+        if (state == null || changingAppearance) return;
+        if (updateAppearance()) return;
         String screen = model.screen();
         if ("GAME".equals(screen) && state.game == null) { model.screen("HOME"); screen = "HOME"; }
         boolean changed = !screen.equals(renderedScreen);
         Parcelable scroll = changed ? null : list.getLayoutManager().onSaveInstanceState();
         if (changed) {
             if (roster != null) { roster.detach(); roster = null; }
+            strategyEditor = null;
+            roundEditor = null; statisticsAdapter = null; statisticsSource = null;
             adapter = new ScoreAdapter(); setContent(adapter); renderedScreen = screen;
         }
         footerActions.clear();
@@ -162,6 +196,11 @@ public final class MainActivity extends AppCompatActivity {
             case "PLAYERS": players(false); break;
             case "MANAGE": players(true); break;
             case "SETTINGS": settings(); break;
+            case "SCORING": scoring(); break;
+            case "SCORING_HELP": scoringHelp(); break;
+            case "ROUND_DETAILS": roundDetails(); break;
+            case "ROUND_EDIT": editHistoricalRound(); break;
+            case "STATISTICS": statistics(); break;
             case "PICK_DEALER": pickDealer(); break;
             case "PICK_SCORE": pickScore(); break;
             case "RESTORE": restorePlayers(); break;
@@ -173,7 +212,9 @@ public final class MainActivity extends AppCompatActivity {
             default: home(); break;
         }
         headerAdapter.notifyItemChanged(0); footerAdapter.notifyItemChanged(0);
-        if (scroll != null) list.getLayoutManager().onRestoreInstanceState(scroll);
+        boolean revealScoringError = "SCORING".equals(screen) && model.strategyRequest() != null
+                && model.strategyRequest().error != null;
+        if (scroll != null && !revealScoringError) list.getLayoutManager().onRestoreInstanceState(scroll);
     }
     private void header(String heading, String subtitle) {
         headingText = heading; descriptionText = subtitle;
@@ -235,7 +276,7 @@ public final class MainActivity extends AppCompatActivity {
         rows(rows);
         action(R.string.new_game, R.id.primary_action, () -> {
             if (state.draft != null) { open("PLAYERS"); return; }
-            model.run(() -> model.repository.saveDraft(new DraftSpec(0, new ArrayList<>(), "ASCENDING", "FIXED", null)), () -> open("PLAYERS"));
+            model.run(() -> model.repository.saveDraft(new DraftSpec(0, new ArrayList<>(), "ASCENDING", "FIXED", null)), "PLAYERS");
         });
     }
     private List<PlayerSpec> draftPlayers() {
@@ -291,7 +332,7 @@ public final class MainActivity extends AppCompatActivity {
                 GameRules.validatePlayerCount(state.draftPlayers.size());
                 if (state.draft.dealerId == null) {
                     long draftId = state.draft.id, dealerId = state.draftPlayers.get(state.draftPlayers.size() - 1).id;
-                    model.run(() -> model.repository.chooseDraftDealer(draftId, dealerId), () -> open("SETTINGS"));
+                    model.run(() -> model.repository.chooseDraftDealer(draftId, dealerId), "SETTINGS");
                 } else open("SETTINGS");
             }
             catch (IllegalArgumentException exception) { model.error.setValue(exception.getMessage()); }
@@ -314,7 +355,14 @@ public final class MainActivity extends AppCompatActivity {
     private void settings() {
         if (state.draft == null) { open("HOME"); return; }
         header(getString(R.string.setup_settings), "");
-        rows(new ScoreAdapter.Row(1, getString(R.string.direction), getString("ASCENDING".equals(state.draft.direction) ? R.string.ascending : R.string.descending))
+        ScoringStrategy scoring = ScoringStrategy.decode(state.draft.scoringConfig);
+        long scoringDraftId = state.draft.id;
+        rows(new ScoreAdapter.Row(4, getString(R.string.scoring_selected, StrategyEditor.label(this, scoring)),
+                        StrategyEditor.rules(this, scoring))
+                        .action(getString(R.string.choose_scoring), () -> model.beginStrategy(new StrategyRequest(
+                                StrategyRequest.Target.DRAFT, scoringDraftId, "SETTINGS", scoring)))
+                        .action(getString(R.string.how_scoring_works), () -> showScoringHelp(scoring, "SETTINGS")),
+                new ScoreAdapter.Row(1, getString(R.string.direction), getString("ASCENDING".equals(state.draft.direction) ? R.string.ascending : R.string.descending))
                         .action(getString(R.string.ascending), () -> config("ASCENDING", null))
                         .action(getString(R.string.descending), () -> config("DESCENDING", null)),
                 new ScoreAdapter.Row(2, getString(R.string.trump_mode), getString("FIXED".equals(state.draft.trumpMode) ? R.string.fixed_trump : R.string.custom_trump))
@@ -324,9 +372,86 @@ public final class MainActivity extends AppCompatActivity {
                         .action(getString(R.string.choose_dealer), () -> { pickerReturn = "SETTINGS"; open("PICK_DEALER"); }));
         action(R.string.start_game, R.id.primary_action, () -> {
             long draftId = state.draft.id;
-            Runnable start = () -> model.run(() -> model.repository.startGame(draftId), () -> { model.tab("ROUND"); open("GAME"); });
+            Runnable start = () -> model.run(() -> model.repository.startGame(draftId), "GAME", "ROUND");
             if (state.game != null) confirm(R.string.replace_game_title, R.string.replace_game_message, R.string.start_game, start); else start.run();
         });
+    }
+    private void scoring() {
+        StrategyRequest request = model.strategyRequest();
+        if (request == null) { open("HOME"); return; }
+        String effect;
+        if (request.target == StrategyRequest.Target.DRAFT) effect = getString(R.string.strategy_for_next_game);
+        else if (state.round == null || state.round.id != request.targetId) effect = getString(R.string.strategy_stale_round);
+        else {
+            boolean started = false;
+            for (Records.RoundPlayer player : state.roundPlayers) started |= player.bid != null;
+            effect = started ? getString(R.string.strategy_from_round, state.round.number + 1)
+                    : getString(R.string.strategy_this_round, state.round.number);
+            if (started) {
+                try {
+                    if (request.strategy().encode().equals(state.round.scoringConfig)) effect = getString(
+                            state.game.pendingScoringConfig == null ? R.string.strategy_unchanged : R.string.strategy_cancel_pending,
+                            StrategyEditor.label(this, request.strategy()));
+                } catch (IllegalArgumentException invalidCustom) { /* The form keeps its raw values. */ }
+            }
+        }
+        header(getString(R.string.choose_scoring), effect + "\n" + getString(R.string.strategy_preview));
+        if (strategyEditor == null) strategyEditor = new StrategyEditor(request, new StrategyEditor.Listener() {
+            @Override public void onChanged(StrategyRequest changed) { model.editStrategy(changed); }
+            @Override public void onHelp() {
+                StrategyRequest current = model.strategyRequest();
+                if (current == null) return;
+                String config = null;
+                try { config = current.strategy().encode(); } catch (IllegalArgumentException invalid) { }
+                model.scoringHelp(config, "SCORING"); open("SCORING_HELP");
+            }
+        });
+        strategyEditor.update(request); setContent(strategyEditor);
+        action(R.string.save_scoring, R.id.primary_action, () -> {
+            StrategyRequest current = model.strategyRequest();
+            if (current == null) return;
+            try { model.saveStrategy(current, current.strategy()); }
+            catch (IllegalArgumentException invalid) {
+                model.strategyError(current.token, invalid.getMessage());
+                if (strategyEditor != null) strategyEditor.focusFirstError();
+            }
+        }).setEnabled(!model.savingStrategy(request.token));
+        action(R.string.cancel, R.id.strategy_cancel, () -> model.finishStrategy(request.token));
+    }
+    private void showScoringHelp(ScoringStrategy strategy, String backTo) {
+        model.scoringHelp(strategy.encode(), backTo); open("SCORING_HELP");
+    }
+    private void scoringHelp() {
+        header(getString(R.string.how_scoring_works), "");
+        String encoded = model.scoringHelpConfig();
+        if (encoded == null) rows(new ScoreAdapter.Row(1, getString(R.string.strategy_custom),
+                getString(R.string.strategy_custom_explanation) + "\n\n" + getString(R.string.strategy_complete_fields)));
+        else {
+            ScoringStrategy strategy = ScoringStrategy.decode(encoded);
+            rows(new ScoreAdapter.Row(1, StrategyEditor.label(this, strategy), StrategyEditor.rules(this, strategy)),
+                    new ScoreAdapter.Row(2, getString(R.string.strategy_examples_title), StrategyEditor.examples(this, strategy)));
+        }
+        action(R.string.back, R.id.primary_action, () -> open(model.scoringHelpReturn()));
+    }
+    private boolean updateAppearance() {
+        String screen = model.screen();
+        ScoringStrategy strategy = ScoringStrategy.defaults();
+        StrategyRequest editing = model.strategyRequest();
+        if (("SCORING".equals(screen) || ("SCORING_HELP".equals(screen) && "SCORING".equals(model.scoringHelpReturn()))) && editing != null) {
+            if (editing.preset == ScoringStrategy.Preset.AGGRESSIVE) strategy = ScoringStrategy.aggressive();
+        } else if ("SCORING_HELP".equals(screen) && model.scoringHelpConfig() != null) strategy = ScoringStrategy.decode(model.scoringHelpConfig());
+        else if (state.draft != null && ("PLAYERS".equals(screen) || "SETTINGS".equals(screen)
+                || (("PICK_DEALER".equals(screen) || "QUICK_ADD".equals(screen)) && !"MANAGE".equals(pickerReturn)))) {
+            strategy = ScoringStrategy.decode(state.draft.scoringConfig);
+        } else if (state.game != null && ("GAME".equals(screen) || "MANAGE".equals(screen)
+                || "ROUND_DETAILS".equals(screen) || "ROUND_EDIT".equals(screen) || "STATISTICS".equals(screen)
+                || "PICK_SCORE".equals(screen) || "RESTORE".equals(screen) || "PICK_DEALER".equals(screen)
+                || ("QUICK_ADD".equals(screen) && "MANAGE".equals(pickerReturn)))) {
+            strategy = ScoringStrategy.decode(state.round == null ? state.game.scoringConfig : state.round.scoringConfig);
+        }
+        boolean aggressive = strategy.preset == ScoringStrategy.Preset.AGGRESSIVE;
+        if (aggressive == aggressiveAppearance) return false;
+        aggressiveAppearance = aggressive; changingAppearance = true; recreate(); return true;
     }
     private void config(String direction, String trump) {
         long draftId = state.draft.id;
@@ -343,7 +468,7 @@ public final class MainActivity extends AppCompatActivity {
                 if (manage) { model.stagedDealer(player.id); open("MANAGE"); }
                 else {
                     long draftId = state.draft.id;
-                    model.run(() -> model.repository.chooseDraftDealer(draftId, player.id), () -> open("SETTINGS"));
+                    model.run(() -> model.repository.chooseDraftDealer(draftId, player.id), "SETTINGS");
                 }
             }));
         }
@@ -354,16 +479,31 @@ public final class MainActivity extends AppCompatActivity {
         return players.isEmpty() ? "" : players.get(players.size() - 1).name;
     }
     private void game() {
+        boolean completed = "COMPLETE".equals(state.game.status);
+        if (completed) {
+            action(R.string.statistics_title, R.id.final_statistics, () -> open("STATISTICS"));
+            long gameId = state.game.id;
+            action(R.string.play_again, R.id.play_again, () -> model.run(
+                    () -> model.repository.playAgain(gameId), "SETTINGS"));
+        }
         if ("SCOREBOARD".equals(model.tab())) { scoreboard(); return; }
         if ("HISTORY".equals(model.tab())) { history(); return; }
         if (state.round == null || "COMPLETE".equals(state.game.status)) {
-            header(getString(R.string.game_complete), getString(R.string.complete_description)); scoreboardRows(); return;
+            String detail = getString(R.string.complete_description);
+            if (state.game.pendingScoringConfig != null) detail += "\n\n" + getString(R.string.strategy_pending_ended,
+                    StrategyEditor.label(this, ScoringStrategy.decode(state.game.pendingScoringConfig)));
+            header(getString(R.string.game_complete), detail); scoreboardRows(); return;
         }
         Records.Round round = state.round;
         String trump = "CUSTOM".equals(state.game.trumpMode) ? getString(R.string.trump_at_table) : getString(R.string.trump_format, getString(new int[]{R.string.spades, R.string.diamonds, R.string.clubs, R.string.hearts}[(round.number - 1) % 4]));
         header(roundHeading(round.number, round.cards),
-                getString(R.string.round_description, getString(R.string.dealer_format, playerName(state.players, round.dealerId)), trump));
+                getString(R.string.round_description, getString(R.string.dealer_format, playerName(state.players, round.dealerId)), trump)
+                        + "\n" + getString(R.string.scoring_selected, StrategyEditor.label(this, ScoringStrategy.decode(round.scoringConfig)))
+                        + (state.game.pendingScoringConfig == null ? "" : "\n" + getString(R.string.strategy_pending,
+                                StrategyEditor.label(this, ScoringStrategy.decode(state.game.pendingScoringConfig)), round.number + 1)));
         if ("BIDDING".equals(round.phase)) bidding(round); else results(round);
+        ScoringStrategy strategy = ScoringStrategy.decode(round.scoringConfig);
+        action(R.string.how_scoring_works, R.id.round_scoring_help, () -> showScoringHelp(strategy, "GAME"));
     }
     private void bidding(Records.Round round) {
         List<ScoreAdapter.Row> rows = new ArrayList<>();
@@ -428,16 +568,90 @@ public final class MainActivity extends AppCompatActivity {
                 Records.RoundPlayer player = history.players.get(i);
                 if (detail.length() > 0) detail.append("\n\n");
                 detail.append(getString(R.string.history_player, i + 1, player.nameSnapshot, player.bid,
-                        getString("WON".equals(player.outcome) ? R.string.won : R.string.lost), GameRules.score(player.bid, Outcome.valueOf(player.outcome))));
+                        getString("WON".equals(player.outcome) ? R.string.won : R.string.lost), ScoringStrategy.decode(history.round.scoringConfig).points(history.round.cards, player.bid, Outcome.valueOf(player.outcome))));
             }
             entries.add(new HistoryEntry(history.round.completedAt == null ? history.round.createdAt : history.round.completedAt,
-                    new ScoreAdapter.Row(history.round.id, roundHeading(history.round.number, history.round.cards), detail.toString())));
+                    new ScoreAdapter.Row(history.round.id, roundHeading(history.round.number, history.round.cards),
+                            StrategyEditor.label(this, ScoringStrategy.decode(history.round.scoringConfig)) + "\n\n" + detail)
+                            .action(getString(R.string.history_inspect_round), () -> inspectRound(history.round.id, "GAME"))));
         }
         for (Records.ScoreAdjustment adjustment : state.adjustments) entries.add(new HistoryEntry(adjustment.createdAt, new ScoreAdapter.Row(-adjustment.id - 1,
                 getString(R.string.adjustment_title, adjustment.nameSnapshot), getResources().getQuantityString(R.plurals.adjustment_detail, Math.addExact(adjustment.previousTotal, adjustment.delta) == 1 ? 1 : 2, adjustment.previousTotal, Math.addExact(adjustment.previousTotal, adjustment.delta)))));
         entries.sort(Comparator.comparingLong(entry -> entry.time));
         List<ScoreAdapter.Row> rows = new ArrayList<>(); for (HistoryEntry entry : entries) rows.add(entry.row);
         rows(rows);
+    }
+    private void inspectRound(long roundId, String returnScreen) {
+        model.inspectRound(roundId, returnScreen);
+    }
+    private Snapshot.RoundHistory selectedHistory() {
+        Long selected = model.historyRoundId();
+        if (selected != null) for (Snapshot.RoundHistory history : state.history)
+            if (history.round.id == selected) return history;
+        return null;
+    }
+    private void roundDetails() {
+        Snapshot.RoundHistory history = selectedHistory();
+        if (history == null) {
+            header(getString(R.string.history_tab), getString(R.string.history_missing_round)); rows();
+            action(R.string.back, R.id.primary_action, () -> open(model.historyReturn())); return;
+        }
+        ScoringStrategy scoring = ScoringStrategy.decode(history.round.scoringConfig);
+        header(roundHeading(history.round.number, history.round.cards), getString(R.string.history_detail_description,
+                StrategyEditor.label(this, scoring)));
+        rows(RoundDetails.rows(this, history, state.roundEdits));
+        action(R.string.history_edit_round, R.id.edit_historical_round, () -> model.beginRoundEditor(history));
+        action(R.string.how_scoring_works, R.id.round_scoring_help, () -> showScoringHelp(scoring, "ROUND_DETAILS"));
+        action(R.string.back, R.id.history_back, () -> open(model.historyReturn()));
+    }
+    private void editHistoricalRound() {
+        RoundEditRequest request = model.roundEditor();
+        if (request == null) { model.screen("ROUND_DETAILS"); roundDetails(); return; }
+        RoundEditPreview preview = model.previewFor(request);
+        boolean busy = model.roundEditorBusy(request);
+        String description = getString(R.string.history_edit_description) + "\n\n"
+                + StrategyEditor.label(this, request.scoring);
+        if (busy) description += "\n" + getString(R.string.history_working);
+        else if (preview != null) description += "\n" + getString(R.string.history_preview_ready);
+        if (request.error != null) description += "\n\n" + request.error;
+        header(getString(R.string.history_edit_round) + " · " + roundHeading(request.roundNumber, request.cards), description);
+        if (roundEditor == null) roundEditor = new RoundEditorAdapter(model::editRoundInput);
+        roundEditor.submit(request, preview, busy); setContent(roundEditor);
+        action(R.string.history_preview, R.id.preview_historical_round, () -> {
+            RoundEditRequest current = model.roundEditor();
+            if (current != null) model.previewRound(current, false);
+        }).setEnabled(!busy);
+        action(R.string.history_save, R.id.save_historical_round, () -> {
+            RoundEditRequest current = model.roundEditor();
+            if (current != null && model.previewFor(current) != null) model.previewRound(current, true);
+        }).setEnabled(!busy && preview != null);
+        action(R.string.cancel, R.id.cancel_historical_round, this::back).setEnabled(!busy);
+    }
+    private void statistics() {
+        if (state.game == null || !"COMPLETE".equals(state.game.status)) {
+            model.screen(state.game == null ? "HOME" : "GAME"); render(); return;
+        }
+        header(getString(R.string.statistics_title), getString(R.string.statistics_round_help));
+        if (statisticsAdapter == null || statisticsSource != state) {
+            statisticsSource = state;
+            GameStatistics report = GameStatistics.from(state);
+            List<Long> defaults = new ArrayList<>();
+            for (GameStatistics.PlayerStatistics player : report.players) if (defaults.size() < 3) defaults.add(player.playerId);
+            long gameId = state.game.id;
+            statisticsAdapter = new StatisticsContentAdapter(this, report, model.comparedPlayers(gameId, defaults),
+                    selected -> model.comparedPlayers(gameId, selected), event -> {
+                        if (event.kind == GameStatistics.EventKind.ROUND) inspectRound(event.round.roundId, "STATISTICS");
+                        else new MaterialAlertDialogBuilder(this).setTitle(R.string.statistics_manual_adjustment)
+                                .setMessage(getString(R.string.adjustment_title, event.adjustment.name) + "\n"
+                                        + getResources().getQuantityString(R.plurals.adjustment_detail,
+                                                Math.addExact(event.adjustment.previousTotal, event.adjustment.delta) == 1 ? 1 : 2,
+                                                event.adjustment.previousTotal,
+                                                Math.addExact(event.adjustment.previousTotal, event.adjustment.delta)))
+                                .setPositiveButton(android.R.string.ok, null).show();
+                    });
+        }
+        setContent(statisticsAdapter);
+        action(R.string.back, R.id.primary_action, () -> open("GAME"));
     }
     private static final class HistoryEntry {
         final long time; final ScoreAdapter.Row row;
@@ -454,7 +668,7 @@ public final class MainActivity extends AppCompatActivity {
             }).show();
             return;
         }
-        final int[] labels = {R.string.manage_players, R.string.change_dealer, R.string.correct_score, R.string.restart_round, R.string.new_game, R.string.help, R.string.home};
+        final int[] labels = {R.string.manage_players, R.string.change_dealer, R.string.correct_score, R.string.restart_round, R.string.change_scoring, R.string.new_game, R.string.how_scoring_works, R.string.help, R.string.home};
         String[] text = new String[labels.length]; for (int i = 0; i < labels.length; i++) text[i] = getString(labels[i]);
         new MaterialAlertDialogBuilder(this).setTitle(R.string.options).setItems(text, (dialog, which) -> {
             switch (which) {
@@ -471,14 +685,19 @@ public final class MainActivity extends AppCompatActivity {
                     confirm(R.string.restart_title, R.string.restart_message, R.string.restart, () -> model.run(() -> model.repository.restartRound(id)));
                 } break;
                 case 4:
-                    newSetup(); break;
-                case 5: open("HELP"); break;
+                    if (state.round != null) model.beginStrategy(new StrategyRequest(StrategyRequest.Target.ROUND,
+                            state.round.id, "GAME", ScoringStrategy.decode(state.game.pendingScoringConfig == null
+                                    ? state.round.scoringConfig : state.game.pendingScoringConfig)));
+                    break;
+                case 5: newSetup(); break;
+                case 6: if (state.round != null) showScoringHelp(ScoringStrategy.decode(state.round.scoringConfig), "GAME"); break;
+                case 7: open("HELP"); break;
                 default: open("HOME"); break;
             }
         }).show();
     }
     private void newSetup() {
-        if (state.draft == null) model.run(() -> model.repository.saveDraft(new DraftSpec(0, new ArrayList<>(), "ASCENDING", "FIXED", null)), () -> open("PLAYERS"));
+        if (state.draft == null) model.run(() -> model.repository.saveDraft(new DraftSpec(0, new ArrayList<>(), "ASCENDING", "FIXED", null)), "PLAYERS");
         else open("PLAYERS");
     }
     private void applyRoster() {
@@ -497,16 +716,24 @@ public final class MainActivity extends AppCompatActivity {
         structure |= dealer == null || dealer != state.round.dealerId;
         boolean started = false; for (Records.RoundPlayer player : state.roundPlayers) started |= player.bid != null;
         long roundId = stagedRoundId; long selected = dealer == null ? 0 : dealer;
-        Runnable apply = () -> model.run(() -> model.repository.applyRoster(roundId, players, selected, true), () -> open("GAME"));
+        Runnable apply = () -> model.run(() -> model.repository.applyRoster(roundId, players, selected, true), "GAME");
         if (structure && started) confirm(R.string.restart_title, R.string.restart_message, R.string.apply, apply); else apply.run();
     }
     private void restorePlayers() {
         header(getString(R.string.restore_players), "");
         List<ScoreAdapter.Row> rows = new ArrayList<>();
-        for (Records.GamePlayer player : state.inactivePlayers) rows.add(new ScoreAdapter.Row(player.id, player.name, points(state.total(player.id)))
-                .action(getString(R.string.restore), () -> {
-                    List<PlayerSpec> players = model.staged(); players.add(new PlayerSpec(player.id, player.name, player.savedPlayerId)); model.stage(players); open("MANAGE");
-                }));
+        Set<Long> stagedIds = new HashSet<>();
+        for (PlayerSpec player : model.staged()) stagedIds.add(player.id);
+        for (Records.GamePlayer player : state.inactivePlayers) {
+            if (stagedIds.contains(player.id)) continue;
+            rows.add(new ScoreAdapter.Row(player.id, player.name, points(state.total(player.id)))
+                    .action(getString(R.string.restore), () -> {
+                        List<PlayerSpec> players = model.staged();
+                        for (PlayerSpec staged : players) if (staged.id == player.id) return;
+                        players.add(new PlayerSpec(player.id, player.name, player.savedPlayerId));
+                        model.stage(players); open("MANAGE");
+                    }));
+        }
         rows(rows);
     }
     private void pickScore() {
@@ -563,7 +790,7 @@ public final class MainActivity extends AppCompatActivity {
                 model.stage(players); open("MANAGE");
             } else {
                 long draftId = state.draft.id;
-                model.run(() -> model.repository.addSavedPlayersToDraft(draftId, selected), () -> open("PLAYERS"));
+                model.run(() -> model.repository.addSavedPlayersToDraft(draftId, selected), "PLAYERS");
             }
         }).setEnabled(!selectedProfiles.isEmpty());
         else action(R.string.add_saved, R.id.primary_action, () -> model.beginForm(new FormRequest(

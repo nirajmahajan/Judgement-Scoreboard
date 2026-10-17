@@ -6,7 +6,7 @@
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar" android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize" app:title="@string/app_name"
-        app:titleTextColor="@color/score_text" />
+        app:titleTextColor="?attr/colorOnSurface" app:navigationIconTint="?attr/colorOnSurface" />
     <androidx.recyclerview.widget.RecyclerView android:id="@+id/screen_list"
         android:layout_width="match_parent" android:layout_height="0dp"
         android:layout_weight="1" android:clipToPadding="false"

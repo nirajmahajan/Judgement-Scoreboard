@@ -1,12 +1,14 @@
 package android.example.judgement.data;
 
 import androidx.annotation.NonNull;
+import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
 /** Persisted records. Names and seats are display properties; only IDs identify participants. */
 public final class Records {
+    public static final String DEFAULT_SCORING = "v1|DEFAULT|10|10|1|0";
     private Records() { }
 
     @Entity(tableName = "games")
@@ -18,6 +20,9 @@ public final class Records {
         public int maximumCards;
         public Long dealerId;
         public long createdAt;
+        @NonNull @ColumnInfo(defaultValue = "'v1|DEFAULT|10|10|1|0'")
+        public String scoringConfig = DEFAULT_SCORING;
+        public String pendingScoringConfig;
     }
 
     @Entity(tableName = "game_players", indices = {@Index("gameId")})
@@ -41,6 +46,9 @@ public final class Records {
         @NonNull public String phase = "BIDDING";
         public long createdAt;
         public Long completedAt;
+        @NonNull @ColumnInfo(defaultValue = "'v1|DEFAULT|10|10|1|0'")
+        public String scoringConfig = DEFAULT_SCORING;
+        @ColumnInfo(defaultValue = "0") public long revision;
     }
 
     @Entity(tableName = "round_players", primaryKeys = {"roundId", "playerId"}, indices = {@Index("playerId")})
@@ -61,6 +69,19 @@ public final class Records {
         public long previousTotal;
         public long delta;
         @NonNull public String nameSnapshot = "";
+        public long createdAt;
+    }
+
+    /** Immutable full-round before/after audit. Repository exposes no mutation or deletion command. */
+    @Entity(tableName = "round_edits", indices = {@Index("gameId"), @Index("roundId")})
+    public static class RoundEdit {
+        @PrimaryKey(autoGenerate = true) public long id;
+        public long gameId;
+        public long roundId;
+        public long previousRevision;
+        public long revision;
+        @NonNull public String previousValues = "";
+        @NonNull public String newValues = "";
         public long createdAt;
     }
 

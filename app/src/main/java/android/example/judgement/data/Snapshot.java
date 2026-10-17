@@ -19,12 +19,14 @@ public final class Snapshot {
     public final List<Records.ScoreAdjustment> adjustments;
     public final List<Records.SavedPlayer> savedPlayers;
     public final List<Records.RecoveryRow> recoveries;
+    public final List<Records.RoundEdit> roundEdits;
 
     Snapshot(Records.Game draft, List<Records.GamePlayer> draftPlayers, Records.Game game,
              List<Records.GamePlayer> players, List<Records.GamePlayer> inactivePlayers,
              Map<Long, Long> totals, Records.Round round, List<Records.RoundPlayer> roundPlayers,
              List<RoundHistory> history, List<Records.ScoreAdjustment> adjustments,
-             List<Records.SavedPlayer> savedPlayers, List<Records.RecoveryRow> recoveries) {
+             List<Records.SavedPlayer> savedPlayers, List<Records.RecoveryRow> recoveries,
+             List<Records.RoundEdit> roundEdits) {
         this.draft = draft;
         this.draftPlayers = Collections.unmodifiableList(draftPlayers);
         this.game = game;
@@ -37,6 +39,7 @@ public final class Snapshot {
         this.adjustments = Collections.unmodifiableList(adjustments);
         this.savedPlayers = Collections.unmodifiableList(savedPlayers);
         this.recoveries = Collections.unmodifiableList(recoveries);
+        this.roundEdits = Collections.unmodifiableList(roundEdits);
     }
 
     public long total(long playerId) { Long total = totals.get(playerId); return total == null ? 0 : total; }

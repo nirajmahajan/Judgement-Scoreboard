@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.example.judgement.data.PlayerSpec;
 import android.example.judgement.data.ScoreRepository;
 import android.example.judgement.data.Snapshot;
+import android.example.judgement.data.RoundEditPreview;
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
@@ -35,18 +36,23 @@ public final class ScoreViewModel extends AndroidViewModel {
     }
     public interface Command { void run(); }
     public void run(Command command) { run(command, null); }
-    public void run(Command command, Runnable success) {
+    public void run(Command command, String nextScreen) { run(command, nextScreen, null); }
+    public void run(Command command, String nextScreen, String nextTab) {
         error.setValue(null);
         repository.execute(() -> {
             try {
                 command.run();
-                if (success != null) main.post(success);
+                if (nextScreen != null) main.post(() -> {
+                    if (nextTab != null) tab(nextTab);
+                    screen(nextScreen);
+                });
             } catch (IllegalArgumentException | IllegalStateException | ArithmeticException exception) {
                 main.post(() -> error.setValue(exception.getMessage()));
             }
         });
     }
     @Override protected void onCleared() { repository.close(); }
+    LiveData<String> screenState() { return saved.getLiveData("screen", "HOME"); }
     String screen() { String value = saved.get("screen"); return value == null ? "HOME" : value; }
     void screen(String screen) { saved.set("screen", screen); error.setValue(null); }
     String tab() { String value = saved.get("tab"); return value == null ? "ROUND" : value; }
@@ -85,6 +91,133 @@ public final class ScoreViewModel extends AndroidViewModel {
                 });
             }
         });
+    }
+    LiveData<Bundle> strategyState() { return saved.getLiveData("strategyEditor"); }
+    StrategyRequest strategyRequest() { return StrategyRequest.fromBundle(saved.get("strategyEditor")); }
+    void beginStrategy(StrategyRequest request) {
+        saved.set("strategyEditor", request.toBundle()); screen("SCORING");
+    }
+    void editStrategy(StrategyRequest request) {
+        StrategyRequest current = strategyRequest();
+        if (current != null && current.token.equals(request.token)) saved.set("strategyEditor", request.toBundle());
+    }
+    void strategyError(String token, String message) {
+        StrategyRequest current = strategyRequest();
+        if (current != null && current.token.equals(token)) editStrategy(current.failure(message));
+    }
+    boolean savingStrategy(String token) { return submittingForms.contains(token); }
+    void finishStrategy(String token) {
+        StrategyRequest current = strategyRequest();
+        if (current != null && current.token.equals(token)) {
+            screen(current.returnScreen); saved.set("strategyEditor", null);
+        }
+    }
+    void saveStrategy(StrategyRequest request, android.example.judgement.domain.ScoringStrategy strategy) {
+        if (!submittingForms.add(request.token)) return;
+        editStrategy(request);
+        repository.execute(() -> {
+            try {
+                if (request.target == StrategyRequest.Target.DRAFT) repository.updateDraftScoring(request.targetId, strategy);
+                else repository.changeScoringStrategy(request.targetId, strategy);
+                main.post(() -> { submittingForms.remove(request.token); finishStrategy(request.token); });
+            } catch (IllegalArgumentException | IllegalStateException | ArithmeticException exception) {
+                main.post(() -> {
+                    submittingForms.remove(request.token);
+                    strategyError(request.token, exception.getMessage());
+                });
+            }
+        });
+    }
+    void scoringHelp(String config, String returnScreen) {
+        saved.set("scoringHelpConfig", config); saved.set("scoringHelpReturn", returnScreen);
+    }
+    String scoringHelpConfig() { return saved.get("scoringHelpConfig"); }
+    String scoringHelpReturn() { String value = saved.get("scoringHelpReturn"); return value == null ? "HOME" : value; }
+    static final class RoundPreview {
+        final String token; final long generation; final RoundEditPreview value;
+        RoundPreview(RoundEditRequest request, RoundEditPreview value) {
+            token = request.token; generation = request.generation; this.value = value;
+        }
+    }
+    final MutableLiveData<RoundPreview> roundPreview = new MutableLiveData<>();
+    LiveData<Bundle> roundEditorState() { return saved.getLiveData("roundEditor"); }
+    RoundEditRequest roundEditor() { return RoundEditRequest.fromBundle(saved.get("roundEditor")); }
+    void beginRoundEditor(Snapshot.RoundHistory history) {
+        saved.set("roundEditor", new RoundEditRequest(history.round, history.players).toBundle());
+        roundPreview.setValue(null);
+        screen("ROUND_EDIT");
+    }
+    void editRoundInput(RoundEditRequest request) {
+        RoundEditRequest current = roundEditor();
+        if (current == null || !current.token.equals(request.token)) return;
+        saved.set("roundEditor", request.toBundle());
+        if (current.generation != request.generation) roundPreview.setValue(null);
+    }
+    RoundEditPreview previewFor(RoundEditRequest request) {
+        RoundPreview preview = roundPreview.getValue();
+        return preview != null && preview.token.equals(request.token) && preview.generation == request.generation
+                ? preview.value : null;
+    }
+    boolean roundEditorBusy(RoundEditRequest request) { return submittingForms.contains(request.token); }
+    private boolean currentRoundInput(RoundEditRequest request) {
+        RoundEditRequest current = roundEditor();
+        return current != null && current.token.equals(request.token) && current.generation == request.generation;
+    }
+    void finishRoundEditor() {
+        screen("ROUND_DETAILS"); saved.set("roundEditor", null); roundPreview.setValue(null);
+    }
+    void previewRound(RoundEditRequest request, boolean save) {
+        RoundEditRequest validated = request.validated();
+        editRoundInput(validated);
+        final List<android.example.judgement.data.RoundPlayerEdit> edits;
+        try { edits = validated.edits(); }
+        catch (IllegalArgumentException exception) { editRoundInput(validated.withError(exception.getMessage())); return; }
+        if (!submittingForms.add(request.token)) return;
+        // Notify after the busy flag changes; an Activity recreated during this command sees the same request.
+        editRoundInput(validated);
+        repository.execute(() -> {
+            try {
+                if (save) repository.editRound(request.roundId, request.expectedRevision, edits);
+                else {
+                    RoundEditPreview result = repository.previewRoundEdit(request.roundId, request.expectedRevision, edits);
+                    main.post(() -> {
+                        submittingForms.remove(request.token);
+                        if (currentRoundInput(request)) {
+                            roundPreview.setValue(new RoundPreview(request, result)); editRoundInput(validated);
+                        }
+                    });
+                    return;
+                }
+                main.post(() -> {
+                    submittingForms.remove(request.token);
+                    if (currentRoundInput(request)) finishRoundEditor();
+                });
+            } catch (IllegalArgumentException | IllegalStateException | ArithmeticException exception) {
+                main.post(() -> {
+                    submittingForms.remove(request.token);
+                    if (currentRoundInput(request)) {
+                        roundPreview.setValue(null); editRoundInput(validated.withError(exception.getMessage()));
+                    }
+                });
+            }
+        });
+    }
+    void inspectRound(long id, String backTo) {
+        saved.set("historyRoundId", id); saved.set("historyReturn", backTo); screen("ROUND_DETAILS");
+    }
+    Long historyRoundId() { return saved.get("historyRoundId"); }
+    String historyReturn() { String value = saved.get("historyReturn"); return value == null ? "GAME" : value; }
+    Set<Long> comparedPlayers(long gameId, List<Long> defaults) {
+        long[] ids = saved.get("comparedPlayers"); Set<Long> result = new HashSet<>();
+        Long owner = saved.get("comparedGameId");
+        if (ids == null || owner == null || owner != gameId) result.addAll(defaults);
+        else for (long id : ids) result.add(id);
+        return result;
+    }
+    void comparedPlayers(long gameId, Set<Long> selected) {
+        long[] values = new long[selected.size()]; int index = 0;
+        for (long id : selected) values[index++] = id;
+        saved.set("comparedGameId", gameId); saved.set("comparedPlayers", values);
     }
     Long stagedDealer() { return saved.get("stagedDealer"); }
     void stagedDealer(Long id) { saved.set("stagedDealer", id); }

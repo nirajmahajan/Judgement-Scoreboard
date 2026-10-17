@@ -7,6 +7,7 @@ The saved model and visible text must survive both a background kill and force-s
 import re
 import json
 import subprocess
+import argparse
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -16,6 +17,11 @@ ACTIVITY = "android.example.judgement.ui.MainActivity"
 RUNNER = f"{PACKAGE}.test/androidx.test.runner.AndroidJUnitRunner"
 OUTPUT = Path("ci-artifacts/process-death")
 OUTPUT.mkdir(parents=True, exist_ok=True)
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--features-only", action="store_true", help="Run only the three feature state fixtures")
+parser.add_argument("--app-apk", default="app/build/outputs/apk/debug/app-debug.apk")
+parser.add_argument("--test-apk", default="app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk")
+options = parser.parse_args()
 
 
 def adb(*args, timeout=60):
@@ -112,13 +118,77 @@ def pid():
     return result.stdout.strip()
 
 
+def feature_fixture(scenario, verify=False):
+    command = ["shell", "am", "instrument", "-w", "-e", "class",
+               f"android.example.judgement.LifecycleFixtureTest#seed{scenario}"]
+    if verify:
+        command += ["-e", "lifecycleVerify", "true"]
+    output = adb(*command, RUNNER, timeout=180)
+    label = f"{scenario}-{'verified' if verify else 'fixture'}"
+    (OUTPUT / f"{label}.txt").write_text(output)
+    if "FAILURES!!!" in output or "OK (1 test)" not in output:
+        raise AssertionError(f"Feature lifecycle fixture failed: {label}")
+    marker = re.search(r"INSTRUMENTATION_STATUS: lifecycleMarker=(.+)", output)
+    data = re.search(r"INSTRUMENTATION_STATUS: lifecycleData=(.+)", output)
+    if not marker or not data:
+        raise AssertionError(f"Feature fixture supplied no persisted state proof: {label}")
+    if verify and scenario == "PendingStrategy" and "lifecycleActivated=v1|AGGRESSIVE|7|10|1|1" not in output:
+        raise AssertionError("Restored pending strategy did not activate on the next round")
+    return marker.group(1).strip(), json.loads(data.group(1))
+
+
+def feature_process_death():
+    for scenario in ["CustomScoring", "PendingStrategy", "CorrectedHistory"]:
+        marker, expected_data = feature_fixture(scenario)
+        baseline = texts(open_state(scenario, f"{scenario}-before", marker))
+        old_pid = pid()
+        if not re.fullmatch(r"\d+", old_pid):
+            raise AssertionError(f"Expected one target PID before feature death: {scenario}")
+        saved_task = background_with_saved_state(f"{scenario}-background")
+        adb("shell", "run-as", PACKAGE, "kill", "-9", old_pid)
+        for _ in range(30):
+            if not pid():
+                break
+            time.sleep(0.2)
+        if pid():
+            raise AssertionError(f"Feature SIGKILL did not remove PID {old_pid}")
+        package_state = adb("shell", "dumpsys", "package", PACKAGE)
+        (OUTPUT / f"{scenario}-background-package-state.txt").write_text(package_state)
+        if not re.search(r"User 0:.*stopped=false", package_state):
+            raise AssertionError(f"Feature death unexpectedly force-stopped the app: {scenario}")
+        restored = texts(open_state(scenario, f"{scenario}-restored", marker))
+        assert_same_task(saved_task, f"{scenario}-restored")
+        new_pid = pid()
+        if not new_pid or new_pid == old_pid:
+            raise AssertionError(f"Feature PID did not change: {old_pid} -> {new_pid}")
+        if baseline - restored:
+            raise AssertionError(f"Feature visible state changed: {scenario}: {sorted(baseline - restored)}")
+        # A new instrumentation process opens Room only after the host has proved
+        # the task/PID transition. Compare exact persisted configuration, progress,
+        # scores, revision and audit values; the pending case then completes a round.
+        _, actual_data = feature_fixture(scenario, verify=True)
+        if actual_data != expected_data:
+            raise AssertionError(f"Persisted feature state changed after death: {scenario}")
+        (OUTPUT / f"{scenario}-persisted-state.json").write_text(json.dumps({
+            "before": expected_data, "after": actual_data, "oldPid": old_pid,
+            "newPid": new_pid, "taskId": saved_task,
+            "attribution": "created by chatgpt-codex",
+        }, indent=2))
+        with (OUTPUT / "pid-changes.txt").open("a") as report:
+            report.write(f"{scenario}/background-kill: {old_pid} -> {new_pid}\n")
+        print(f"{scenario}: PID {old_pid} -> {new_pid}; persisted state retained.", flush=True)
+
+
 # Connected Android tests remove their packages when they finish. Install the exact
 # APKs built by that run before starting the independent host-side verifier.
-for apk in ["app/build/outputs/apk/debug/app-debug.apk",
-            "app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"]:
+for apk in [options.app_apk, options.test_apk]:
     if not Path(apk).is_file():
         raise AssertionError(f"Lifecycle APK is missing: {apk}")
     adb("install", "-r", "-t", apk)
+
+if options.features_only:
+    feature_process_death()
+    raise SystemExit(0)
 
 for scenario in ["Setup", "Bidding", "Results", "Completed"]:
     fixture = adb("shell", "am", "instrument", "-w", "-e", "class",
@@ -262,3 +332,4 @@ if not new_pid or new_pid == old_pid:
 with (OUTPUT / "pid-changes.txt").open("a") as report:
     report.write(f"OpenNameForm/background-kill: {old_pid} -> {new_pid}\n")
 print("Unsaved name and Save-for-future checkbox survived genuine background process death.")
+feature_process_death()

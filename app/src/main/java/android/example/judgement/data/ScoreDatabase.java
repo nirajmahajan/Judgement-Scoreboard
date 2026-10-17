@@ -17,7 +17,7 @@ import java.util.List;
 
 @Database(entities = {Records.Game.class, Records.GamePlayer.class, Records.Round.class,
         Records.RoundPlayer.class, Records.ScoreAdjustment.class, Records.SavedPlayer.class,
-        Records.RecoveryRow.class}, version = 3, exportSchema = true)
+        Records.RecoveryRow.class, Records.RoundEdit.class}, version = 4, exportSchema = true)
 public abstract class ScoreDatabase extends RoomDatabase {
     public static final String NAME = "player-database";
     public abstract ScoreDao dao();
@@ -25,7 +25,7 @@ public abstract class ScoreDatabase extends RoomDatabase {
     public static ScoreDatabase open(Context context) { return open(context, NAME); }
     public static ScoreDatabase open(Context context, String name) {
         return Room.databaseBuilder(context.getApplicationContext(), ScoreDatabase.class, name)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3).build();
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build();
     }
 
     public static final Migration MIGRATION_1_2 = new Migration(1, 2) {
@@ -42,13 +42,24 @@ public abstract class ScoreDatabase extends RoomDatabase {
             db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_saved_players_nameKey ON saved_players(nameKey)");
         }
     };
+    public static final Migration MIGRATION_3_4 = new Migration(3, 4) {
+        @Override public void migrate(@NonNull SupportSQLiteDatabase db) {
+            db.execSQL("ALTER TABLE games ADD COLUMN scoringConfig TEXT NOT NULL DEFAULT 'v1|DEFAULT|10|10|1|0'");
+            db.execSQL("ALTER TABLE games ADD COLUMN pendingScoringConfig TEXT");
+            db.execSQL("ALTER TABLE rounds ADD COLUMN scoringConfig TEXT NOT NULL DEFAULT 'v1|DEFAULT|10|10|1|0'");
+            db.execSQL("ALTER TABLE rounds ADD COLUMN revision INTEGER NOT NULL DEFAULT 0");
+            db.execSQL("CREATE TABLE IF NOT EXISTS round_edits (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, gameId INTEGER NOT NULL, roundId INTEGER NOT NULL, previousRevision INTEGER NOT NULL, revision INTEGER NOT NULL, previousValues TEXT NOT NULL, newValues TEXT NOT NULL, createdAt INTEGER NOT NULL)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_round_edits_gameId ON round_edits(gameId)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_round_edits_roundId ON round_edits(roundId)");
+        }
+    };
 
     private static void isolateConflictingLegacyTables(SupportSQLiteDatabase db) {
         List<String> names = new ArrayList<>();
         try (Cursor cursor = db.query("SELECT name FROM sqlite_master WHERE type='table'")) {
             while (cursor.moveToNext()) names.add(cursor.getString(0));
         }
-        String[] reserved = {"games", "game_players", "rounds", "round_players", "score_adjustments", "saved_players", "legacy_recovery"};
+        String[] reserved = {"games", "game_players", "rounds", "round_players", "score_adjustments", "saved_players", "legacy_recovery", "round_edits"};
         for (String original : reserved) {
             if (!names.contains(original)) continue;
             String destination = "legacy_source_" + original;
