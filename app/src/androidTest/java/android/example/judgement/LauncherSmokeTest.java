@@ -25,12 +25,15 @@ public class LauncherSmokeTest {
         for (String database : context.databaseList()) context.deleteDatabase(database);
     }
     @Test public void installedLauncherOpensAnInteractiveHome() {
-        try (ActivityScenario<Activity> scenario = ActivityScenario.launch(launcher())) { awaitInteractiveHome(scenario); }
+        ActivityScenario<Activity> scenario = ActivityScenario.launch(launcher());
+        try { awaitInteractiveHome(scenario); }
+        finally { android.example.judgement.ui.RepositoryTestCleanup.close(scenario, null); }
     }
     @Test public void launcherRemainsInteractiveAfterActivityRecreation() {
-        try (ActivityScenario<Activity> scenario = ActivityScenario.launch(launcher())) {
+        ActivityScenario<Activity> scenario = ActivityScenario.launch(launcher());
+        try {
             awaitInteractiveHome(scenario); scenario.recreate(); awaitInteractiveHome(scenario);
-        }
+        } finally { android.example.judgement.ui.RepositoryTestCleanup.close(scenario, null); }
     }
     private Intent launcher() {
         Intent launch = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());

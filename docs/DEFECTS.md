@@ -47,6 +47,7 @@ The named tests below exercise the repaired behavior. JVM tests are under `app/s
 | D33 | Restoring an inactive participant twice creates duplicate staged IDs | Filter and guard stable IDs; `restoredPlayerIsNotOfferedAgainInTheStagedRoster` |
 | D34 | Scoring and player forms hide validation errors after keyboard resizing; dark Back icon lacks contrast | Reveal errors after viewport changes and use `colorOnSurface`; native strategy and `invalidNameAndSaveRemainReachableWithKeyboardActuallyOpen` regressions |
 | D35 | Opening a new screen inherits the previous screen's scroll anchor and hides its heading | Reset the list anchor on screen changes; setup navigation regressions |
+| D36 | Device tests delete the shared database before queued connection closure finishes | Await Activity and inspector repository shutdown during test cleanup; complete device suites exercise isolated fixtures |
 
 ## Accepted legacy limitation
 

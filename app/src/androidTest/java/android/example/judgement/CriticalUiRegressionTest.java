@@ -38,8 +38,7 @@ public class CriticalUiRegressionTest {
         context = ApplicationProvider.getApplicationContext(); context.deleteDatabase(ScoreDatabase.NAME);
     }
     @After public void close() {
-        if (scenario != null) scenario.close();
-        if (inspector != null) inspector.close();
+        android.example.judgement.ui.RepositoryTestCleanup.close(scenario, inspector);
     }
 
     @Test public void newGameFormPreservesInvalidInputAndAcceptsFullUnicodeLongName() {
@@ -151,7 +150,7 @@ public class CriticalUiRegressionTest {
             for (Records.RoundPlayer row : state.roundPlayers) repository.submitBid(state.round.id, row.playerId, 0);
             repository.recordBids(state.round.id);
         }
-        repository.close();
+        android.example.judgement.ui.RepositoryTestCleanup.close(null, repository);
     }
     private void awaitState(Predicate<Snapshot> expected) {
         long until = SystemClock.uptimeMillis() + 10_000;

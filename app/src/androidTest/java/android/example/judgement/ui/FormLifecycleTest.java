@@ -52,8 +52,7 @@ public class FormLifecycleTest {
     }
 
     @After public void close() {
-        if (scenario != null) scenario.close();
-        repository.close();
+        android.example.judgement.ui.RepositoryTestCleanup.close(scenario, repository);
     }
 
     @Test public void longNameAndUncheckedOptInSurviveActivityRecreation() {

@@ -73,8 +73,7 @@ public class FeatureUiRegressionTest {
         inspector = new ScoreRepository(context);
     }
     @After public void closeDatabase() {
-        if (scenario != null) scenario.close();
-        inspector.close();
+        android.example.judgement.ui.RepositoryTestCleanup.close(scenario, inspector);
     }
 
     @Test public void savedLibraryCrudRejectsCanonicalDuplicateAndKeepsInvalidText() {

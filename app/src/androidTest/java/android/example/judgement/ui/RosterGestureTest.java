@@ -49,7 +49,7 @@ public class RosterGestureTest {
             if (adapter != null) {
                 scenario.onActivity(activity -> adapter.detach());
             }
-            scenario.close();
+            RepositoryTestCleanup.close(scenario, null);
         }
     }
 
