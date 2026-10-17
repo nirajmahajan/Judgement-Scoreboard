@@ -1,99 +1,16 @@
-<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
     android:sharedUserId="com.example.nirajmahajan64725"
     android:sharedUserMaxSdkVersion="32">
-
-    <application
-        android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:theme="@style/AppTheme.NoActionBar"
-        tools:ignore="GoogleAppIndexingWarning">
-        <activity android:name=".Information.help.activities.howToPlay"></activity>
-        <activity android:name=".Information.help.activities.addingPlayers" />
-        <activity android:name=".Information.help.activities.chooseMode" />
-        <activity android:name=".Information.help.activities.editPlayerDetails" />
-        <activity android:name=".Information.help.HelpTemplate" />
-        <activity android:name=".Information.help.activities.editScore" />
-        <activity android:name=".Information.help.activities.enteringResults" />
-        <activity android:name=".Information.help.activities.finishingGame" />
-        <activity android:name=".Information.help.activities.settingDealer" />
-        <activity android:name=".Information.help.activities.takingBids" />
-        <activity android:name=".Information.help.activities.viewingLogs" />
-        <activity android:name=".Information.help.activities.viewingScorecard" />
-        <activity
-            android:name=".Information.help.HelpBase"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".Information.FixedVsCustom"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".Utils.log.UI.editScoreLog.ShowEditScoreLog"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".Utils.log.UI.roundLog.ShowRoundLog"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".Game.TakeResults.TakeResults"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".Game.TakeHands.TakeHands"
-            android:screenOrientation="portrait"
-            android:windowSoftInputMode="adjustResize" />
-        <activity
-            android:name=".Game.PlayGame"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".Game.ShowFinalScore.DisplayFinalScore"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".Game.template.DealerEdit"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".Game.template.ScoreboardEdit.ScoreBoardEdit"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".Game.template.ScoreboardDisplay.ScoreboardDisplay"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".Game.template.editPlayer.game_edit_player"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".Game.template.GameTemplate"
-            android:label="@string/title_activity_game_template"
-            android:screenOrientation="portrait"
-            android:theme="@style/AppTheme.NoActionBar.NoActionBar" />
-        <activity
-            android:name=".Information.About"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".Initialise.Init_Dealer"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".Initialise.TemplateActivity"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".Initialise.Init_Players"
-            android:label="@string/title_activity_init__players"
-            android:parentActivityName=".Initialise.MainActivity"
-            android:screenOrientation="portrait"
-            tools:targetApi="jelly_bean">
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value="android.example.judgement.Initialise.MainActivity" />
-        </activity>
-        <activity
-            android:name=".Initialise.MainActivity" android:exported="true"
-            android:screenOrientation="portrait">
+    <application android:allowBackup="true" android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher" android:label="@string/app_name"
+        android:supportsRtl="true" android:theme="@style/Theme.Score">
+        <activity android:name=".ui.MainActivity" android:exported="true"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
     </application>
-
 </manifest>

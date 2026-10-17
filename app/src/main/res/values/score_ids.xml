@@ -1,0 +1,4 @@
+<resources>
+    <item name="primary_action" type="id"/><item name="add_player" type="id"/><item name="quick_add" type="id"/>
+    <item name="edit_value" type="id"/><item name="row_drag_handle" type="id"/>
+</resources>

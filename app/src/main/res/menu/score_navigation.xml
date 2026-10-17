@@ -1,0 +1,5 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/tab_round" android:title="@string/round_tab" android:icon="@drawable/ic_score_round" />
+    <item android:id="@+id/tab_scoreboard" android:title="@string/scoreboard_tab" android:icon="@drawable/ic_score_board" />
+    <item android:id="@+id/tab_history" android:title="@string/history_tab" android:icon="@drawable/ic_score_history" />
+</menu>

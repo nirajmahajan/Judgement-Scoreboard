@@ -1,0 +1,13 @@
+<resources>
+    <color name="score_background">#F5F5F5</color>
+    <color name="score_surface">#FFFFFF</color>
+    <color name="score_text">#202020</color>
+    <color name="score_secondary">#5E5E5E</color>
+    <color name="score_accent">#4E4E4E</color>
+    <color name="score_on_accent">#FFFFFF</color>
+    <color name="score_border">#DADADA</color>
+    <color name="score_container_low">#F0F0F0</color><color name="score_container">#EAEAEA</color>
+    <color name="score_container_high">#E4E4E4</color><color name="score_container_highest">#DEDEDE</color>
+    <color name="score_accent_container">#E0E0E0</color><color name="score_on_accent_container">#303030</color>
+    <color name="score_inverse">#303030</color><color name="score_on_inverse">#EFEFEF</color>
+</resources>
