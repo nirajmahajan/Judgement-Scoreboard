@@ -240,12 +240,23 @@ public final class ScoreGraphView extends View {
         text.setColor(secondary);
         text.setTextAlign(Paint.Align.CENTER);
         int labelEvery = Math.max(1, (int) Math.ceil(events.size() * sp(40) / plot.width()));
-        for (int index = 0; index < events.size(); index++) {
-            if (index % labelEvery != 0 && index != events.size() - 1) continue;
-            GameStatistics.TimelineEvent event = events.get(index);
-            String label = event.round == null ? "Adjust" : "R" + event.round.number;
-            canvas.drawText(label, x(index), plot.bottom + sp(20), text);
+        int last = events.size() - 1;
+        // Always retain the final event, reserving its real glyph width before earlier ticks.
+        String lastLabel = eventLabel(last);
+        float lastX = labelX(lastLabel, last);
+        float lastLeft = labelBounds(lastLabel, lastX).left;
+        float previousRight = Float.NEGATIVE_INFINITY;
+        float gap = dp(4);
+        for (int index = 0; index < last; index++) {
+            if (index % labelEvery != 0) continue;
+            String label = eventLabel(index);
+            float labelX = labelX(label, index);
+            RectF bounds = labelBounds(label, labelX);
+            if (bounds.left < previousRight + gap || bounds.right + gap > lastLeft) continue;
+            canvas.drawText(label, labelX, plot.bottom + sp(20), text);
+            previousRight = bounds.right;
         }
+        canvas.drawText(lastLabel, lastX, plot.bottom + sp(20), text);
         if (strategyCaption != null) {
             text.setTextAlign(Paint.Align.LEFT);
             text.setColor(secondary);
@@ -254,6 +265,25 @@ public final class ScoreGraphView extends View {
             strategyCaption.draw(canvas);
             canvas.restore();
         }
+    }
+
+    private String eventLabel(int index) {
+        GameStatistics.TimelineEvent event = events.get(index);
+        return event.round == null ? "Adjust" : "R" + event.round.number;
+    }
+
+    private RectF labelBounds(String label, float center) {
+        Rect glyphs = new Rect();
+        text.getTextBounds(label, 0, label.length(), glyphs);
+        float origin = center - text.measureText(label) / 2f;
+        return new RectF(origin + glyphs.left, glyphs.top, origin + glyphs.right, glyphs.bottom);
+    }
+
+    private float labelX(String label, int index) {
+        float center = x(index);
+        RectF bounds = labelBounds(label, center);
+        return center + Math.max(0f, dp(4) - bounds.left)
+                - Math.max(0f, bounds.right - (getWidth() - dp(4)));
     }
 
     @Override public boolean onTouchEvent(MotionEvent event) {

@@ -737,6 +737,104 @@ public class ScreenVisualTest {
         capture("final_cumulative_plot_320", activity.getWindow().getDecorView());
     }
 
+    @Test public void largeScoresUseFittingNotationAndKeepExactAccessibleValues() throws Exception {
+        seedEnglishSetup(false);
+        databaseWorker.submit(() -> {
+            try (ScoreRepository repository = new ScoreRepository(context)) {
+                repository.startGame(repository.snapshot().draft.id);
+                Snapshot snapshot = repository.snapshot();
+                repository.correctScore(snapshot.players.get(0).id, 0L, Long.MAX_VALUE);
+                repository.correctScore(snapshot.players.get(1).id, 0L, 84L);
+            }
+        }).get(10, TimeUnit.SECONDS);
+        for (int scale = 1; scale <= 2; scale++) {
+            RuntimeEnvironment.setFontScale(scale);
+            launch(false, false, false); open("GAME", "SCOREBOARD");
+            RecyclerView list = activity.findViewById(R.id.screen_list);
+            TextView large = list.findViewHolderForAdapterPosition(contentOffset(list))
+                    .itemView.findViewById(R.id.row_detail);
+            assertTrue("Abbreviated scores explicitly show their exponent",
+                    large.getText().toString().matches("[1-9]([.][0-9]{1,2})?E18"));
+            assertEquals("9223372036854775807 points", large.getTooltipText().toString());
+            assertEquals("9223372036854775807 points", large.getContentDescription().toString());
+            assertCompleteText(large);
+            assertTrue("Every displayed digit fits the score column", large.getPaint().measureText(
+                    large.getText().toString()) <= large.getWidth()
+                    - large.getCompoundPaddingLeft() - large.getCompoundPaddingRight());
+            TextView ordinary = list.findViewHolderForAdapterPosition(contentOffset(list) + 1)
+                    .itemView.findViewById(R.id.row_detail);
+            assertEquals("84", ordinary.getText().toString());
+            assertEquals("84 points", ordinary.getTooltipText().toString());
+            assertEquals("84 points", ordinary.getContentDescription().toString());
+            assertCompleteText(ordinary);
+            capture(scale == 1 ? "score_large_notation_320" : "score_large_notation_font200_320");
+            controller.pause().stop().destroy(); controller = null;
+        }
+    }
+
+    @Test public void tenRoundFinalGraphKeepsLastLabelClearAtLargeFonts() throws Exception {
+        RuntimeEnvironment.setFontScale(2f);
+        databaseWorker.submit(() -> {
+            try (ScoreRepository repository = new ScoreRepository(context)) {
+                List<PlayerSpec> players = Arrays.asList(new PlayerSpec("Alice"), new PlayerSpec("Ben"),
+                        new PlayerSpec("Charlie"), new PlayerSpec("David"), new PlayerSpec("Emma"));
+                repository.startGame(repository.saveDraft(new DraftSpec(0, players,
+                        "ASCENDING", "CUSTOM", null)));
+                while (repository.snapshot().round != null) {
+                    Snapshot snapshot = repository.snapshot();
+                    int[] actual = new int[snapshot.roundPlayers.size()];
+                    for (int hand = 0; hand < snapshot.round.cards; hand++)
+                        actual[(hand + snapshot.round.number) % actual.length]++;
+                    int missed = 0;
+                    while (actual[missed] == 0) missed++;
+                    for (int index = 0; index < actual.length; index++) repository.submitBid(
+                            snapshot.round.id, snapshot.roundPlayers.get(index).playerId,
+                            actual[index] - (index == missed ? 1 : 0));
+                    repository.recordBids(snapshot.round.id);
+                    for (int index = 0; index < actual.length; index++) repository.setOutcome(
+                            snapshot.round.id, snapshot.roundPlayers.get(index).playerId,
+                            index == missed ? Outcome.LOST : Outcome.WON);
+                    repository.completeRound(snapshot.round.id);
+                }
+            }
+        }).get(10, TimeUnit.SECONDS);
+        launch(false, false, false); open("GAME", "ROUND");
+        assertEquals(10, model.state.getValue().history.size());
+        RecyclerView list = activity.findViewById(R.id.screen_list);
+        scrollTo(5);
+        ScoreGraphView graph = graphIn(list.findViewHolderForAdapterPosition(5 + contentOffset(list)).itemView);
+        assertNotNull(graph);
+        ((androidx.recyclerview.widget.LinearLayoutManager) list.getLayoutManager())
+                .scrollToPositionWithOffset(5 + contentOffset(list), 0); layout();
+        capture("final_graph_10round_font200_320", activity.getWindow().getDecorView());
+        List<String> labels = new ArrayList<>();
+        List<android.graphics.RectF> labelBounds = new ArrayList<>();
+        android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(graph.getWidth(),
+                graph.getHeight(), android.graphics.Bitmap.Config.ARGB_8888);
+        graph.draw(new android.graphics.Canvas(bitmap) {
+            @Override public void drawText(String text, float x, float y, android.graphics.Paint paint) {
+                if (text.matches("R[0-9]+")) {
+                    Rect glyphs = new Rect(); paint.getTextBounds(text, 0, text.length(), glyphs);
+                    float origin = x - paint.measureText(text) / 2f;
+                    labels.add(text);
+                    labelBounds.add(new android.graphics.RectF(origin + glyphs.left, y + glyphs.top,
+                            origin + glyphs.right, y + glyphs.bottom));
+                }
+                super.drawText(text, x, y, paint);
+            }
+        });
+        assertTrue("The final round remains labelled", labels.contains("R10"));
+        assertFalse("The conflicting preceding tick is omitted", labels.contains("R9"));
+        assertTrue("The graph retains earlier round labels", labels.size() >= 2);
+        float previousRight = Float.NEGATIVE_INFINITY;
+        for (android.graphics.RectF bounds : labelBounds) {
+            assertTrue("Actual painted labels retain a 4dp gap", bounds.left >= previousRight + dp(4));
+            assertTrue("Painted labels stay within the graph", bounds.left >= 0 && bounds.right <= graph.getWidth());
+            previousRight = bounds.right;
+        }
+        bitmap.recycle();
+    }
+
     @Test public void aggressiveChooserLightUsesTheActualThemeRoles() throws Exception {
         aggressiveChooser("aggressive_chooser_light_320");
     }
@@ -883,7 +981,16 @@ public class ScreenVisualTest {
                 content.offsetDescendantRectToMyCoords(detail, detailBounds);
                 assertFalse("Player and bid/score columns never overlap: " + nameBounds + " / " + detailBounds, Rect.intersects(nameBounds, detailBounds));
                 assertEquals("Bid/score column stays aligned across rows", dp(88), detail.getWidth());
-                assertSingleLineNameData((TextView) detail);
+                TextView value = (TextView) detail;
+                if (value.getContentDescription() != null) {
+                    assertNotNull("Exact score remains available in a tooltip", value.getTooltipText());
+                    assertEquals("Tooltip and TalkBack retain the same exact score",
+                            value.getContentDescription().toString(), value.getTooltipText().toString());
+                    assertEquals("Scores stay on one line", 1, value.getMaxLines());
+                    assertCompleteText(value);
+                } else {
+                    assertSingleLineNameData(value);
+                }
             }
             if (actions.getHeight() > 0) {
                 assertTrue("Bid/result controls stay below the table body", actionBounds.top >= tableBody.getBottom());

@@ -32,6 +32,7 @@ final class ScoreAdapter extends RecyclerView.Adapter<ScoreAdapter.Holder> {
         final long id;
         final String name;
         final String detail;
+        Long score;
         boolean compactName, dealer, legend;
         final List<Action> actions = new ArrayList<>();
         final List<QuickBid> quickBids = new ArrayList<>();
@@ -41,6 +42,7 @@ final class ScoreAdapter extends RecyclerView.Adapter<ScoreAdapter.Holder> {
         Row quickBid(int value, boolean enabled, Runnable run) { quickBids.add(new QuickBid(value, enabled, run)); return this; }
         Row dealer(boolean value) { dealer = value; return this; }
         Row compactName() { compactName = true; return this; }
+        Row score(long value) { score = value; return this; }
         Row legend(boolean value) { legend = value; return this; }
     }
     private final List<Row> rows = new ArrayList<>();
@@ -55,7 +57,7 @@ final class ScoreAdapter extends RecyclerView.Adapter<ScoreAdapter.Holder> {
                 Row old = previous.get(oldIndex), current = next.get(newIndex);
                 // Action callbacks capture the current round and must always be rebound.
                 return old.actions.isEmpty() && current.actions.isEmpty() && old.quickBids.isEmpty() && current.quickBids.isEmpty()
-                        && old.legend == current.legend && old.dealer == current.dealer && old.compactName == current.compactName && old.name.equals(current.name) && old.detail.equals(current.detail);
+                        && java.util.Objects.equals(old.score, current.score) && old.legend == current.legend && old.dealer == current.dealer && old.compactName == current.compactName && old.name.equals(current.name) && old.detail.equals(current.detail);
             }
         });
         rows.clear(); rows.addAll(next); difference.dispatchUpdatesTo(this);
@@ -92,7 +94,8 @@ final class ScoreAdapter extends RecyclerView.Adapter<ScoreAdapter.Holder> {
         int verticalPadding = dp(content, row.compactName ? 0 : 16);
         content.setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding);
         androidx.core.view.ViewCompat.setAccessibilityHeading(holder.name, true);
-        holder.detail.setText(row.detail);
+        holder.detail.setText(row.score == null ? row.detail : scoreText(row.score, holder.detail));
+        holder.detail.setContentDescription(row.score == null ? null : row.detail);
         holder.detail.setSingleLine(row.compactName);
         holder.detail.setMaxLines(row.compactName ? 1 : Integer.MAX_VALUE);
         holder.detail.setEllipsize(row.compactName ? TextUtils.TruncateAt.END : null);
@@ -132,6 +135,20 @@ final class ScoreAdapter extends RecyclerView.Adapter<ScoreAdapter.Holder> {
             button.setOnClickListener(v -> action.run.run());
             holder.actions.addView(button, new LinearLayout.LayoutParams(-1, -2));
         }
+    }
+    /** Explicit notation replaces misleading ellipsis; speech and long-press retain the exact total. */
+    private static String scoreText(long score, TextView view) {
+        String exact = Long.toString(score);
+        int width = view.getLayoutParams().width - view.getCompoundPaddingLeft() - view.getCompoundPaddingRight();
+        if (view.getPaint().measureText(exact) <= width) return exact;
+        java.math.BigDecimal value = java.math.BigDecimal.valueOf(score);
+        String compact = exact;
+        for (int precision = 3; precision >= 1; precision--) {
+            compact = value.round(new java.math.MathContext(precision, java.math.RoundingMode.HALF_UP))
+                    .stripTrailingZeros().toString().replace("E+", "E");
+            if (view.getPaint().measureText(compact) <= width) return compact;
+        }
+        return compact;
     }
     static int dp(View view, int value) { return Math.round(value * view.getResources().getDisplayMetrics().density); }
     static final class Holder extends RecyclerView.ViewHolder {

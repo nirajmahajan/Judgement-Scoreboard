@@ -177,7 +177,8 @@ public final class HistoryStatisticsUiRegressionTest {
                         assertNotNull("Each player has a graph color legend",name.getCompoundDrawablesRelative()[0]);
                         android.widget.TextView score=root.findViewById(R.id.row_detail);
                         assertEquals(context.getResources().getQuantityString(R.plurals.score_points,
-                                expected.total==1?1:2,expected.total),score.getText().toString());
+                                expected.total==1?1:2,expected.total),score.getContentDescription().toString());
+                        assertEquals(Long.toString(expected.total),score.getText().toString());
                     }
                 }
                 assertEquals(report.players.size(),players);

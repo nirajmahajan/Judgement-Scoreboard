@@ -8,7 +8,9 @@ import android.example.judgement.ui.ScoreGraphView;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -214,6 +216,51 @@ public class ScoreGraphViewTest {
     }
 
     @Test
+    public void largeFontRoundLabelsKeepTheFinalRoundWithoutOverlappingEarlierTicks() {
+        RuntimeEnvironment.setFontScale(2f);
+        Fixture fixture = new Fixture(5);
+        for (int round = 1; round <= 10; round++) {
+            fixture.round(round, ScoringStrategy.defaults(), true);
+        }
+        ScoreGraphView graph = graph(GameStatistics.from(fixture.snapshot()), set(1L),
+                ScoreGraphView.Mode.CUMULATIVE, new AtomicReference<>());
+        graph.measure(View.MeasureSpec.makeMeasureSpec(288, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        graph.layout(0, 0, graph.getMeasuredWidth(), graph.getMeasuredHeight());
+        AxisLabels labels = axisLabels(graph);
+        assertEquals("R10", labels.names.get(labels.names.size() - 1));
+        assertTrue("Earlier rounds remain labelled", labels.names.size() > 1);
+        labels.assertSeparatedAndInside(4f, graph.getWidth());
+    }
+
+    @Test
+    public void largeFontAdjustmentLabelsReserveTheirActualWidthIncludingTheFinalEvent() {
+        RuntimeEnvironment.setFontScale(2f);
+        Fixture fixture = new Fixture(2);
+        for (int round = 1; round <= 10; round++) {
+            fixture.round(round, ScoringStrategy.defaults(), true);
+        }
+        fixture.adjust(1L, 1_050L);
+        ScoreGraphView graph = graph(GameStatistics.from(fixture.snapshot()), set(1L),
+                ScoreGraphView.Mode.CUMULATIVE, new AtomicReference<>());
+        AxisLabels labels = axisLabels(graph);
+        assertEquals("Adjust", labels.names.get(labels.names.size() - 1));
+        labels.assertSeparatedAndInside(4f, graph.getWidth());
+    }
+
+    @Test
+    public void aSingleRoundKeepsItsCenteredLabel() {
+        Fixture fixture = new Fixture(2);
+        fixture.round(1, ScoringStrategy.defaults(), true);
+        ScoreGraphView graph = graph(GameStatistics.from(fixture.snapshot()), set(1L),
+                ScoreGraphView.Mode.CUMULATIVE, new AtomicReference<>());
+        AxisLabels labels = axisLabels(graph);
+        assertEquals(Collections.singletonList("R1"), labels.names);
+        assertTrue(labels.bounds.get(0).left >= 0);
+        assertTrue(labels.bounds.get(0).right <= graph.getWidth());
+    }
+
+    @Test
     public void emptyComparisonHasAnExplanationAndNoInaccessibleClickableEvents() {
         Fixture fixture = new Fixture(2);
         fixture.round(1, ScoringStrategy.defaults(), true);
@@ -267,6 +314,40 @@ public class ScoreGraphViewTest {
         canvas.drawColor(Color.rgb(248, 247, 242));
         graph.draw(canvas);
         return bitmap;
+    }
+
+    private static AxisLabels axisLabels(ScoreGraphView graph) {
+        AxisLabels labels = new AxisLabels(Bitmap.createBitmap(graph.getWidth(), graph.getHeight(),
+                Bitmap.Config.ARGB_8888));
+        graph.draw(labels);
+        return labels;
+    }
+
+    /** Captures the actual text drawn rather than repeating the tick-selection algorithm. */
+    private static final class AxisLabels extends Canvas {
+        final List<String> names = new ArrayList<>();
+        final List<RectF> bounds = new ArrayList<>();
+        AxisLabels(Bitmap bitmap) { super(bitmap); }
+        @Override public void drawText(String value, float x, float y, Paint paint) {
+            super.drawText(value, x, y, paint);
+            if (!value.matches("R[0-9]+|Adjust")) return;
+            Rect glyphs = new Rect();
+            paint.getTextBounds(value, 0, value.length(), glyphs);
+            float origin = x - paint.measureText(value) / 2f;
+            names.add(value);
+            bounds.add(new RectF(origin + glyphs.left, y + glyphs.top,
+                    origin + glyphs.right, y + glyphs.bottom));
+        }
+        void assertSeparatedAndInside(float gap, int width) {
+            for (RectF label : bounds) {
+                assertTrue("Label extends past the left edge", label.left >= 0);
+                assertTrue("Label extends past the right edge", label.right <= width);
+            }
+            for (int index = 1; index < bounds.size(); index++) {
+                assertTrue(names.get(index - 1) + " overlaps " + names.get(index),
+                        bounds.get(index).left >= bounds.get(index - 1).right + gap);
+            }
+        }
     }
 
     private static int pixels(Bitmap bitmap, int color) {

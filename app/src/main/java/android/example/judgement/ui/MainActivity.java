@@ -750,7 +750,7 @@ public final class MainActivity extends AppCompatActivity {
         for (Records.GamePlayer player : players) {
             long total = state.total(player.id); if (previous == null || previous != total) rank++;
             previous = total;
-            rows.add(new ScoreAdapter.Row(player.id, getString(R.string.ranking_format, rank, player.name), player.active ? points(total) : getString(R.string.removed_player_score, points(total))).compactName().legend("COMPLETE".equals(state.game.status)));
+            rows.add(new ScoreAdapter.Row(player.id, getString(R.string.ranking_format, rank, player.name), player.active ? points(total) : getString(R.string.removed_player_score, points(total))).compactName().score(total).legend("COMPLETE".equals(state.game.status)));
         }
         adapter.submit(rows);
         if (!"COMPLETE".equals(state.game.status)) { setContent(adapter); return; }
