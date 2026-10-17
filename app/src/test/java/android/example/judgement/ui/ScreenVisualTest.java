@@ -61,6 +61,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.hamcrest.Matchers.is;
 
@@ -565,6 +566,62 @@ public class ScreenVisualTest {
         assertTrue("Plus stays above the selection action", plus.getBottom() <= list.getHeight());
         assertEquals(0, model.state.getValue().draftPlayers.size());
         capture("saved_players_picker_320");
+    }
+
+    @Test public void savedPlayerSelectionKeepsRowsAndScrollStableAndSurvivesRecyclingAndRecreation() throws Exception {
+        seedEnglishSetup(true);
+        databaseWorker.submit(() -> {
+            try (ScoreRepository repository = new ScoreRepository(context)) {
+                for (int index = 0; index < 20; index++) repository.addSavedPlayer("Player " + (index + 10));
+            }
+        }).get(10, TimeUnit.SECONDS);
+        for (String screen : new String[]{"SAVED", "QUICK_ADD"}) {
+            launch(false, false, false); open(screen, "ROUND");
+            RecyclerView list = activity.findViewById(R.id.screen_list);
+            RecyclerView.Adapter<?> outer = list.getAdapter(), content = contentAdapter(list);
+            androidx.recyclerview.widget.LinearLayoutManager manager =
+                    (androidx.recyclerview.widget.LinearLayoutManager) list.getLayoutManager();
+            manager.scrollToPositionWithOffset(12 + contentOffset(list), -dp(9)); layout();
+            int target = 13 + contentOffset(list);
+            View row = list.findViewHolderForAdapterPosition(target).itemView;
+            android.widget.CheckBox checkbox = row.findViewById(R.id.saved_player_checkbox);
+            long selectedId = content.getItemId(13);
+            View add = activity.findViewById(R.id.primary_action);
+            android.view.MenuItem delete = ((com.google.android.material.appbar.MaterialToolbar)
+                    activity.findViewById(R.id.toolbar)).getMenu().findItem(R.id.delete_saved_players);
+            int first = manager.findFirstVisibleItemPosition();
+            int top = manager.findViewByPosition(first).getTop();
+            assertFalse(add.isEnabled()); assertFalse(delete.isEnabled());
+            checkbox.performClick(); layout();
+            assertTrue(checkbox.isChecked()); assertTrue(add.isEnabled()); assertTrue(delete.isEnabled());
+            assertSame("Selection never replaces the list", outer, list.getAdapter());
+            assertSame("Selection never replaces player rows", row, list.findViewHolderForAdapterPosition(target).itemView);
+            assertSame("Selection never replaces the Add action", add, activity.findViewById(R.id.primary_action));
+            assertSame("Selection never rebuilds the toolbar", delete,
+                    ((com.google.android.material.appbar.MaterialToolbar) activity.findViewById(R.id.toolbar))
+                            .getMenu().findItem(R.id.delete_saved_players));
+            assertEquals(first, manager.findFirstVisibleItemPosition());
+            assertEquals(top, manager.findViewByPosition(first).getTop());
+            row.findViewById(R.id.saved_player_picker_body).performClick(); layout();
+            assertFalse(checkbox.isChecked()); assertFalse(add.isEnabled()); assertFalse(delete.isEnabled());
+            checkbox.performClick(); layout();
+            scrollTo(0); scrollTo(25); scrollTo(13);
+            checkbox = list.findViewHolderForAdapterPosition(target).itemView.findViewById(R.id.saved_player_checkbox);
+            assertTrue("Scrolled/recycled rows retain their selection", checkbox.isChecked());
+            assertTrue("Checking profiles leaves the roster untouched", model.state.getValue().draftPlayers.isEmpty());
+            controller.recreate(); activity = controller.get();
+            model = new ViewModelProvider(activity).get(ScoreViewModel.class);
+            await(() -> model.state.getValue() != null); layout(); scrollTo(13);
+            list = activity.findViewById(R.id.screen_list);
+            checkbox = list.findViewHolderForAdapterPosition(13 + contentOffset(list)).itemView.findViewById(R.id.saved_player_checkbox);
+            assertTrue("Recreation retains the checked profile", checkbox.isChecked());
+            if ("QUICK_ADD".equals(screen)) {
+                activity.findViewById(R.id.primary_action).performClick();
+                await(() -> model.state.getValue().draftPlayers.size() == 1);
+                assertEquals(Long.valueOf(selectedId), model.state.getValue().draftPlayers.get(0).savedPlayerId);
+            }
+            controller.pause().stop().destroy(); controller = null;
+        }
     }
 
     private void seedEnglishSetup(boolean profiles) throws Exception {

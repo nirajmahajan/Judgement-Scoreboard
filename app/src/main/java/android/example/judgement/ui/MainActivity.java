@@ -976,10 +976,6 @@ public final class MainActivity extends AppCompatActivity {
                     canAdd ? "" : getString(present ? R.string.already_added : R.string.name_conflict)));
         }
         selectedProfiles.retainAll(eligible);
-        SavedPlayerPickerAdapter pickerAdapter = new SavedPlayerPickerAdapter(profileId -> {
-            if (!selectedProfiles.add(profileId)) selectedProfiles.remove(profileId); render();
-        });
-        pickerAdapter.submit(items); setContent(pickerAdapter);
         android.view.MenuItem delete = toolbar.getMenu().add(android.view.Menu.NONE,
                 R.id.delete_saved_players, 0, R.string.delete_selected_players);
         android.graphics.drawable.Drawable bin = androidx.appcompat.content.res.AppCompatResources
@@ -1026,6 +1022,13 @@ public final class MainActivity extends AppCompatActivity {
             }
         });
         fixedActions.addView(add, new LinearLayout.LayoutParams(-1, dp(56)));
+        SavedPlayerPickerAdapter pickerAdapter = new SavedPlayerPickerAdapter((profileId, checked) -> {
+            if (checked) selectedProfiles.add(profileId); else selectedProfiles.remove(profileId);
+            bin.setAlpha(selectedProfiles.isEmpty() ? 96 : 255);
+            delete.setEnabled(!selectedProfiles.isEmpty());
+            add.setEnabled(!selectedProfiles.isEmpty() && addable.containsAll(selectedProfiles));
+        });
+        pickerAdapter.submit(items); setContent(pickerAdapter);
     }
     private void manageSavedPlayers() {
         header(getString(R.string.manage_saved_players), state.savedPlayers.isEmpty() ? getString(R.string.no_saved_players) : "");

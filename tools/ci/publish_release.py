@@ -39,6 +39,7 @@ if new_key:
 - Scoring strategies, durable game state, editable round history, and cumulative score graph.
 - Repaired scoring, results validation, lifecycle behavior, and large-score/graph layouts.
 - Launcher app name: **Judgement Scoreboard**.
+- Saved-player checkboxes update in place without refreshing the screen.
 
 Download **judgement-scoreboard.apk** below. Requires Android 8 or later.
 

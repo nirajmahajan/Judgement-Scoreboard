@@ -11,7 +11,7 @@ import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.LongConsumer;
+import java.util.function.BiConsumer;
 
 /** A compact selection list. The owning screen keeps the selected profile IDs. */
 final class SavedPlayerPickerAdapter extends RecyclerView.Adapter<SavedPlayerPickerAdapter.Holder> {
@@ -31,10 +31,10 @@ final class SavedPlayerPickerAdapter extends RecyclerView.Adapter<SavedPlayerPic
     }
 
     private final List<Item> items = new ArrayList<>();
-    private final LongConsumer toggleSelection;
+    private final BiConsumer<Long, Boolean> selectionChanged;
 
-    SavedPlayerPickerAdapter(LongConsumer toggleSelection) {
-        this.toggleSelection = toggleSelection;
+    SavedPlayerPickerAdapter(BiConsumer<Long, Boolean> selectionChanged) {
+        this.selectionChanged = selectionChanged;
         setHasStableIds(true);
     }
 
@@ -76,7 +76,12 @@ final class SavedPlayerPickerAdapter extends RecyclerView.Adapter<SavedPlayerPic
         holder.row.setEnabled(item.enabled);
         holder.row.setOnClickListener(view -> holder.checkbox.performClick());
         holder.checkbox.setOnCheckedChangeListener((checkbox, checked) -> {
-            if (item.enabled) toggleSelection.accept(item.id);
+            int current = holder.getBindingAdapterPosition();
+            if (!item.enabled || current == RecyclerView.NO_POSITION || items.get(current).id != item.id) return;
+            // The checkbox has already drawn its new state. Keep recycled rows consistent
+            // without notifying RecyclerView or rebuilding the owning screen.
+            items.set(current, new Item(item.id, item.name, checked, item.enabled, item.disabledReason));
+            selectionChanged.accept(item.id, checked);
         });
     }
 
