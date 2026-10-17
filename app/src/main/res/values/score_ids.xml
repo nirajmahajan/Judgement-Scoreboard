@@ -1,0 +1,9 @@
+<resources>
+    <item name="primary_action" type="id"/><item name="add_player" type="id"/><item name="quick_add" type="id"/>
+    <item name="edit_value" type="id"/><item name="row_drag_handle" type="id"/>
+    <item name="strategy_default" type="id"/><item name="strategy_aggressive" type="id"/><item name="strategy_custom" type="id"/>
+    <item name="strategy_zero" type="id"/><item name="strategy_base" type="id"/><item name="strategy_per_trick" type="id"/>
+    <item name="strategy_bonus" type="id"/><item name="strategy_error" type="id"/><item name="strategy_rules" type="id"/>
+    <item name="strategy_examples" type="id"/><item name="strategy_help" type="id"/><item name="strategy_cancel" type="id"/>
+    <item name="round_scoring_help" type="id"/><item name="play_again" type="id"/>
+</resources>

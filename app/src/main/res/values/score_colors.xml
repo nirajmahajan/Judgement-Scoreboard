@@ -1,0 +1,13 @@
+<resources>
+    <color name="score_background">#F7F6F2</color>
+    <color name="score_surface">#FFFEFA</color>
+    <color name="score_text">#172D35</color>
+    <color name="score_secondary">#52666B</color>
+    <color name="score_accent">#176760</color>
+    <color name="score_on_accent">#FFFFFF</color>
+    <color name="score_border">#D9E1DE</color>
+    <color name="score_container_low">#F3F3ED</color><color name="score_container">#EFEFE9</color>
+    <color name="score_container_high">#EAEDE6</color><color name="score_container_highest">#E3E8E0</color>
+    <color name="score_accent_container">#D6EAE2</color><color name="score_on_accent_container">#123E36</color>
+    <color name="score_inverse">#24383E</color><color name="score_on_inverse">#EAF0ED</color>
+</resources>

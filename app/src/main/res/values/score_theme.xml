@@ -1,0 +1,86 @@
+<resources>
+    <style name="Theme.Score" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/score_accent</item>
+        <item name="colorOnPrimary">@color/score_on_accent</item>
+        <item name="colorSecondary">@color/score_accent</item>
+        <item name="colorOnSecondary">@color/score_on_accent</item>
+        <item name="colorPrimaryContainer">@color/score_accent_container</item>
+        <item name="colorOnPrimaryContainer">@color/score_on_accent_container</item>
+        <item name="colorSecondaryContainer">@color/score_accent_container</item>
+        <item name="colorOnSecondaryContainer">@color/score_on_accent_container</item>
+        <item name="colorTertiary">@color/score_accent</item>
+        <item name="colorOnTertiary">@color/score_on_accent</item>
+        <item name="colorTertiaryContainer">@color/score_accent_container</item>
+        <item name="colorOnTertiaryContainer">@color/score_on_accent_container</item>
+        <item name="colorSurface">@color/score_surface</item>
+        <item name="colorSurfaceDim">@color/score_container_low</item>
+        <item name="colorSurfaceBright">@color/score_surface</item>
+        <item name="colorSurfaceContainerLowest">@color/score_background</item>
+        <item name="colorSurfaceContainerLow">@color/score_container_low</item>
+        <item name="colorSurfaceContainer">@color/score_container</item>
+        <item name="colorSurfaceContainerHigh">@color/score_container_high</item>
+        <item name="colorSurfaceContainerHighest">@color/score_container_highest</item>
+        <item name="colorSurfaceVariant">@color/score_container_high</item>
+        <item name="colorSurfaceInverse">@color/score_inverse</item>
+        <item name="colorOnSurfaceInverse">@color/score_on_inverse</item>
+        <item name="colorAccent">@color/score_accent</item>
+        <item name="android:colorAccent">@color/score_accent</item>
+        <item name="colorControlActivated">@color/score_accent</item>
+        <item name="colorOnSurface">@color/score_text</item>
+        <item name="colorOnSurfaceVariant">@color/score_secondary</item>
+        <item name="colorOutlineVariant">@color/score_border</item>
+        <item name="colorOutline">@color/score_secondary</item>
+        <item name="android:colorBackground">@color/score_background</item>
+        <item name="android:textColorPrimary">@color/score_text</item>
+        <item name="android:textColorSecondary">@color/score_secondary</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@color/score_background</item>
+        <item name="android:navigationBarColor">@color/score_background</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+    <style name="Theme.Score.Aggressive" parent="Theme.Score">
+        <item name="colorPrimary">@color/aggressive_accent</item>
+        <item name="colorOnPrimary">@color/aggressive_on_accent</item>
+        <item name="colorSecondary">@color/aggressive_accent</item>
+        <item name="colorOnSecondary">@color/aggressive_on_accent</item>
+        <item name="colorPrimaryContainer">@color/aggressive_accent_container</item>
+        <item name="colorOnPrimaryContainer">@color/aggressive_on_accent_container</item>
+        <item name="colorSecondaryContainer">@color/aggressive_accent_container</item>
+        <item name="colorOnSecondaryContainer">@color/aggressive_on_accent_container</item>
+        <item name="colorTertiary">@color/aggressive_accent</item>
+        <item name="colorOnTertiary">@color/aggressive_on_accent</item>
+        <item name="colorTertiaryContainer">@color/aggressive_accent_container</item>
+        <item name="colorOnTertiaryContainer">@color/aggressive_on_accent_container</item>
+        <item name="colorSurface">@color/aggressive_surface</item>
+        <item name="colorSurfaceDim">@color/aggressive_container_low</item>
+        <item name="colorSurfaceBright">@color/aggressive_surface</item>
+        <item name="colorSurfaceContainerLowest">@color/aggressive_background</item>
+        <item name="colorSurfaceContainerLow">@color/aggressive_container_low</item>
+        <item name="colorSurfaceContainer">@color/aggressive_container</item>
+        <item name="colorSurfaceContainerHigh">@color/aggressive_container_high</item>
+        <item name="colorSurfaceContainerHighest">@color/aggressive_container_highest</item>
+        <item name="colorSurfaceVariant">@color/aggressive_container_high</item>
+        <item name="colorSurfaceInverse">@color/aggressive_inverse</item>
+        <item name="colorOnSurfaceInverse">@color/aggressive_on_inverse</item>
+        <item name="colorAccent">@color/aggressive_accent</item>
+        <item name="android:colorAccent">@color/aggressive_accent</item>
+        <item name="colorControlActivated">@color/aggressive_accent</item>
+        <item name="colorOnSurface">@color/aggressive_text</item>
+        <item name="colorOnSurfaceVariant">@color/aggressive_secondary</item>
+        <item name="colorOutlineVariant">@color/aggressive_border</item>
+        <item name="colorOutline">@color/aggressive_secondary</item>
+        <item name="android:colorBackground">@color/aggressive_background</item>
+        <item name="android:textColorPrimary">@color/aggressive_text</item>
+        <item name="android:textColorSecondary">@color/aggressive_secondary</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@color/aggressive_background</item>
+        <item name="android:navigationBarColor">@color/aggressive_background</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="textAppearanceHeadlineMedium">@style/TextAppearance.Score.AggressiveHeadline</item>
+    </style>
+    <style name="TextAppearance.Score.AggressiveHeadline" parent="TextAppearance.Material3.HeadlineMedium">
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+</resources>

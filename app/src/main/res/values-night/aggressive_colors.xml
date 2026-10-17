@@ -1,0 +1,17 @@
+<resources>
+    <color name="aggressive_background">#201E1C</color>
+    <color name="aggressive_surface">#2A2724</color>
+    <color name="aggressive_text">#F4EDE6</color>
+    <color name="aggressive_secondary">#D1BFB0</color>
+    <color name="aggressive_accent">#EBA57B</color>
+    <color name="aggressive_on_accent">#4B210B</color>
+    <color name="aggressive_border">#544940</color>
+    <color name="aggressive_container_low">#25211F</color>
+    <color name="aggressive_container">#2F2925</color>
+    <color name="aggressive_container_high">#3A322C</color>
+    <color name="aggressive_container_highest">#473B32</color>
+    <color name="aggressive_accent_container">#6B381D</color>
+    <color name="aggressive_on_accent_container">#FFE0CA</color>
+    <color name="aggressive_inverse">#F4EDE6</color>
+    <color name="aggressive_on_inverse">#302824</color>
+</resources>
