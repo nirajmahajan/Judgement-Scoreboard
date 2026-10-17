@@ -3,7 +3,7 @@ package android.example.judgement.Information.help.activities;
 import android.example.judgement.Information.help.HelpTemplate;
 import android.example.judgement.R;
 import android.graphics.Color;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 
 public class addingPlayers extends HelpTemplate {

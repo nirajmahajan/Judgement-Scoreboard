@@ -26,6 +26,9 @@ public class DealerEdit extends TemplateActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override public void handleOnBackPressed() { handleLegacyBack(); }
+        });
         setContentView(R.layout.activity_dealer_edit);
         populateRadioGroup();
     }
@@ -91,8 +94,7 @@ public class DealerEdit extends TemplateActivity {
         }
     }
 
-    @Override
-    public void onBackPressed() {
+    private void handleLegacyBack() {
         Toast.makeText(getApplicationContext(), "Cannot go Back at this stage", Toast.LENGTH_SHORT).show();
     }
     @Override

@@ -3,7 +3,7 @@ package android.example.judgement.Game;
 import android.content.Intent;
 import android.example.judgement.Game.TakeHands.TakeHands;
 import android.example.judgement.Utils.database.AppDatabase;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 
 public class PlayGame extends AppCompatActivity {

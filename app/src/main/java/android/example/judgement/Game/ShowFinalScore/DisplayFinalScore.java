@@ -10,9 +10,9 @@ import android.example.judgement.Utils.database.Player;
 import android.example.judgement.Utils.log.UI.editScoreLog.ShowEditScoreLog;
 import android.example.judgement.Utils.log.UI.roundLog.ShowRoundLog;
 import android.example.judgement.Utils.log.Utils.Log;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
-import android.support.v7.widget.Toolbar;
+import androidx.appcompat.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -33,6 +33,9 @@ public class DisplayFinalScore extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override public void handleOnBackPressed() { handleLegacyBack(); }
+        });
         setContentView(R.layout.activity_display_final_score);
 
         Toolbar toolbar = findViewById(R.id.toolbar_sce_game_init);
@@ -93,8 +96,7 @@ public class DisplayFinalScore extends AppCompatActivity {
         System.exit(0);
     }
 
-    @Override
-    public void onBackPressed() {
+    private void handleLegacyBack() {
         Toast.makeText(getApplicationContext(), "Cannot go Back at this stage", Toast.LENGTH_SHORT).show();
     }
 

@@ -5,7 +5,7 @@ import android.app.Activity;
 import android.example.judgement.R;
 import android.example.judgement.Utils.database.AppDatabase;
 import android.example.judgement.Utils.database.Player;
-import android.support.design.widget.FloatingActionButton;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;

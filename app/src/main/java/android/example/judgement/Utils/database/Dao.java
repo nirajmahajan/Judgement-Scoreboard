@@ -1,12 +1,12 @@
 package android.example.judgement.Utils.database;
 
-import android.arch.persistence.room.Delete;
-import android.arch.persistence.room.Insert;
-import android.arch.persistence.room.Query;
+import androidx.room.Delete;
+import androidx.room.Insert;
+import androidx.room.Query;
 
 import java.util.List;
 
-@android.arch.persistence.room.Dao
+@androidx.room.Dao
 public interface Dao {
 
     @Query("Select * from players")

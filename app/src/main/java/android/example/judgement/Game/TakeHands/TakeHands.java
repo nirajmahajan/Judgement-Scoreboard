@@ -7,7 +7,7 @@ import android.example.judgement.Game.template.GameTemplate;
 import android.example.judgement.R;
 import android.example.judgement.Utils.database.AppDatabase;
 import android.example.judgement.Utils.database.Player;
-import android.support.design.widget.FloatingActionButton;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -34,6 +34,9 @@ public class TakeHands extends GameTemplate {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override public void handleOnBackPressed() { handleLegacyBack(); }
+        });
         setContentView(R.layout.activity_take_hands);
 
         step = getIntent().getExtras().getInt("STEP");
@@ -77,8 +80,7 @@ public class TakeHands extends GameTemplate {
     }
 
 
-    @Override
-    public void onBackPressed() {
+    private void handleLegacyBack() {
         Toast.makeText(getApplicationContext(), "Cannot go Back at this stage", Toast.LENGTH_SHORT).show();
     }
 

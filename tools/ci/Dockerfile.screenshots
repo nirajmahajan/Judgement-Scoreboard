@@ -1,0 +1,12 @@
+# Record and verify goldens with this exact Linux/JDK/font/Android toolchain image.
+FROM eclipse-temurin:21.0.8_9-jdk-noble@sha256:03b731a231066bd04ada0a7ee9003cdbc1460083344f9277245b233e5ffcbf47
+RUN rm -f /etc/apt/sources.list /etc/apt/sources.list.d/* \
+ && printf 'deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20261001T000000Z noble main universe\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20261001T000000Z noble-updates main universe\ndeb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/20261001T000000Z noble-security main universe\n' > /etc/apt/sources.list \
+ && apt-get update \
+ && apt-get install --no-install-recommends -y curl unzip python3 fontconfig fonts-dejavu-core libfreetype6 libxi6 libxrender1 libxtst6 \
+ && rm -rf /var/lib/apt/lists/*
+ENV ANDROID_HOME=/opt/android-sdk ANDROID_SDK_ROOT=/opt/android-sdk LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC
+COPY tools/ci/setup_android.sh /tmp/setup_android.sh
+RUN bash /tmp/setup_android.sh && rm /tmp/setup_android.sh
+ENV PATH="/opt/android-sdk/cmdline-tools/23.0/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/emulator:${PATH}"
+WORKDIR /workspace

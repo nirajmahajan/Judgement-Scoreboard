@@ -8,8 +8,8 @@ import android.example.judgement.R;
 import android.example.judgement.Utils.database.AppDatabase;
 import android.example.judgement.Utils.database.Player;
 import android.example.judgement.Utils.log.Utils.Log;
-import android.support.constraint.ConstraintLayout;
-import android.support.design.widget.FloatingActionButton;
+import androidx.constraintlayout.widget.ConstraintLayout;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -40,6 +40,9 @@ public class TakeResults extends GameTemplate {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override public void handleOnBackPressed() { handleLegacyBack(); }
+        });
         setContentView(R.layout.activity_take_results);
         Intent intent = getIntent();
         round = intent.getExtras().getInt("ROUND_NUMBER");
@@ -75,8 +78,7 @@ public class TakeResults extends GameTemplate {
         listView.setAdapter(adapter);
     }
 
-    @Override
-    public void onBackPressed() {
+    private void handleLegacyBack() {
         Toast.makeText(getApplicationContext(), "Cannot go Back at this stage", Toast.LENGTH_SHORT).show();
     }
 

@@ -9,7 +9,7 @@ import android.example.judgement.Utils.database.AppDatabase;
 import android.example.judgement.Utils.database.Player;
 import android.graphics.Color;
 import android.os.Build;
-import android.support.constraint.ConstraintLayout;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;

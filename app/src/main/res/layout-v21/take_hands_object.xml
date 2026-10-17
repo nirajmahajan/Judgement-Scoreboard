@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.support.constraint.ConstraintLayout
+<androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -71,7 +71,7 @@
         android:layout_gravity="center_vertical|center_horizontal"
         android:layout_height="40dp"
         android:layout_weight="1"
-        android:tint="@color/FullWhite"
+        app:tint="@color/FullWhite"
         android:backgroundTint="@color/GoButton"
         app:srcCompat="@drawable/tick"
         app:layout_constraintTop_toTopOf="parent"
@@ -87,7 +87,7 @@
         android:layout_weight="1"
         android:backgroundTint="@color/cyan"
         app:srcCompat="@drawable/edit"
-        android:tint="@color/DarkBlue"
+        app:tint="@color/DarkBlue"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -95,4 +95,4 @@
 
 
 
-</android.support.constraint.ConstraintLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

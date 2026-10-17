@@ -1,0 +1,5 @@
+**
+!tools/
+!tools/ci/
+!tools/ci/setup_android.sh
+!tools/ci/Dockerfile.screenshots

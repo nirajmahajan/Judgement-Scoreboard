@@ -24,14 +24,16 @@ public class Init_Dealer extends TemplateActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override public void handleOnBackPressed() { handleLegacyBack(); }
+        });
         setContentView(R.layout.activity_init__dealer);
         populateRadioGroup();
         mode = getIntent().getStringExtra("MODE");
         askForStart();
     }
 
-    @Override
-    public void onBackPressed() {
+    private void handleLegacyBack() {
         Toast.makeText(getApplicationContext(), "Cannot go Back at this stage", Toast.LENGTH_SHORT).show();
     }
 

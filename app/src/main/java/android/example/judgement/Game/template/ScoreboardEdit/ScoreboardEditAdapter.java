@@ -10,7 +10,7 @@ import android.example.judgement.Utils.database.Player;
 import android.example.judgement.Utils.log.Utils.Log;
 import android.graphics.Color;
 import android.os.Build;
-import android.support.constraint.ConstraintLayout;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.View;
