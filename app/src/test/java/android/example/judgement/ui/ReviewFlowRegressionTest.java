@@ -109,8 +109,9 @@ public class ReviewFlowRegressionTest {
         await(() -> "SETUP_DEALER".equals(model.screen())); layout();
         RecyclerView list = activity.findViewById(R.id.screen_list);
         View dealer = list.findViewHolderForAdapterPosition(2).itemView.findViewById(R.id.dealer_choice_radio);
+        dealer.performClick(); layout();
         model.tab("HISTORY");
-        completeAfterRecreation(dealer::performClick);
+        completeAfterRecreation(() -> clickFooter(R.id.primary_action));
         assertNotNull(model.state.getValue().game);
         assertEquals("GAME", field("renderedScreen"));
         assertEquals("ROUND", model.tab());
@@ -129,7 +130,8 @@ public class ReviewFlowRegressionTest {
         clickFooter(R.id.deal_order_descending);
         await(() -> "SETUP_DEALER".equals(model.screen())); layout();
         RecyclerView list = activity.findViewById(R.id.screen_list);
-        list.findViewHolderForAdapterPosition(2).itemView.findViewById(R.id.dealer_choice_radio).performClick();
+        list.findViewHolderForAdapterPosition(2).itemView.findViewById(R.id.dealer_choice_radio).performClick(); layout();
+        clickFooter(R.id.primary_action);
         await(() -> "CONFIRM_START".equals(model.screen())); layout();
         assertEquals(originalGame, model.state.getValue().game.id);
         controller.recreate(); activity = controller.get(); layout();

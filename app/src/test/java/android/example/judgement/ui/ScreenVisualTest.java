@@ -391,6 +391,16 @@ public class ScreenVisualTest {
             android.widget.RadioButton choice = row.findViewById(R.id.dealer_choice_radio);
             assertFalse("A dealer must be chosen explicitly", choice.isChecked()); assertFullyVisible(choice);
         }
+        View confirm = activity.findViewById(R.id.primary_action);
+        assertFullyVisible(confirm); assertFalse(confirm.isEnabled());
+        list.findViewHolderForAdapterPosition(contentOffset(list)).itemView.findViewById(R.id.dealer_choice_radio).performClick(); layout();
+        assertNull(model.state.getValue().game); assertNull(model.state.getValue().draft.dealerId);
+        controller.recreate(); activity = controller.get(); model = new ViewModelProvider(activity).get(ScoreViewModel.class);
+        await(() -> model.state.getValue() != null); layout();
+        list = activity.findViewById(R.id.screen_list);
+        assertTrue(((android.widget.RadioButton) list.findViewHolderForAdapterPosition(contentOffset(list)).itemView
+                .findViewById(R.id.dealer_choice_radio)).isChecked());
+        assertTrue(activity.findViewById(R.id.primary_action).isEnabled());
         capture("setup_dealer_320");
     }
 

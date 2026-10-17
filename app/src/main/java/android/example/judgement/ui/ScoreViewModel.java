@@ -40,6 +40,15 @@ public final class ScoreViewModel extends AndroidViewModel {
         saved.set("setupDirectionChosen", false); saved.set("setupConfirmed", false);
         screen("SETUP_DIRECTION");
     }
+    Long pendingDealer(String owner, Long initial) {
+        if (!owner.equals(saved.get("dealerChoiceOwner"))) {
+            saved.set("dealerChoiceOwner", owner); saved.set("dealerChoicePlayer", initial);
+        }
+        return saved.get("dealerChoicePlayer");
+    }
+    void selectDealer(String owner, long playerId) {
+        saved.set("dealerChoiceOwner", owner); saved.set("dealerChoicePlayer", playerId);
+    }
     boolean setupConfirmed(long draftId, String roster) {
         Long owner = saved.get("setupDraft");
         return owner != null && owner == draftId && roster.equals(saved.get("setupRoster"))
@@ -158,7 +167,11 @@ public final class ScoreViewModel extends AndroidViewModel {
     @Override protected void onCleared() { repository.close(); }
     LiveData<String> screenState() { return saved.getLiveData("screen", "HOME"); }
     String screen() { String value = saved.get("screen"); return value == null ? "HOME" : value; }
-    void screen(String screen) { saved.set("screen", screen); error.setValue(null); }
+    void screen(String screen) {
+        if (!screen.equals(screen()) && ("SETUP_DEALER".equals(screen) || "PICK_DEALER".equals(screen)))
+            saved.set("dealerChoiceOwner", null);
+        saved.set("screen", screen); error.setValue(null);
+    }
     String tab() { String value = saved.get("tab"); return value == null ? "ROUND" : value; }
     void tab(String value) { saved.set("tab", value); }
     LiveData<Bundle> formState() { return saved.getLiveData("form"); }

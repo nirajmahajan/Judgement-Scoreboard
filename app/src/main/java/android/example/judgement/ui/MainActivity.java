@@ -596,14 +596,29 @@ public final class MainActivity extends AppCompatActivity {
         boolean manage = !required && "MANAGE".equals(pickerReturn);
         if (!manage && state.draft == null) { open("PLAYERS"); return; }
         List<PlayerSpec> players = manage ? model.staged() : draftPlayers();
-        Long selected = required ? null : manage ? model.stagedDealer() : state.draft.dealerId;
+        Long initial = required ? null : manage ? model.stagedDealer() : state.draft.dealerId;
         long draftId = manage ? 0 : state.draft.id;
         String signature = manage ? "" : setupRosterSignature();
+        StringBuilder owner = new StringBuilder(required ? "SETUP:" : manage ? "MANAGE:" : "DRAFT:");
+        owner.append(manage ? state.game.id : draftId);
+        if (manage) owner.append(':').append(model.stagedRoundId());
+        for (PlayerSpec player : players) owner.append(':').append(player.id);
+        String choiceOwner = owner.toString();
+        Long selected = model.pendingDealer(choiceOwner, initial);
         setContent(new DealerChoiceAdapter(players, selected, playerId -> {
-            if (manage) { model.stagedDealer(playerId); open("MANAGE"); }
-            else if (required) model.chooseSetupDealer(draftId, signature, playerId);
-            else model.run(() -> model.repository.chooseDraftDealer(draftId, playerId), "SETTINGS");
+            model.selectDealer(choiceOwner, playerId); render();
         }));
+        boolean valid = false;
+        for (PlayerSpec player : players) if (selected != null && player.id == selected) valid = true;
+        fixedActions.removeAllViews(); fixedActions.setVisibility(View.VISIBLE);
+        MaterialButton confirm = new MaterialButton(this);
+        confirm.setId(R.id.primary_action); confirm.setText(R.string.confirm_dealer); confirm.setEnabled(valid);
+        confirm.setOnClickListener(view -> {
+            if (manage) { model.stagedDealer(selected); open("MANAGE"); }
+            else if (required) model.chooseSetupDealer(draftId, signature, selected);
+            else model.run(() -> model.repository.chooseDraftDealer(draftId, selected), "SETTINGS");
+        });
+        fixedActions.addView(confirm, new LinearLayout.LayoutParams(-1, dp(56)));
     }
     private String playerName(List<Records.GamePlayer> players, Long id) {
         if (id != null) for (Records.GamePlayer player : players) if (player.id == id) return player.name;

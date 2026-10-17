@@ -66,4 +66,5 @@
     </plurals>
     <string name="result_prediction">Prediction %1$d</string>
     <string name="result_choice_description">%1$s, %2$s, prediction %3$d</string>
+    <string name="confirm_dealer">Confirm dealer</string>
 </resources>

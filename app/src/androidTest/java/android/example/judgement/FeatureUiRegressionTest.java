@@ -290,6 +290,8 @@ public class FeatureUiRegressionTest {
         clickLabel(R.string.choose_dealer);
         onView(allOf(withId(R.id.dealer_choice_radio), hasSibling(withText("Player C")))).check(matches(isChecked()));
         onView(allOf(withId(R.id.dealer_choice_radio), hasSibling(withText("Player A")))).perform(click());
+        assertEquals(removed, inspector.snapshot().round.dealerId);
+        clickId(R.id.primary_action);
         awaitView(withText(R.string.manage_players));
         clickId(R.id.primary_action); clickDialogPositive();
         awaitState(s -> s.round.id != original.round.id && s.players.size() == 2);
@@ -556,6 +558,7 @@ public class FeatureUiRegressionTest {
         List<Records.GamePlayer> players = inspector.snapshot().draftPlayers;
         onView(allOf(withId(R.id.dealer_choice_radio), hasSibling(withText(players.get(players.size() - 1).name))))
                 .perform(click());
+        clickId(R.id.primary_action);
         if (inspector.snapshot().game != null && inspector.snapshot().draft != null) {
             awaitView(allOf(withId(R.id.screen_title), withText(R.string.replace_game_title)));
         } else awaitView(withId(R.id.bottom_navigation));

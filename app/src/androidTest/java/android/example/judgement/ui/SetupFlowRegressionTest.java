@@ -72,9 +72,13 @@ public final class SetupFlowRegressionTest {
         onView(withId(R.id.deal_order_ascending)).check(matches(withText("1 card → 26 cards")));
         onView(withId(R.id.deal_order_descending)).check(matches(withText("26 cards → 1 card"))).perform(click());
         awaitView(allOf(withId(R.id.screen_title), withText(R.string.choose_dealer)));
-        scenario.recreate();
-        awaitView(allOf(withId(R.id.screen_title), withText(R.string.choose_dealer)));
+        onView(withId(R.id.primary_action)).check(matches(org.hamcrest.Matchers.not(isEnabled())));
         onView(allOf(withId(R.id.dealer_choice_radio), hasSibling(withText("Ben")))).perform(click());
+        assertNull("Selecting a dealer does not start the game", repository.snapshot().game);
+        assertNull("Selecting is staged until confirmation", repository.snapshot().draft.dealerId);
+        scenario.recreate();
+        awaitView(allOf(withId(R.id.dealer_choice_radio), hasSibling(withText("Ben")), isChecked()));
+        onView(withId(R.id.primary_action)).check(matches(allOf(isEnabled(), withText(R.string.confirm_dealer)))).perform(click());
         awaitView(withId(R.id.bottom_navigation));
         awaitState(state -> state.game != null && state.draft == null);
         Snapshot state = repository.snapshot();
