@@ -118,7 +118,7 @@ public final class StrategyUiRegressionTest {
         await(() -> repository.snapshot().round.scoringConfig.equals(ScoringStrategy.aggressive().encode()));
         await(() -> screen().equals("GAME") && hasAppearance(true));
         Snapshot initial=repository.snapshot();
-        onView(withId(R.id.screen_list)).perform(findAndClick(withText("0")));
+        onView(withId(R.id.quick_bid_0)).perform(click());
         await(() -> uiSnapshot().roundPlayers.get(0).bid!=null);
         option(R.string.change_scoring); clickId(R.id.strategy_default);
         await(() -> hasAppearance(false)); // Chooser preview only.
@@ -404,7 +404,15 @@ public final class StrategyUiRegressionTest {
         Espresso.openActionBarOverflowOrOptionsMenu(context);onView(withText(R.string.options)).perform(click());onView(withText(label)).perform(click());
     }
     private void enter(int id,String value) { onView(withId(id)).perform(reveal(),replaceText(value),closeSoftKeyboard()); }
-    private void clickId(int id) { onView(withId(R.id.screen_list)).perform(findAndClick(withId(id))); }
+    private void clickId(int id) {
+        Matcher<View> visible = org.hamcrest.Matchers.allOf(withId(id), androidx.test.espresso.matcher.ViewMatchers.isDisplayed());
+        try { onView(visible).check(androidx.test.espresso.assertion.ViewAssertions.matches(
+                androidx.test.espresso.matcher.ViewMatchers.isDisplayed())); }
+        catch (androidx.test.espresso.NoMatchingViewException missing) {
+            onView(withId(R.id.screen_list)).perform(findAndClick(withId(id))); return;
+        }
+        onView(visible).perform(click());
+    }
     private void clickText(int label) { onView(withId(R.id.screen_list)).perform(findAndClick(withText(label))); }
     private static ViewAction findAndClick(Matcher<View> target) {
         return new ViewAction() {

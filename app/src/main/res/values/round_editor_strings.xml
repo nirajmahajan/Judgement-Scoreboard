@@ -1,8 +1,8 @@
 <resources>
-    <string name="round_edit_bid_hint">Corrected bid</string>
-    <string name="round_edit_bid_description">Corrected bid, %1$s</string>
+    <string name="round_edit_bid_hint">Corrected prediction</string>
+    <string name="round_edit_bid_description">Corrected prediction, %1$s</string>
     <string name="round_edit_outcome_description">%1$s, %2$s</string>
-    <string name="round_edit_original">Original: bid %1$d · %2$s · %3$s</string>
+    <string name="round_edit_original">Original: prediction %1$d · %2$s · %3$s</string>
     <string name="round_edit_preview_points">Corrected round: %1$s (%2$s)\nNew total: %3$s</string>
     <string name="round_edit_positive_delta">+%1$d points</string>
     <string name="round_edit_negative_delta">%1$d points</string>

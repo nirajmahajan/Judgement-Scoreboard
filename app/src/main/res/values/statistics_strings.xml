@@ -18,10 +18,10 @@
     <string name="statistics_per_round_help">Shows points earned only in rounds each player actually played. Gaps mean the player did not participate.</string>
     <string name="statistics_select_prompt">Select a player to show their performance.</string>
     <string name="statistics_round_details">Rounds and adjustments</string>
-    <string name="statistics_round_help">Inspect recorded cards, scoring rules, bids, outcomes and points. Strategy changes are marked on the timeline.</string>
+    <string name="statistics_round_help">Inspect recorded cards, scoring rules, predictions, outcomes and points. Strategy changes are marked on the timeline.</string>
     <string name="statistics_not_played">No completed rounds played</string>
     <string name="statistics_exact_rate">Exact predictions: %1$d / %2$d (%3$s)</string>
-    <string name="statistics_highest_bid">Highest successful bid: %1$s</string>
+    <string name="statistics_highest_bid">Highest successful prediction: %1$s</string>
     <string name="statistics_no_exact_bid">None</string>
     <plurals name="statistics_streak"><item quantity="one">Longest exact streak: %1$d prediction</item><item quantity="other">Longest exact streak: %1$d predictions</item></plurals>
     <string name="statistics_strategy_change">Scoring strategy changed</string>

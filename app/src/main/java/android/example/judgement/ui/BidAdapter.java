@@ -1,0 +1,85 @@
+package android.example.judgement.ui;
+
+import android.example.judgement.R;
+import android.example.judgement.data.Records;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.TextView;
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Compact bidding table; drafts live in the ViewModel and commands carry stable IDs. */
+final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
+    private final ScoreViewModel model;
+    private final Runnable refresh;
+    private final List<Records.RoundPlayer> players = new ArrayList<>();
+    private long roundId;
+    private int current;
+    BidAdapter(ScoreViewModel model, Runnable refresh) {
+        this.model = model; this.refresh = refresh; setHasStableIds(true);
+    }
+    void submit(long roundId, List<Records.RoundPlayer> players, int current) {
+        this.roundId = roundId; this.players.clear(); this.players.addAll(players); this.current = current;
+        notifyDataSetChanged();
+    }
+    @Override public long getItemId(int position) { return players.get(position).playerId; }
+    @Override public int getItemCount() { return players.size(); }
+    @NonNull @Override public Holder onCreateViewHolder(@NonNull ViewGroup parent, int type) {
+        return new Holder(LayoutInflater.from(parent.getContext()).inflate(R.layout.bid_row, parent, false));
+    }
+    @Override public void onBindViewHolder(@NonNull Holder holder, int position) {
+        Records.RoundPlayer player = players.get(position);
+        final long owner = roundId;
+        boolean latest = position == current - 1;
+        boolean editing = position == current || (latest && model.editingBid(owner, player.playerId));
+        holder.name.setText(player.nameSnapshot);
+        holder.name.setTooltipText(player.nameSnapshot);
+        holder.name.setTypeface(null, position == current ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+        holder.detail.setText(player.bid == null ? "—" : player.bid.toString());
+        holder.detail.setVisibility(editing ? View.GONE : View.VISIBLE);
+        if (holder.watcher != null) holder.input.removeTextChangedListener(holder.watcher);
+        holder.input.setVisibility(editing ? View.VISIBLE : View.GONE);
+        String input = model.bidInput(owner, player.playerId, player.bid);
+        if (!holder.input.getText().toString().equals(input)) holder.input.setText(input);
+        holder.input.setContentDescription(player.nameSnapshot + ", " + holder.itemView.getContext().getString(R.string.table_bid));
+        holder.watcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                model.bidInput(owner, player.playerId, s.toString());
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        };
+        holder.input.addTextChangedListener(holder.watcher);
+        Runnable submit = () -> model.submitInlineBid(owner, player.playerId, holder.input.getText().toString());
+        holder.input.setOnEditorActionListener((view, action, event) -> {
+            if (action != EditorInfo.IME_ACTION_DONE) return false;
+            submit.run(); return true;
+        });
+        holder.confirm.setVisibility(editing || latest ? View.VISIBLE : View.INVISIBLE);
+        holder.confirm.setImageResource(editing ? R.drawable.ic_bid_confirm : R.drawable.ic_roster_edit);
+        holder.confirm.setContentDescription(holder.itemView.getContext().getString(editing ? R.string.enter_bid : R.string.edit_bid)
+                + ", " + player.nameSnapshot);
+        holder.confirm.setOnClickListener(view -> {
+            if (editing) submit.run();
+            else { model.editBid(owner, player.playerId); refresh.run(); }
+        });
+    }
+    static final class Holder extends RecyclerView.ViewHolder {
+        final TextView name, detail;
+        final EditText input;
+        final ImageButton confirm;
+        TextWatcher watcher;
+        Holder(View view) {
+            super(view); name = view.findViewById(R.id.row_name); detail = view.findViewById(R.id.row_detail);
+            input = view.findViewById(R.id.bid_input); confirm = view.findViewById(R.id.bid_confirm);
+        }
+    }
+}

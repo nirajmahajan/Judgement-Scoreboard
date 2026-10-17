@@ -62,7 +62,7 @@ public final class GameStatistics {
                     .thenComparingLong(row -> row.playerId));
             for (Records.RoundPlayer row : ordered) {
                 if (row.bid == null || row.outcome == null) {
-                    throw new IllegalArgumentException("A completed round needs every bid and outcome.");
+                    throw new IllegalArgumentException("A completed round needs every prediction and outcome.");
                 }
                 Outcome outcome = Outcome.valueOf(row.outcome);
                 long earned = strategy.points(source.cards, row.bid, outcome);

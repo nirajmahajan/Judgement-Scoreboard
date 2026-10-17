@@ -437,7 +437,7 @@ public final class ScoreGraphView extends View {
                 if (performance == null) {
                     description.append("did not participate");
                 } else {
-                    description.append("bid ").append(performance.bid).append(", ")
+                    description.append("prediction ").append(performance.bid).append(", ")
                             .append(performance.outcome == Outcome.WON ? "Won" : "Lost")
                             .append(", earned ").append(performance.points).append(" points");
                 }

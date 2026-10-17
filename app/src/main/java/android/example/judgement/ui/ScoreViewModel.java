@@ -35,6 +35,47 @@ public final class ScoreViewModel extends AndroidViewModel {
         state = repository.observe();
     }
     public interface Command { void run(); }
+    private Bundle bidInputs(long roundId) {
+        Bundle inputs = saved.get("bidInputs");
+        if (inputs == null || inputs.getLong("roundId") != roundId) {
+            inputs = new Bundle(); inputs.putLong("roundId", roundId);
+        }
+        return inputs;
+    }
+    String bidInput(long roundId, long playerId, Integer bid) {
+        return bidInputs(roundId).getString(Long.toString(playerId), bid == null ? "" : bid.toString());
+    }
+    void bidInput(long roundId, long playerId, String value) {
+        Bundle inputs = new Bundle(bidInputs(roundId));
+        inputs.putString(Long.toString(playerId), value); saved.set("bidInputs", inputs);
+    }
+    boolean editingBid(long roundId, long playerId) {
+        Bundle inputs = bidInputs(roundId);
+        return inputs.containsKey("editing") && inputs.getLong("editing") == playerId;
+    }
+    void editBid(long roundId, long playerId) {
+        Bundle inputs = new Bundle(bidInputs(roundId));
+        inputs.putLong("editing", playerId); saved.set("bidInputs", inputs);
+    }
+    final MutableLiveData<Long> bidSubmitted = new MutableLiveData<>();
+    void submitInlineBid(long roundId, long playerId, String value) {
+        final int bid;
+        try { bid = Integer.parseInt(value.trim()); }
+        catch (NumberFormatException exception) { error.setValue("Enter a valid prediction."); return; }
+        error.setValue(null);
+        repository.execute(() -> {
+            try {
+                repository.submitBid(roundId, playerId, bid);
+                main.post(() -> {
+                    Bundle inputs = new Bundle(bidInputs(roundId));
+                    inputs.remove(Long.toString(playerId)); inputs.remove("editing");
+                    saved.set("bidInputs", inputs); bidSubmitted.setValue(roundId);
+                });
+            } catch (IllegalArgumentException | IllegalStateException | ArithmeticException exception) {
+                main.post(() -> error.setValue(exception.getMessage()));
+            }
+        });
+    }
     public void run(Command command) { run(command, null); }
     public void run(Command command, String nextScreen) { run(command, nextScreen, null); }
     public void run(Command command, String nextScreen, String nextTab) {

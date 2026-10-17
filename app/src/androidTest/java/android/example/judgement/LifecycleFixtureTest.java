@@ -110,7 +110,7 @@ public class LifecycleFixtureTest {
         ScoreRepository repository = started();
         Snapshot state = repository.snapshot();
         repository.submitBid(state.round.id, state.roundPlayers.get(0).playerId, 0);
-        repository.close(); marker("Bid: 0");
+        repository.close(); marker("Prediction: 0");
     }
     @Test public void seedResults() {
         ScoreRepository repository = started();

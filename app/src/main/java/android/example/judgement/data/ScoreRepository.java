@@ -366,7 +366,7 @@ public final class ScoreRepository implements AutoCloseable {
         if (!"ACTIVE".equals(game.status) && !"COMPLETE".equals(game.status)) fail("This scorecard is no longer current.");
         if (round.revision != expectedRevision) fail("This round was edited. Reopen it before saving another correction.");
         List<Records.RoundPlayer> before = dao.roundPlayers(roundId), after = new ArrayList<>();
-        if (edits == null || edits.size() != before.size()) fail("Enter a bid and result for every recorded participant.");
+        if (edits == null || edits.size() != before.size()) fail("Enter a prediction and result for every recorded participant.");
         Map<Long, RoundPlayerEdit> requested = new HashMap<>();
         for (RoundPlayerEdit edit : edits) {
             if (edit == null || requested.put(edit.playerId, edit) != null) fail("Each recorded participant must appear once.");
@@ -397,7 +397,7 @@ public final class ScoreRepository implements AutoCloseable {
         }
         GameRules.validateBidsComplete(round.cards, roundIds(after), round.dealerId, bids(after));
         if (!GameRules.areOutcomesFeasible(round.cards, correctedBids, correctedOutcomes)) {
-            fail("These results are impossible for " + round.cards + " tricks. Check the bids and Won/Lost choices.");
+            fail("These results are impossible for " + round.cards + " tricks. Check the predictions and Won/Lost choices.");
         }
         return new ValidatedEdit(round, before, after, new RoundEditPreview(round.id, expectedRevision,
                 changes, totals(round.gameId, round.id, after), deltas, changed));

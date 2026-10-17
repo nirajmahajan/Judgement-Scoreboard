@@ -180,7 +180,7 @@ final class RoundEditRequest {
             GameRules.validateBid(cards, parsed);
             return parsed;
         } catch (NumberFormatException invalid) {
-            throw new IllegalArgumentException("Enter a whole bid from 0 to " + cards + ".");
+            throw new IllegalArgumentException("Enter a whole prediction from 0 to " + cards + ".");
         }
     }
 

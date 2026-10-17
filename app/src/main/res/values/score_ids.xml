@@ -1,4 +1,6 @@
 <resources>
+    <item name="quick_bid_0" type="id"/><item name="quick_bid_1" type="id"/>
+    <item name="quick_bid_2" type="id"/><item name="quick_bid_3" type="id"/>
     <item name="primary_action" type="id"/><item name="add_player" type="id"/><item name="quick_add" type="id"/>
     <item name="edit_value" type="id"/><item name="row_drag_handle" type="id"/>
     <item name="strategy_default" type="id"/><item name="strategy_aggressive" type="id"/><item name="strategy_custom" type="id"/>

@@ -138,7 +138,7 @@ public class ScoreGraphViewTest {
                 .createAccessibilityNodeInfo(0);
         String description = node.getContentDescription().toString();
         assertTrue(description.contains(fullName));
-        assertTrue(description.contains("bid 0, Won, earned 10 points"));
+        assertTrue(description.contains("prediction 0, Won, earned 10 points"));
         assertFalse(description.contains("actual tricks"));
         Rect bounds = new Rect();
         node.getBoundsInParent(bounds);

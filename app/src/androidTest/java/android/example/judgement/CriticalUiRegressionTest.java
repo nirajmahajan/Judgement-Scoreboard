@@ -61,7 +61,7 @@ public class CriticalUiRegressionTest {
     @Test public void quickBidsFollowCurrentPlayerAndSelectionsSurviveScoreboardReturn() {
         seed(3, false, 0); launchGame();
         for (int player = 0; player < 3; player++) {
-            rowAction(player, "0"); final int filled = player + 1;
+            onView(withId(R.id.quick_bid_0)).perform(click()); final int filled = player + 1;
             awaitState(s -> s.roundPlayers.stream().filter(row -> row.bid != null).count() == filled);
         }
         clickFooter(R.id.primary_action);
@@ -76,6 +76,19 @@ public class CriticalUiRegressionTest {
         assertEquals("LOST", inspector.snapshot().roundPlayers.get(0).outcome);
         scenario.recreate();
         awaitView(withText("0 · Lost"));
+    }
+
+    @Test public void inlineBidDraftSurvivesRecreationAndConfirmAdvancesCurrentPlayer() {
+        seed(5, false, 0); launchGame();
+        onView(allOf(withId(R.id.bid_input), isDisplayed())).perform(replaceText("1"), closeSoftKeyboard());
+        scenario.recreate();
+        onView(allOf(withId(R.id.bid_input), isDisplayed())).check(matches(withText("1")));
+        onView(allOf(withId(R.id.bid_confirm), isDisplayed())).perform(click());
+        awaitState(s -> Integer.valueOf(1).equals(s.roundPlayers.get(0).bid));
+        onView(allOf(withId(R.id.bid_input), isDisplayed())).check(matches(withText("")));
+        onView(withId(R.id.quick_bid_0)).perform(click());
+        awaitState(s -> Integer.valueOf(0).equals(s.roundPlayers.get(1).bid));
+        assertNull(inspector.snapshot().roundPlayers.get(2).bid);
     }
 
     @Test public void scrollingEightPlayerResultsFinishFromBottomWithoutVisibleFirstRow() {
@@ -167,8 +180,11 @@ public class CriticalUiRegressionTest {
         throw last == null ? new AssertionError("Missing view") : last;
     }
     private static void clickFooter(int id) {
-        onView(withId(R.id.screen_list)).perform(RecyclerViewActions.scrollTo(hasDescendant(withId(id))));
-        onView(withId(id)).perform(click());
+        try { onView(allOf(withId(id), isDisplayed())).check(matches(isDisplayed())); }
+        catch (androidx.test.espresso.NoMatchingViewException missing) {
+            onView(withId(R.id.screen_list)).perform(RecyclerViewActions.scrollTo(hasDescendant(withId(id))));
+        }
+        onView(allOf(withId(id), isDisplayed())).perform(click());
     }
     private static void rowAction(int position, String label) {
         onView(withId(R.id.screen_list)).perform(RecyclerViewActions.actionOnItemAtPosition(position + 1, new ViewAction() {

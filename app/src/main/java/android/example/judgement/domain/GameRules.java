@@ -83,7 +83,7 @@ public final class GameRules {
 
     public static void validateBid(int cards, int bid) {
         if (cards < 1 || cards > DECK_SIZE || bid < 0 || bid > cards) {
-            throw new IllegalArgumentException("Bid from 0 to " + cards + ".");
+            throw new IllegalArgumentException("Enter a prediction from 0 to " + cards + ".");
         }
     }
 
@@ -104,7 +104,7 @@ public final class GameRules {
         validateBid(cards, bid);
         Long current = currentBidder(bidOrder, bids);
         if (current == null || current != bidderId) {
-            throw new IllegalArgumentException("Only the current bidder can record a new bid.");
+            throw new IllegalArgumentException("Only the current player can record a new prediction.");
         }
         validateDealerTotal(cards, dealerId, bids, bidderId, bid);
     }
@@ -115,7 +115,7 @@ public final class GameRules {
         validateBidState(cards, bidOrder, dealerId, bids);
         validateBid(cards, bid);
         if (bids.isEmpty() || bidOrder[bids.size() - 1] != bidderId) {
-            throw new IllegalArgumentException("Only the latest bid can change before the next bid.");
+            throw new IllegalArgumentException("Only the latest prediction can change before the next prediction.");
         }
         validateDealerTotal(cards, dealerId, bids, bidderId, bid);
     }
@@ -124,7 +124,7 @@ public final class GameRules {
             Map<Long, Integer> bids) {
         validateBidState(cards, bidOrder, dealerId, bids);
         if (bids.size() != bidOrder.length) {
-            throw new IllegalArgumentException("Record every player's bid first.");
+            throw new IllegalArgumentException("Record every player's prediction first.");
         }
         validateDealerTotal(cards, dealerId, bids, dealerId, bids.get(dealerId));
     }
@@ -135,7 +135,7 @@ public final class GameRules {
      */
     public static boolean areOutcomesFeasible(int cards, int[] bids, Outcome[] outcomes) {
         if (bids == null || outcomes == null || bids.length != outcomes.length) {
-            throw new IllegalArgumentException("Every player needs a bid and an outcome.");
+            throw new IllegalArgumentException("Every player needs a prediction and an outcome.");
         }
         validateCards(cards, bids.length);
         for (int i = 0; i < bids.length; i++) {
@@ -196,7 +196,7 @@ public final class GameRules {
         validateCards(cards, order == null ? 0 : order.length);
         validateBidPrefix(order, bids);
         if (order[order.length - 1] != dealerId) {
-            throw new IllegalArgumentException("The dealer must bid last.");
+            throw new IllegalArgumentException("The dealer must predict last.");
         }
         for (Integer existing : bids.values()) {
             validateBid(cards, existing);
@@ -206,21 +206,21 @@ public final class GameRules {
     private static void validateBidPrefix(long[] order, Map<Long, Integer> bids) {
         validateSeats(order);
         if (bids == null) {
-            throw new IllegalArgumentException("The bid state is missing.");
+            throw new IllegalArgumentException("The prediction state is missing.");
         }
         Set<Long> playerIds = new HashSet<>();
         for (long id : order) {
             playerIds.add(id);
         }
         if (!playerIds.containsAll(bids.keySet())) {
-            throw new IllegalArgumentException("A bid belongs to a player outside this round.");
+            throw new IllegalArgumentException("A prediction belongs to a player outside this round.");
         }
         boolean foundMissing = false;
         for (long playerId : order) {
             if (!bids.containsKey(playerId)) {
                 foundMissing = true;
             } else if (foundMissing || bids.get(playerId) == null) {
-                throw new IllegalArgumentException("Bids must be recorded in order.");
+                throw new IllegalArgumentException("Predictions must be recorded in order.");
             }
         }
     }
@@ -237,7 +237,7 @@ public final class GameRules {
             }
         }
         if (total == cards) {
-            throw new IllegalArgumentException("The dealer's bid cannot make total bids equal the cards dealt.");
+            throw new IllegalArgumentException("The dealer's prediction cannot make total predictions equal the cards dealt.");
         }
     }
 

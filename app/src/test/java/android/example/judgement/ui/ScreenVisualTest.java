@@ -211,17 +211,32 @@ public class ScreenVisualTest {
         launch(false, false, false);
         open("GAME", "ROUND");
         RecyclerView list = activity.findViewById(R.id.screen_list);
-        List<String> bids = Arrays.asList("0", "1", context.getString(R.string.table_bidding), "—", "—");
+        List<String> bids = Arrays.asList("0", "1", "", "—", "—");
         for (int index = 0; index < names.size(); index++) {
             RecyclerView.ViewHolder holder = list.findViewHolderForAdapterPosition(index + contentOffset(list));
             assertNotNull("All five players stay visible while predicting", holder);
             TextView name = holder.itemView.findViewById(R.id.row_name);
             assertEquals(names.get(index), name.getText().toString());
             assertFullyVisible(name);
-            assertEquals(bids.get(index), ((TextView) holder.itemView.findViewById(R.id.row_detail)).getText().toString());
+            assertSingleLineNameData(name);
+            TextView detail = holder.itemView.findViewById(R.id.row_detail);
+            if (index == 2) {
+                TextView input = holder.itemView.findViewById(R.id.bid_input);
+                assertEquals(View.VISIBLE, input.getVisibility());
+                assertEquals(context.getString(R.string.table_bid), input.getHint().toString());
+                assertFullyVisible(input);
+                assertFullyVisible(holder.itemView.findViewById(R.id.bid_confirm));
+                Rect nameBounds = new Rect(), inputBounds = new Rect();
+                name.getGlobalVisibleRect(nameBounds); input.getGlobalVisibleRect(inputBounds);
+                assertFalse("The editable bid stays beside the name", Rect.intersects(nameBounds, inputBounds));
+            } else {
+                assertEquals(bids.get(index), detail.getText().toString());
+                assertFullyVisible(detail);
+            }
         }
+        for (int id : new int[]{R.id.quick_bid_0, R.id.quick_bid_1, R.id.quick_bid_2, R.id.quick_bid_3})
+            assertFullyVisible(activity.findViewById(id));
         assertFixedControlsReachable();
-        assertEachNameAndRowLayout(names, true);
         capture("round_dark_320");
     }
 

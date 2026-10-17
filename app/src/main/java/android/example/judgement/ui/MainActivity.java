@@ -52,6 +52,9 @@ public final class MainActivity extends AppCompatActivity {
     private RecyclerView list;
     private BottomNavigationView navigation;
     private ScoreAdapter adapter;
+    private BidAdapter bids;
+    private LinearLayout bidShortcuts;
+    private boolean biddingColumns;
     private RosterAdapter roster;
     private StrategyEditor strategyEditor;
     private RoundEditorAdapter roundEditor;
@@ -102,6 +105,7 @@ public final class MainActivity extends AppCompatActivity {
         footerAdapter = new ChromeAdapter(R.layout.score_footer, this::bindFooter);
         toolbar = findViewById(R.id.toolbar);
         navigation = findViewById(R.id.bottom_navigation);
+        bidShortcuts = findViewById(R.id.bid_shortcuts);
         adapter = new ScoreAdapter(); setContent(adapter);
         model = new ViewModelProvider(this).get(ScoreViewModel.class);
         navigation.setOnItemSelectedListener(item -> {
@@ -113,6 +117,7 @@ public final class MainActivity extends AppCompatActivity {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() { back(); }
         });
+        model.bidSubmitted.observe(this, roundId -> { if (state != null) render(); });
         model.state.observe(this, snapshot -> { state = snapshot; render(); restoreForm(model.form()); });
         model.screenState().observe(this, screen -> { if (state != null) render(); });
         model.strategyState().observe(this, request -> { if (state != null) render(); });
@@ -184,7 +189,8 @@ public final class MainActivity extends AppCompatActivity {
             adapter = new ScoreAdapter(); setContent(adapter); renderedScreen = screen;
         }
         footerActions.clear();
-        tableDetailLabel = 0; rosterColumns = false;
+        tableDetailLabel = 0; rosterColumns = false; biddingColumns = false;
+        bidShortcuts.setVisibility(View.GONE);
         boolean game = "GAME".equals(screen);
         navigation.setVisibility(game ? View.VISIBLE : View.GONE);
         toolbar.getMenu().clear();
@@ -268,6 +274,11 @@ public final class MainActivity extends AppCompatActivity {
                 edit.setTextAlignment(View.TEXT_ALIGNMENT_CENTER); delete.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
                 columns.addView(edit, new LinearLayout.LayoutParams(dp(48), -2));
                 columns.addView(delete, new LinearLayout.LayoutParams(dp(48), -2));
+            } else if (biddingColumns) {
+                TextView bid = columnLabel(tableDetailLabel, false);
+                bid.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+                columns.addView(bid, new LinearLayout.LayoutParams(dp(104), -2));
+                columns.addView(new View(this), new LinearLayout.LayoutParams(dp(48), 1));
             } else columns.addView(columnLabel(tableDetailLabel, true), new LinearLayout.LayoutParams(dp(88), -2));
         }
     }
@@ -553,37 +564,41 @@ public final class MainActivity extends AppCompatActivity {
                         + (state.game.pendingScoringConfig == null ? "" : "\n" + getString(R.string.strategy_pending,
                                 StrategyEditor.label(this, ScoringStrategy.decode(state.game.pendingScoringConfig)), round.number + 1)));
         if ("BIDDING".equals(round.phase)) bidding(round); else results(round);
-        ScoringStrategy strategy = ScoringStrategy.decode(round.scoringConfig);
-        action(R.string.how_scoring_works, R.id.round_scoring_help, () -> showScoringHelp(strategy, "GAME"));
+
     }
     private void bidding(Records.Round round) {
-        tableDetailLabel = R.string.table_bid;
-        List<ScoreAdapter.Row> rows = new ArrayList<>();
-        int firstMissing = state.roundPlayers.size();
-        int submittedTotal = 0;
+        tableDetailLabel = R.string.table_bid; biddingColumns = true;
+        int firstMissing = state.roundPlayers.size(), submittedTotal = 0;
         for (int i = 0; i < state.roundPlayers.size(); i++) {
             Integer bid = state.roundPlayers.get(i).bid;
             if (bid != null) submittedTotal += bid;
             else if (firstMissing == state.roundPlayers.size()) firstMissing = i;
         }
-        for (int i = 0; i < state.roundPlayers.size(); i++) {
-            Records.RoundPlayer player = state.roundPlayers.get(i);
-            boolean current = i == firstMissing;
-            ScoreAdapter.Row row = new ScoreAdapter.Row(player.playerId, player.nameSnapshot,
-                    player.bid == null ? (current ? getString(R.string.table_bidding) : "—") : Integer.toString(player.bid)).compactName();
-            if (current) {
-                row.action(getString(R.string.enter_bid), () -> bidDialog(round, player));
-                // Quick bids carry this bidder's stable ID, independent of attached row views.
-                for (int bid = 0; bid <= 3; bid++) {
-                    final int value = bid;
-                    boolean allowed = bid <= round.cards && (player.playerId != round.dealerId || submittedTotal + bid != round.cards);
-                    row.quickBid(bid, allowed, () -> model.run(() -> model.repository.submitBid(round.id, player.playerId, value)));
-                }
-            } else if (i == firstMissing - 1) row.action(getString(R.string.edit_bid), () -> bidDialog(round, player));
-            rows.add(row);
+        if (bids == null) bids = new BidAdapter(model, this::render);
+        bids.submit(round.id, state.roundPlayers, firstMissing); setContent(bids);
+        bidShortcuts.removeAllViews(); bidShortcuts.setVisibility(View.VISIBLE);
+        Records.RoundPlayer current = firstMissing < state.roundPlayers.size() ? state.roundPlayers.get(firstMissing) : null;
+        int[] ids = {R.id.quick_bid_0, R.id.quick_bid_1, R.id.quick_bid_2, R.id.quick_bid_3};
+        for (int value = 0; current != null && value <= 3; value++) {
+            final int bid = value;
+            MaterialButton button = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+            button.setId(ids[value]); button.setText(Integer.toString(value));
+            button.setMinWidth(0); button.setMinimumWidth(0); button.setPadding(0, 0, 0, 0);
+            button.setMinHeight(dp(48));
+            button.setContentDescription(getString(R.string.quick_bid, value) + (current == null ? "" : ", " + current.nameSnapshot));
+            button.setEnabled(current != null && value <= round.cards
+                    && (current.playerId != round.dealerId || submittedTotal + value != round.cards));
+            if (current != null) button.setOnClickListener(view -> model.submitInlineBid(round.id, current.playerId, Integer.toString(bid)));
+            LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(0, dp(56), 1);
+            if (value < 3) layout.setMarginEnd(dp(6));
+            bidShortcuts.addView(button, layout);
         }
-        rows(rows);
-        action(R.string.record_bids, R.id.primary_action, () -> model.run(() -> model.repository.recordBids(round.id))).setEnabled(firstMissing == state.roundPlayers.size());
+        if (current == null) {
+            MaterialButton record = new MaterialButton(this);
+            record.setId(R.id.primary_action); record.setText(R.string.record_bids);
+            record.setOnClickListener(view -> model.run(() -> model.repository.recordBids(round.id)));
+            bidShortcuts.addView(record, new LinearLayout.LayoutParams(-1, dp(56)));
+        }
     }
     private void bidDialog(Records.Round round, Records.RoundPlayer player) {
         model.beginForm(new FormRequest(FormRequest.Kind.BID,
@@ -1011,7 +1026,7 @@ public final class MainActivity extends AppCompatActivity {
         if (request.kind == FormRequest.Kind.BID) {
             int bid;
             try { bid = Integer.parseInt(request.text); }
-            catch (NumberFormatException exception) { throw new IllegalArgumentException("Enter a bid from 0 to " + request.maximumBid + "."); }
+            catch (NumberFormatException exception) { throw new IllegalArgumentException("Enter a prediction from 0 to " + request.maximumBid + "."); }
             GameRules.validateBid(request.maximumBid, bid);
             model.runForm(request, () -> model.repository.submitBid(request.roundId, request.playerId, bid));
             return;
