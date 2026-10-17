@@ -179,7 +179,7 @@ public class FeatureUiRegressionTest {
         inspector.addSavedPlayer("Table conflict");
         inspector.saveDraft(new DraftSpec(0, Arrays.asList(new PlayerSpec(0, "Alice", alice),
                 new PlayerSpec("TABLE CONFLICT")), "ASCENDING", "FIXED", null));
-        launch(); clickLabel(R.string.continue_setup);
+        launch(); clickId(R.id.primary_action);
         awaitView(withText(R.string.setup_players));
         clickId(R.id.quick_add);
         awaitView(allOf(withId(R.id.saved_player_checkbox), hasSibling(withText("Alice"))));
@@ -327,7 +327,7 @@ public class FeatureUiRegressionTest {
         long originalDraft = inspector.saveDraft(new DraftSpec(0, Arrays.asList(
                 new PlayerSpec("Original setup A"), new PlayerSpec("Original setup B")),
                 "ASCENDING", "FIXED", null));
-        launch(); clickLabel(R.string.continue_setup);
+        launch(); clickId(R.id.primary_action);
         completeSetupChoices(); assertScreenStartsAtTop();
         awaitView(withText(R.string.replace_game_title));
         ScoreViewModel model = activityModel();
@@ -357,7 +357,7 @@ public class FeatureUiRegressionTest {
     @Test public void queuedQuickAddCannotRetargetAReplacementDraft() throws Exception {
         inspector.addSavedPlayer("Selected saved profile");
         inspector.saveDraft(new DraftSpec(0, new ArrayList<>(), "ASCENDING", "FIXED", null));
-        launch(); clickLabel(R.string.continue_setup); clickId(R.id.quick_add);
+        launch(); clickId(R.id.primary_action); clickId(R.id.quick_add);
         toggleSaved("Selected saved profile");
         ScoreViewModel model = activityModel();
         CountDownLatch blocked = new CountDownLatch(1);
@@ -431,7 +431,7 @@ public class FeatureUiRegressionTest {
     }
 
     @Test public void helpFromEmptyHomeReturnsSafelyAndExplainsThirteenPointBid() {
-        launch(); clickLabel(R.string.help);
+        launch(); clickId(R.id.home_help);
         awaitView(allOf(withId(R.id.screen_title), withText(R.string.help_title)));
         onView(withId(R.id.screen_list)).perform(RecyclerViewActions.actionOnItemAtPosition(1,
                 new ViewAction() {
@@ -535,7 +535,9 @@ public class FeatureUiRegressionTest {
         onView(visible).perform(click());
     }
     private void openSavedManagement() {
-        clickLabel(R.string.saved_players);
+        clickId(R.id.primary_action);
+        awaitView(allOf(withId(R.id.screen_title), withText(R.string.setup_players)));
+        clickId(R.id.quick_add);
         Espresso.openActionBarOverflowOrOptionsMenu(context);
         onView(withText(R.string.manage_saved_players)).perform(click());
     }

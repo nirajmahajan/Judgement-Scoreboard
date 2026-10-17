@@ -94,6 +94,11 @@ public class ScreenVisualTest {
     @Test public void homeLightOnNarrowPhone() throws Exception {
         launch(false, false, false);
         assertFixedControlsReachable();
+        View help = activity.findViewById(R.id.home_help);
+        assertFullyVisible(help);
+        assertTrue("Home Help stays compact", help.getWidth() < activity.getResources().getDisplayMetrics().widthPixels / 2);
+        assertTrue("Home Help stays at the bottom", help.getBottom() >= activity.findViewById(R.id.score_root).getHeight() - dp(16));
+        assertEquals(0, contentAdapter((RecyclerView) activity.findViewById(R.id.screen_list)).getItemCount());
         capture("home_light_320");
     }
 
@@ -102,6 +107,19 @@ public class ScreenVisualTest {
         launch(false, false, false);
         assertFixedControlsReachable();
         capture("home_dark_320");
+    }
+
+    @Test public void homeWithUnfinishedSetupHasOneStartActionAndSmallHelp() throws Exception {
+        seedEnglishSetup(false); launch(false, false, false);
+        assertEquals(0, contentAdapter((RecyclerView) activity.findViewById(R.id.screen_list)).getItemCount());
+        assertFullyVisible(activity.findViewById(R.id.home_help));
+        assertFullyVisible(activity.findViewById(R.id.primary_action));
+        capture("home_unfinished_setup_320");
+        long draft = model.state.getValue().draft.id;
+        showFooter(); activity.findViewById(R.id.primary_action).performClick(); layout();
+        assertEquals("PLAYERS", model.screen());
+        assertEquals(draft, model.state.getValue().draft.id);
+        assertEquals(6, model.state.getValue().draftPlayers.size());
     }
 
     @Test public void setupEllipsizesLongNamesWhileRetainingFullTextAndControls() throws Exception {

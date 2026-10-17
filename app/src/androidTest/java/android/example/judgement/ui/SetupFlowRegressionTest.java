@@ -40,6 +40,29 @@ public final class SetupFlowRegressionTest {
 
     @After public void close() { RepositoryTestCleanup.close(scenario, repository); }
 
+    @Test public void newGameResumesUnstartedSetupWithoutReplacingStartedGame() {
+        long active = repository.saveDraft(new android.example.judgement.data.DraftSpec(0, java.util.Arrays.asList(
+                new android.example.judgement.data.PlayerSpec("Alice"), new android.example.judgement.data.PlayerSpec("Ben")),
+                "ASCENDING", "CUSTOM", null));
+        repository.startGame(active);
+        long draft = repository.saveDraft(new android.example.judgement.data.DraftSpec(0, java.util.Arrays.asList(
+                new android.example.judgement.data.PlayerSpec("Charlotte"), new android.example.judgement.data.PlayerSpec("David")),
+                "DESCENDING", "CUSTOM", null));
+        long player = repository.snapshot().draftPlayers.get(0).id;
+        long round = repository.snapshot().round.id;
+        scenario = ActivityScenario.launch(MainActivity.class);
+        awaitView(withText(R.string.home_title));
+        onView(withId(R.id.home_help)).check(matches(isDisplayed()));
+        onView(withText(R.string.continue_setup)).check(androidx.test.espresso.assertion.ViewAssertions.doesNotExist());
+        onView(withText(R.string.saved_players)).check(androidx.test.espresso.assertion.ViewAssertions.doesNotExist());
+        clickId(R.id.primary_action);
+        awaitView(allOf(withId(R.id.screen_title), withText(R.string.setup_players)));
+        Snapshot state = repository.snapshot();
+        assertEquals(draft, state.draft.id); assertEquals(player, state.draftPlayers.get(0).id);
+        assertEquals("Charlotte", state.draftPlayers.get(0).name); assertEquals("DESCENDING", state.draft.direction);
+        assertEquals(active, state.game.id); assertEquals(round, state.round.id);
+    }
+
     @Test public void startRequiresDirectionThenExplicitDealerAndOpensGame() {
         newGame();
         assertEquals("CUSTOM", repository.snapshot().draft.trumpMode);
@@ -100,12 +123,16 @@ public final class SetupFlowRegressionTest {
     @Test public void savedPlayerBinDeletesSelectionAndPreservesExistingRoster() {
         long alice = repository.addSavedPlayer("Alice"); repository.addSavedPlayer("Ben");
         repository.saveDraft(new android.example.judgement.data.DraftSpec(0, java.util.Arrays.asList(
-                new android.example.judgement.data.PlayerSpec(0, "Alice", alice)), "ASCENDING", "CUSTOM", null));
-        long participantId = repository.snapshot().draftPlayers.get(0).id;
+                new android.example.judgement.data.PlayerSpec(0, "Alice", alice),
+                new android.example.judgement.data.PlayerSpec("Other player")), "ASCENDING", "CUSTOM", null));
+        repository.startGame(repository.snapshot().draft.id);
+        long participantId = repository.snapshot().players.get(0).id;
         scenario = ActivityScenario.launch(MainActivity.class);
         awaitView(withText(R.string.home_title));
-        onView(withId(R.id.screen_list)).perform(RecyclerViewActions.scrollTo(hasDescendant(withText(R.string.saved_players))));
-        onView(allOf(withText(R.string.saved_players), isClickable())).perform(click());
+        clickId(R.id.primary_action);
+        awaitState(state -> state.draft != null);
+        awaitView(allOf(withId(R.id.screen_title), withText(R.string.setup_players)));
+        clickId(R.id.quick_add);
         onView(withId(R.id.delete_saved_players)).check(matches(org.hamcrest.Matchers.not(isEnabled())));
         onView(allOf(withId(R.id.saved_player_checkbox), hasSibling(withText("Alice")))).perform(click());
         onView(allOf(withId(R.id.saved_player_checkbox), hasSibling(withText("Ben")))).perform(click());
@@ -115,8 +142,8 @@ public final class SetupFlowRegressionTest {
         onView(withId(R.id.delete_saved_players)).perform(click());
         onView(withId(android.R.id.button1)).perform(click());
         awaitState(state -> state.savedPlayers.isEmpty());
-        assertEquals(participantId, repository.snapshot().draftPlayers.get(0).id);
-        assertEquals("Alice", repository.snapshot().draftPlayers.get(0).name);
+        assertEquals(participantId, repository.snapshot().players.get(0).id);
+        assertEquals("Alice", repository.snapshot().players.get(0).name);
         onView(withId(R.id.primary_action)).check(matches(org.hamcrest.Matchers.not(isEnabled())));
     }
 

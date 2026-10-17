@@ -55,7 +55,7 @@ public final class MainActivity extends AppCompatActivity {
     private BidAdapter bids;
     private ResultAdapter outcomes;
     private LinearLayout fixedActions;
-    private View addSavedPlayer;
+    private View addSavedPlayer, homeHelp;
     private boolean biddingColumns;
     private RosterAdapter roster;
     private StrategyEditor strategyEditor;
@@ -124,6 +124,8 @@ public final class MainActivity extends AppCompatActivity {
         fixedActions = findViewById(R.id.fixed_actions);
         adapter = new ScoreAdapter(); setContent(adapter);
         model = new ViewModelProvider(this).get(ScoreViewModel.class);
+        homeHelp = findViewById(R.id.home_help);
+        homeHelp.setOnClickListener(view -> open("HELP"));
         addSavedPlayer = findViewById(R.id.add_saved_player);
         addSavedPlayer.setOnClickListener(view -> model.beginForm(new FormRequest(
                 FormRequest.Kind.ADD_SAVED, "", false, 0, 0, 0, 0, 0)));
@@ -213,6 +215,7 @@ public final class MainActivity extends AppCompatActivity {
         footerActions.clear();
         tableDetailLabel = 0; rosterColumns = false; biddingColumns = false;
         fixedActions.setVisibility(View.GONE);
+        homeHelp.setVisibility("HOME".equals(screen) ? View.VISIBLE : View.GONE);
         boolean savedPicker = "SAVED".equals(screen) || "QUICK_ADD".equals(screen);
         addSavedPlayer.setVisibility(savedPicker ? View.VISIBLE : View.GONE);
         list.setPaddingRelative(dp(16), 0, dp(16), dp(savedPicker ? 88 : 16));
@@ -369,9 +372,6 @@ public final class MainActivity extends AppCompatActivity {
         List<ScoreAdapter.Row> rows = new ArrayList<>();
         if (state.game != null) rows.add(new ScoreAdapter.Row(1, getString("COMPLETE".equals(state.game.status) ? R.string.completed_results : R.string.resume_game), "")
                 .action(getString("COMPLETE".equals(state.game.status) ? R.string.completed_results : R.string.resume_game), () -> open("GAME")));
-        if (state.draft != null) rows.add(new ScoreAdapter.Row(2, getString(R.string.continue_setup), "").action(getString(R.string.continue_setup), () -> open("PLAYERS")));
-        rows.add(new ScoreAdapter.Row(3, getString(R.string.saved_players), "").action(getString(R.string.saved_players), () -> { selectedProfiles.clear(); search = ""; open("SAVED"); }));
-        rows.add(new ScoreAdapter.Row(4, getString(R.string.help), "").action(getString(R.string.help), () -> open("HELP")));
         if (!state.recoveries.isEmpty()) rows.add(new ScoreAdapter.Row(5, getString(R.string.recovery_title), "").action(getString(R.string.recovery_title), () -> open("RECOVERY")));
         rows(rows);
         action(R.string.new_game, R.id.primary_action, () -> {
