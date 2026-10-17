@@ -1,13 +1,15 @@
 <resources>
-    <color name="score_background">#152326</color>
-    <color name="score_surface">#1E3033</color>
-    <color name="score_text">#EAF0ED</color>
-    <color name="score_secondary">#B5C5C1</color>
-    <color name="score_accent">#9CCFC2</color>
-    <color name="score_on_accent">#07382F</color>
-    <color name="score_border">#3C4D4C</color>
-    <color name="score_container_low">#1A2B2E</color><color name="score_container">#223538</color>
-    <color name="score_container_high">#293D40</color><color name="score_container_highest">#34494C</color>
-    <color name="score_accent_container">#294C42</color><color name="score_on_accent_container">#D8EFE6</color>
-    <color name="score_inverse">#EAF0ED</color><color name="score_on_inverse">#24383E</color>
+    <color name="score_background">#111D31</color>
+    <color name="score_surface">#1B2A42</color>
+    <color name="score_text">#EAF0FC</color>
+    <color name="score_secondary">#BAC8DF</color>
+    <color name="score_accent">#A8C7FA</color>
+    <color name="score_on_accent">#102F64</color>
+    <color name="score_border">#3A4B65</color>
+    <color name="score_container_low">#16233A</color><color name="score_container">#203049</color>
+    <color name="score_container_high">#293B55</color><color name="score_container_highest">#344862</color>
+    <color name="score_accent_container">#244575</color><color name="score_on_accent_container">#DCE8FF</color>
+    <color name="score_inverse">#EAF0FC</color><color name="score_on_inverse">#22324D</color>
+    <color name="result_won">#8ED7A6</color>
+    <color name="result_lost">#FFB4AB</color>
 </resources>

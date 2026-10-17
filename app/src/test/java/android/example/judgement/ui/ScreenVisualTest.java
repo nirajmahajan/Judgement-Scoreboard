@@ -244,7 +244,7 @@ public class ScreenVisualTest {
             if (!(columns.getChildAt(index) instanceof TextView)) continue;
             TextView label = (TextView) columns.getChildAt(index);
             assertNull("Table labels have no flame icons", label.getCompoundDrawablesRelative()[0]);
-            assertTrue("Header labels remain readable on teal", androidx.core.graphics.ColorUtils.calculateContrast(
+            assertTrue("Header labels remain readable on the dark header", androidx.core.graphics.ColorUtils.calculateContrast(
                     label.getCurrentTextColor(), headerColor) >= 4.5);
         }
         TextView description = activity.findViewById(R.id.screen_description);
@@ -347,6 +347,11 @@ public class ScreenVisualTest {
             assertTrue("Result choices stay beside the name", row.findViewById(R.id.result_choices).getLeft() >= name.getWidth());
             assertEquals(index == 0, ((android.widget.RadioButton) lost).isChecked());
             assertFalse(((android.widget.RadioButton) won).isChecked());
+            assertEquals(activity.getColor(R.color.result_won), ((TextView) won).getCurrentTextColor());
+            assertEquals(activity.getColor(R.color.result_lost), ((TextView) lost).getCurrentTextColor());
+            for (View choice : new View[]{won, lost}) assertTrue("Result labels retain readable contrast",
+                    androidx.core.graphics.ColorUtils.calculateContrast(((TextView) choice).getCurrentTextColor(),
+                            activity.getColor(R.color.score_background)) >= 4.5);
         }
         assertFullyVisible(activity.findViewById(R.id.primary_action));
         capture("results_compact_320");
