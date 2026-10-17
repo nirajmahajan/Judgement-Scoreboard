@@ -38,6 +38,6 @@ Optional proposals are ranked separately in [follow-up features](docs/FOLLOW_UPS
 
 ## Release
 
-CI retains downloadable debug and unsigned release APKs. Production-compatible signing requires the original signing key, a higher version code, exact-commit automated verification, owner acceptance and approval through the protected release workflow. No push or pull request automatically publishes a release.
+V2 is signed with a new release key approved by the owner. Uninstall the original app before installing v2; future updates will reuse the new key. The **Create release** action publishes version tags only after checking the APK's signature, package identity and payload against a fresh build. Signed APKs, checksums and certificate evidence are attached to GitHub releases. A password-encrypted keystore backup is in `signing/`; its password stays outside Git. See [release instructions](tools/ci/README.md).
 
 created by chatgpt-codex

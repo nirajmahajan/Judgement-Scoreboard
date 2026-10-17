@@ -15,6 +15,7 @@ assert re.fullmatch(r"[0-9a-f]{40}", commit)
 assert os.environ["GITHUB_ACTOR"] == "nirajmahajan"
 root = Path("release")
 assert (root / "judgement-scoreboard.apk").is_file()
+new_key = os.environ.get("RELEASE_SIGNING_MODE") == "new"
 body = f"""Judgement Scoreboard 2.0
 
 - Repaired predictions, scoring, lifecycle state, and legacy data recovery.
@@ -29,14 +30,37 @@ Physical-device, TalkBack, and production-certificate upgrade acceptance were co
 
 created by chatgpt-codex
 """
+if new_key:
+    verification = json.loads((root / "verification.json").read_text())
+    assert verification["commit"] == commit and verification["productionSigned"]
+    body = f"""Judgement Scoreboard {tag}
+
+- Compact blue interface, saved players, drag ordering, and fast 0/1/2/3 predictions.
+- Scoring strategies, durable game state, editable round history, and cumulative score graph.
+- Repaired scoring, results validation, lifecycle behavior, and large-score/graph layouts.
+
+Download **judgement-scoreboard.apk** below. Requires Android 8 or later.
+
+**Installation:** uninstall the original Judgement app first, then install this APK. This release uses a new signing key and cannot update the old installation. Uninstalling removes the old app's local data. Future releases will reuse the new key so they can update v2 normally.
+
+Source commit: `{commit}`
+APK signature, production identity, version, and payload matching the source build were verified by the [release action]({os.environ['EVIDENCE_RUN']}). Checksums and the signing certificate are attached. Physical-device/TalkBack acceptance is not claimed.
+
+created by chatgpt-codex
+"""
 (root / "CHANGELOG.md").write_text(body)
-(root / "test-evidence.json").write_text(json.dumps({
+evidence = {
     "commit": commit, "run": os.environ["EVIDENCE_RUN"],
     "owner": os.environ["GITHUB_ACTOR"],
     "physicalAcceptance": True, "talkBackAcceptance": True,
     "productionUpgradeAcceptance": True,
     "attribution": "created by chatgpt-codex",
-}, indent=2))
+}
+if new_key:
+    evidence = verification | {"run": os.environ["EVIDENCE_RUN"],
+                               "physicalAcceptance": False, "talkBackAcceptance": False,
+                               "productionUpgradeAcceptance": False}
+(root / "test-evidence.json").write_text(json.dumps(evidence, indent=2))
 headers = {"Authorization": "Bearer " + os.environ["GITHUB_TOKEN"],
            "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
 api = f"https://api.github.com/repos/{repository}"
@@ -49,7 +73,7 @@ while release is None:
     if len(releases) < 100:
         break
     page += 1
-if release is not None and (not release["draft"] or release["target_commitish"] != commit):
+if release is not None and (not release["draft"] or (not new_key and release["target_commitish"] != commit)):
     raise SystemExit("Release already published or draft targets another commit; refusing to overwrite it")
 payload = json.dumps({"tag_name": tag, "target_commitish": commit,
                       "name": f"Judgement Scoreboard {tag}", "body": body,

@@ -11,6 +11,9 @@
 *.keystore
 *.pem
 *.p12
+!/signing/judgement-release.p12
+/release/
+/release-draft/
 .env
 .env.*
 /artifacts/

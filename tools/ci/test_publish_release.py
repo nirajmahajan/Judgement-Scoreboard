@@ -14,7 +14,7 @@ COMMIT = "a" * 40
 
 
 class ReleasePublicationTest(unittest.TestCase):
-    def publish(self, existing):
+    def publish(self, existing, new_key=False):
         calls = []
         release = {"id": 1, "tag_name": "v2.0.0", "draft": True, "target_commitish": COMMIT,
                    "assets": [], "upload_url": "https://uploads.github.com/test{?name}",
@@ -35,9 +35,12 @@ class ReleasePublicationTest(unittest.TestCase):
                 Path("release").mkdir()
                 for name in ["judgement-scoreboard.apk", "SHA256SUMS", "certificate.txt"]:
                     Path("release", name).write_text("fixture")
+                Path("release/verification.json").write_text(json.dumps({"commit": COMMIT,
+                        "productionSigned": True, "payloadMatchesCommitBuild": True}))
                 with patch.dict(os.environ, {"GITHUB_REPOSITORY": "test/repo", "TESTED_COMMIT": COMMIT,
                         "RELEASE_TAG": "v2.0.0", "GITHUB_ACTOR": "nirajmahajan",
-                        "GITHUB_TOKEN": "fixture-token", "EVIDENCE_RUN": "https://github.com/test/actions/runs/1"}), \
+                        "GITHUB_TOKEN": "fixture-token", "RELEASE_SIGNING_MODE": "new" if new_key else "legacy",
+                        "EVIDENCE_RUN": "https://github.com/test/actions/runs/1"}), \
                         patch("urllib.request.urlopen", side_effect=request):
                     runpy.run_path(str(SCRIPT), run_name="__main__")
             finally:
@@ -63,6 +66,21 @@ class ReleasePublicationTest(unittest.TestCase):
     def test_draft_for_another_commit_is_never_overwritten(self):
         with self.assertRaisesRegex(SystemExit, "refusing to overwrite"):
             self.publish([{"tag_name": "v2.0.0", "draft": True, "target_commitish": "b" * 40}])
+
+    def test_new_key_publication_retargets_the_unpublished_draft_and_discloses_reinstall(self):
+        calls = self.publish([{"id": 1, "tag_name": "v2.0.0", "draft": True, "target_commitish": "b" * 40}], new_key=True)
+        update = next(json.loads(data) for method, url, data in calls
+                      if method == "PATCH" and "tag_name" in json.loads(data))
+        self.assertEqual(COMMIT, update["target_commitish"])
+        self.assertIn("uninstall the original", update["body"])
+        self.assertNotIn("were confirmed by the owner", update["body"])
+        evidence = next(json.loads(data) for _, url, data in calls if url.endswith("name=test-evidence.json"))
+        self.assertFalse(evidence["physicalAcceptance"])
+        self.assertFalse(evidence["productionUpgradeAcceptance"])
+
+    def test_new_key_publication_still_refuses_to_replace_a_published_release(self):
+        with self.assertRaisesRegex(SystemExit, "refusing to overwrite"):
+            self.publish([{"tag_name": "v2.0.0", "draft": False, "target_commitish": COMMIT}], new_key=True)
 
 
 if __name__ == "__main__":
