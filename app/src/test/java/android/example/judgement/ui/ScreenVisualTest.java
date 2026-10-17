@@ -405,7 +405,7 @@ public class ScreenVisualTest {
         activity.findViewById(R.id.primary_action).performClick();
         await(() -> model.error.getValue() != null); layout();
         String error = model.error.getValue();
-        assertTrue(error.contains("Benjamin Alexander")); assertTrue(error.contains("Won"));
+        assertTrue(error.startsWith("Benjamin Alexander cannot Lose\n(")); assertTrue(error.contains("Won"));
         assertTrue(error.contains("0")); assertTrue(error.contains("1")); assertFalse(error.toLowerCase(java.util.Locale.ROOT).contains("trick"));
         assertTrue(model.state.getValue().history.isEmpty());
         assertEquals("RESULTS", model.state.getValue().round.phase);

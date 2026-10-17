@@ -174,58 +174,50 @@ public final class GameRules {
         }
         if (areOutcomesFeasible(cards, predictions, outcomes)) return null;
         int wonTotal = 0;
-        List<String> winners = new ArrayList<>(), losers = new ArrayList<>();
+        List<String> losers = new ArrayList<>();
         List<String> zeroPredictionLosers = new ArrayList<>();
         int onlyLoser = -1;
         for (int index = 0; index < predictions.length; index++) {
             if (outcomes[index] == null) return "Choose Won or Lost for every player.";
             if (outcomes[index] == Outcome.WON) {
                 wonTotal += predictions[index];
-                winners.add(names[index]);
             } else {
                 losers.add(names[index]);
                 onlyLoser = index;
                 if (predictions[index] == 0) zeroPredictionLosers.add(names[index]);
             }
         }
-        String wonSummary = winners.isEmpty() ? "No players are marked Won. "
-                : "Players marked Won (" + String.join(", ", winners) + ") predicted "
-                        + wonTotal + " in total. ";
         if (wonTotal > cards) {
-            return wonSummary + "Only " + cards + " can be won in this deal, so that total is too high.";
+            return "The sum of hands of the players marked WON exceeds " + cards + ".";
         }
         int remaining = cards - wonTotal;
         if (remaining == 0 && !zeroPredictionLosers.isEmpty()) {
-            return wonSummary + "That accounts for the whole deal. "
-                    + String.join(", ", zeroPredictionLosers)
-                    + " predicted 0 and cannot collect any cards, so they must be marked Won.";
+            String players = String.join(", ", zeroPredictionLosers);
+            return players + " cannot Lose\n(Players marked Won already sum to "
+                    + handCount(wonTotal) + ". " + players + " predicted 0.)";
         }
         if (zeroPredictionLosers.size() > remaining) {
-            return wonSummary + "Only " + cardCount(remaining)
-                    + (remaining == 1 ? " remains" : " remain") + " to be collected, but "
-                    + String.join(", ", zeroPredictionLosers)
-                    + " predicted 0 and are marked Lost. Each must collect at least 1 card; they need at least "
-                    + cardCount(zeroPredictionLosers.size()) + " between them.";
+            return String.join(", ", zeroPredictionLosers) + " cannot all Lose\n(Only "
+                    + handCount(remaining) + (remaining == 1 ? " remains" : " remain")
+                    + "; each predicted 0 and needs at least 1 hand to Lose.)";
         }
         if (losers.isEmpty()) {
-            return wonSummary + "This is a " + cards + "-card deal, leaving "
-                    + cardCount(remaining) + " unaccounted for. At least one player must be marked Lost.";
+            return "At least one player must Lose\n(Players marked Won sum to "
+                    + handCount(wonTotal) + "; this deal has " + cards + ".)";
         }
         if (losers.size() == 1) {
-            return wonSummary + names[onlyLoser] + " must collect the remaining "
-                    + cardCount(remaining) + ". That matches their prediction of "
-                    + predictions[onlyLoser] + ", so they must be marked Won.";
+            return names[onlyLoser] + " cannot Lose\n(The remaining " + handCount(remaining)
+                    + (remaining == 1 ? " matches" : " match") + " their prediction of "
+                    + predictions[onlyLoser] + ".)";
         }
         // With no zero predictions, every Lost player can collect zero. The only remaining
         // impossible total for two or more such players is one when all predicted one.
-        return wonSummary + "There is 1 card left to be collected. "
-                + String.join(", ", losers)
-                + " are all marked Lost with predictions of 1, but whoever collects that card "
-                + "would match their prediction and must be marked Won.";
+        return String.join(", ", losers) + " cannot all Lose\n(1 hand remains and each predicted 1; "
+                + "whoever wins it matches their prediction.)";
     }
 
-    private static String cardCount(int count) {
-        return count + (count == 1 ? " card" : " cards");
+    private static String handCount(int count) {
+        return count + (count == 1 ? " hand" : " hands");
     }
 
     public static long score(int bid, Outcome outcome) {

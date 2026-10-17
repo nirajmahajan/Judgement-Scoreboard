@@ -162,8 +162,7 @@ public class GameRulesTest {
                         assertEquals("Only impossible allocations need an explanation", expected, conflict == null);
                         if (conflict != null) {
                             assertFalse(conflict.contains("trick"));
-                            assertTrue(conflict.contains("Player "));
-                            if (conflict.contains("There is 1 card left")) {
+                            if (conflict.contains("1 hand remains and each predicted 1")) {
                                 int won = 0;
                                 for (int player = 0; player < count; player++) {
                                     if (outcomes[player] == Outcome.WON) won += bids[player];
@@ -213,40 +212,31 @@ public class GameRulesTest {
         String[] names = {"Alice", "Ben", "Cara"};
         String over = GameRules.outcomeConflict(3, new int[] {2, 2, 0},
                 new Outcome[] {Outcome.WON, Outcome.WON, Outcome.LOST}, names);
-        assertTrue(over.contains("Won (Alice, Ben) predicted 4 in total"));
-        assertTrue(over.contains("Only 3 can be won"));
+        assertEquals("The sum of hands of the players marked WON exceeds 3.", over);
 
         String zeroMustWin = GameRules.outcomeConflict(3, new int[] {3, 0, 0},
                 new Outcome[] {Outcome.WON, Outcome.LOST, Outcome.LOST}, names);
-        assertTrue(zeroMustWin.contains("accounts for the whole deal"));
-        assertTrue(zeroMustWin.contains("Ben, Cara predicted 0"));
-        assertTrue(zeroMustWin.contains("must be marked Won"));
+        assertEquals("Ben, Cara cannot Lose\n(Players marked Won already sum to 3 hands. Ben, Cara predicted 0.)", zeroMustWin);
 
         String zeroNeedMore = GameRules.outcomeConflict(2, new int[] {1, 0, 0},
                 new Outcome[] {Outcome.WON, Outcome.LOST, Outcome.LOST}, names);
-        assertTrue(zeroNeedMore.contains("Only 1 card remains"));
-        assertTrue(zeroNeedMore.contains("Ben, Cara predicted 0"));
-        assertTrue(zeroNeedMore.contains("at least 2 cards between them"));
+        assertEquals("Ben, Cara cannot all Lose\n(Only 1 hand remains; each predicted 0 and needs at least 1 hand to Lose.)", zeroNeedMore);
 
         String allZeroLost = GameRules.outcomeConflict(1, new int[] {0, 0, 0},
                 new Outcome[] {Outcome.LOST, Outcome.LOST, Outcome.LOST}, names);
-        assertTrue(allZeroLost.contains("Alice, Ben, Cara predicted 0"));
-        assertTrue(allZeroLost.contains("at least 3 cards between them"));
+        assertEquals("Alice, Ben, Cara cannot all Lose\n(Only 1 hand remains; each predicted 0 and needs at least 1 hand to Lose.)", allZeroLost);
 
         String loneLost = GameRules.outcomeConflict(3, new int[] {1, 2, 0},
                 new Outcome[] {Outcome.WON, Outcome.LOST, Outcome.WON}, names);
-        assertTrue(loneLost.contains("Ben must collect the remaining 2 cards"));
-        assertTrue(loneLost.contains("matches their prediction of 2"));
+        assertEquals("Ben cannot Lose\n(The remaining 2 hands match their prediction of 2.)", loneLost);
 
         String unaccounted = GameRules.outcomeConflict(3, new int[] {1, 1, 0},
                 new Outcome[] {Outcome.WON, Outcome.WON, Outcome.WON}, names);
-        assertTrue(unaccounted.contains("predicted 2 in total"));
-        assertTrue(unaccounted.contains("1 card unaccounted for"));
+        assertEquals("At least one player must Lose\n(Players marked Won sum to 2 hands; this deal has 3.)", unaccounted);
 
         String oneLeft = GameRules.outcomeConflict(1, new int[] {1, 1, 0},
                 new Outcome[] {Outcome.LOST, Outcome.LOST, Outcome.WON}, names);
-        assertTrue(oneLeft.contains("There is 1 card left"));
-        assertTrue(oneLeft.contains("Alice, Ben are all marked Lost with predictions of 1"));
+        assertEquals("Alice, Ben cannot all Lose\n(1 hand remains and each predicted 1; whoever wins it matches their prediction.)", oneLeft);
 
         assertNull(GameRules.outcomeConflict(3, new int[] {1, 0, 0},
                 new Outcome[] {Outcome.WON, Outcome.LOST, Outcome.LOST}, names));

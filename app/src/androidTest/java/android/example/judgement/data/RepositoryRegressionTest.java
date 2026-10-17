@@ -82,7 +82,7 @@ public class RepositoryRegressionTest {
             fail("Impossible results must be rejected");
         } catch (IllegalArgumentException error) {
             assertTrue(error.getMessage().contains("predicted 0"));
-            assertTrue(error.getMessage().contains("3 cards"));
+            assertTrue(error.getMessage().contains("1 hand remains"));
             for (Records.RoundPlayer row : before.roundPlayers) assertTrue(error.getMessage().contains(row.nameSnapshot));
             assertFalse(error.getMessage().toLowerCase(java.util.Locale.ROOT).contains("trick"));
         }

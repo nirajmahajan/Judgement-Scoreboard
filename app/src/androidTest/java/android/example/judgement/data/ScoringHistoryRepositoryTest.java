@@ -214,8 +214,8 @@ public class ScoringHistoryRepositoryTest {
             repository.editRound(history.round.id, 0, Arrays.asList(new RoundPlayerEdit(first, 0, Outcome.WON), new RoundPlayerEdit(second, 0, Outcome.WON)));
             fail("Impossible historical results must be rejected");
         } catch (IllegalArgumentException error) {
-            assertTrue(error.getMessage().contains("predicted 0 in total"));
-            assertTrue(error.getMessage().contains("1 card unaccounted for"));
+            assertTrue(error.getMessage().contains("sum to 0 hands"));
+            assertTrue(error.getMessage().contains("this deal has 1"));
             assertFalse(error.getMessage().toLowerCase(java.util.Locale.ROOT).contains("trick"));
         }
         rejects(() -> repository.editRound(history.round.id, 0, Arrays.asList(new RoundPlayerEdit(first, 0, Outcome.LOST), new RoundPlayerEdit(first, 0, Outcome.WON))));
