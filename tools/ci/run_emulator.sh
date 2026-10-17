@@ -24,6 +24,7 @@ cleanup() {
   adb shell uiautomator dump /sdcard/final-hierarchy.xml >/dev/null 2>&1 || true
   adb pull /sdcard/final-hierarchy.xml ci-artifacts/device/final-hierarchy.xml >/dev/null 2>&1 || true
   adb exec-out screencap -p > ci-artifacts/device/final-screen.png 2>/dev/null || true
+  adb pull /sdcard/judgement-test-evidence ci-artifacts/device/test-evidence >/dev/null 2>&1 || true
   adb emu kill >/dev/null 2>&1 || true
   kill "$emulator_pid" >/dev/null 2>&1 || true
 }
@@ -45,4 +46,21 @@ for setting in window_animation_scale transition_animation_scale animator_durati
 done
 adb shell getprop > ci-artifacts/device/system-properties.txt
 sdkmanager --list_installed > ci-artifacts/device/sdk-versions.txt
-./gradlew --no-daemon --dependency-verification=strict connectedDebugAndroidTest
+./gradlew --no-daemon --dependency-verification=strict createDebugAndroidTestCoverageReport
+if [[ "$suite" == extended ]]; then
+  adb shell settings put system font_scale 2.0
+  adb shell settings put system accelerometer_rotation 0
+  adb shell settings put system user_rotation 1
+  ./gradlew --no-daemon --dependency-verification=strict -Pandroid.testInstrumentationRunnerArguments.sequenceSeeds=100 createDebugAndroidTestCoverageReport
+  python3 tools/ci/process_death.py
+  seed=170026
+  printf '%s\n' "$seed" > ci-artifacts/device/monkey-seed.txt
+  adb logcat -c
+  adb shell monkey -p android.example.judgement.debug -s "$seed" --throttle 100 --monitor-native-crashes 3000 > ci-artifacts/device/monkey.log 2>&1
+  if grep -Eq 'CRASH:|ANR:|Monkey aborted' ci-artifacts/device/monkey.log; then exit 1; fi
+fi
+
+if [[ "$suite" == upgrade ]]; then
+  ./gradlew --no-daemon --dependency-verification=strict assembleRelease
+  python3 tools/ci/upgrade_install.py app/build/outputs/apk/release/app-release-unsigned.apk
+fi

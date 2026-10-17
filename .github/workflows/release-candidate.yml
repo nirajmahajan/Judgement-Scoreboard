@@ -1,0 +1,145 @@
+name: Release candidate and approved publication
+# created by chatgpt-codex
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Exact 40-character commit SHA to test
+        required: true
+        type: string
+      publish:
+        description: Publish after all gates and protected release environment approval
+        required: true
+        default: false
+        type: boolean
+      tag:
+        description: Release tag for the exact tested commit
+        required: true
+        default: v2.0.0
+        type: string
+      physical_acceptance:
+        description: Owner completed physical-device acceptance on this exact commit
+        required: true
+        default: false
+        type: boolean
+      talkback_acceptance:
+        description: Owner completed TalkBack acceptance on this exact commit
+        required: true
+        default: false
+        type: boolean
+      production_upgrade_acceptance:
+        description: Owner verified upgrade with original production signing certificate
+        required: true
+        default: false
+        type: boolean
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Validate exact commit input
+        env:
+          TESTED_COMMIT: ${{ inputs.commit }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          [[ "$TESTED_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.commit }}
+          persist-credentials: false
+      - name: Check resolved commit
+        env:
+          TESTED_COMMIT: ${{ inputs.commit }}
+        run: test "$(git rev-parse HEAD)" = "$TESTED_COMMIT"
+  full-suite:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+    with:
+      commit: ${{ inputs.commit }}
+      retention_days: 90
+  upgrade:
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      ANDROID_HOME: /home/runner/android-sdk-pinned
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.commit }}
+          persist-credentials: false
+      - run: python3 tools/ci/verify_wrapper.py
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: 21.0.8+9
+      - run: tools/ci/setup_android.sh
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
+      - run: tools/ci/run_emulator.sh 36 upgrade
+      - name: Retain exact-commit RC evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-candidate-${{ inputs.commit }}
+          path: |
+            app/build/outputs/apk/release/
+            ci-artifacts/
+            app/build/reports/
+            app/build/outputs/code_coverage/
+          retention-days: 90
+          if-no-files-found: error
+  publish:
+    if: inputs.publish
+    needs: [full-suite, upgrade]
+    environment: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      ANDROID_HOME: /home/runner/android-sdk-pinned
+    steps:
+      - name: Require exact-commit manual acceptance
+        env:
+          PHYSICAL_ACCEPTED: ${{ inputs.physical_acceptance }}
+          TALKBACK_ACCEPTED: ${{ inputs.talkback_acceptance }}
+          UPGRADE_ACCEPTED: ${{ inputs.production_upgrade_acceptance }}
+        run: |
+          test "$PHYSICAL_ACCEPTED" = true
+          test "$TALKBACK_ACCEPTED" = true
+          test "$UPGRADE_ACCEPTED" = true
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: 21.0.8+9
+      - run: tools/ci/setup_android.sh
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-candidate-${{ inputs.commit }}
+          path: candidate
+      - name: Sign and verify original release certificate
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: tools/ci/sign_release.sh candidate/app/build/outputs/apk/release/app-release-unsigned.apk
+      - name: Publish owner-approved exact commit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TESTED_COMMIT: ${{ inputs.commit }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          EVIDENCE_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 tools/ci/publish_release.py

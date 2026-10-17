@@ -13,4 +13,4 @@ if [[ "$mode" == verify ]]; then
 else
   task=recordRoborazziDebug
 fi
-docker run --platform linux/amd64 --rm --env CI="${CI:-false}" --volume "$PWD:/workspace" --volume judgement-foundation-gradle-linux-amd64:/root/.gradle --volume judgement-foundation-m2-linux-amd64:/root/.m2 "$image" ./gradlew --no-daemon --no-watch-fs --dependency-verification=strict "$task"
+docker run --platform linux/amd64 --rm --env CI="${CI:-false}" --volume "$PWD:/workspace" --volume judgement-gradle-linux-amd64:/root/.gradle --volume judgement-m2-linux-amd64:/root/.m2 "$image" ./gradlew --no-daemon --no-watch-fs --dependency-verification=strict "$task"

@@ -1,0 +1,61 @@
+name: Android nightly regressions
+# created by chatgpt-codex
+on:
+  schedule:
+    - cron: '30 20 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {api: 28, suite: critical}
+          - {api: 32, suite: critical}
+          - {api: 35, suite: critical}
+          - {api: 37, suite: critical}
+          - {api: 36, suite: extended}
+    env:
+      ANDROID_HOME: /home/runner/android-sdk-pinned
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - run: python3 tools/ci/verify_wrapper.py
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: 21.0.8+9
+      - run: tools/ci/setup_android.sh
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
+      - run: tools/ci/run_emulator.sh '${{ matrix.api }}' '${{ matrix.suite }}'
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: nightly-api-${{ matrix.api }}-${{ matrix.suite }}
+          path: |
+            ci-artifacts/
+            app/build/reports/
+            app/build/outputs/androidTest-results/
+            app/build/outputs/code_coverage/
+          retention-days: 30
+          if-no-files-found: error
+  required:
+    if: always()
+    needs: runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - run: python3 tools/ci/required_gate.py '${{ toJSON(needs) }}' runtime

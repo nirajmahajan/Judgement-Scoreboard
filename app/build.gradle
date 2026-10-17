@@ -25,6 +25,8 @@ android {
     }
     buildTypes {
         debug {
+            enableAndroidTestCoverage true
+            enableUnitTestCoverage true
             applicationIdSuffix '.debug'
             versionNameSuffix '-debug'
         }
@@ -39,6 +41,9 @@ android {
     }
     buildFeatures {
         viewBinding true
+    }
+    testCoverage {
+        jacocoVersion '0.8.13'
     }
     testOptions {
         animationsDisabled true
