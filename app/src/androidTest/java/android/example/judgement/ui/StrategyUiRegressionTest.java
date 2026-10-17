@@ -129,7 +129,7 @@ public final class StrategyUiRegressionTest {
         await(() -> ScoringStrategy.defaults().encode().equals(uiSnapshot().game.pendingScoringConfig));
         showHeader();
         assertFalse(text(R.id.screen_description).contains(context.getString(R.string.strategy_pending,"Default",2)));
-        assertFalse(text(R.id.screen_description).contains(context.getString(R.string.scoring_selected,"Judgement+")));
+        assertTrue(text(R.id.screen_description).contains(context.getString(R.string.scoring_selected,"Aggressive")));
         scenario.recreate(); await(() -> hasAppearance(true));
         assertEquals(ScoringStrategy.defaults().encode(),repository.snapshot().game.pendingScoringConfig);
         completeRound(); refreshUi();

@@ -1,4 +1,6 @@
 <resources>
+    <color name="score_table_header">#204C49</color>
+    <color name="score_table_on_header">#FFFFFF</color>
     <color name="score_background">#F7F6F2</color>
     <color name="score_surface">#FFFEFA</color>
     <color name="score_text">#172D35</color>

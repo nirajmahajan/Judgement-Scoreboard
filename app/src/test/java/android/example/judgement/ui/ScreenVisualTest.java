@@ -205,8 +205,8 @@ public class ScreenVisualTest {
         roundPreview("CUSTOM", false, "round_custom_320");
     }
 
-    @Test public void judgementPlusUsesFireHeadersWithoutScoringText() throws Exception {
-        roundPreview("FIXED", true, "round_judgement_plus_320");
+    @Test public void aggressiveRoundShowsStrategyWithoutFlames() throws Exception {
+        roundPreview("FIXED", true, "round_aggressive_320");
     }
 
     private void roundPreview(String trumpMode, boolean plus, String imageName) throws Exception {
@@ -232,15 +232,25 @@ public class ScreenVisualTest {
         assertEquals(android.content.res.Configuration.UI_MODE_NIGHT_NO,
                 activity.getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK);
         TextView title = activity.findViewById(R.id.screen_title);
-        assertEquals(plus, title.getCompoundDrawablesRelative()[0] != null);
-        assertEquals(plus ? "Judgement+" : "Judgement", ((com.google.android.material.appbar.MaterialToolbar)
+        assertNull("The round heading has no flame", title.getCompoundDrawablesRelative()[0]);
+        assertEquals("Judgement", ((com.google.android.material.appbar.MaterialToolbar)
                 activity.findViewById(R.id.toolbar)).getTitle().toString());
         RecyclerView list = activity.findViewById(R.id.screen_list);
         assertEquals(model.state.getValue().round.dealerId,
                 model.state.getValue().roundPlayers.get(names.size() - 1).playerId);
+        ViewGroup columns = activity.findViewById(R.id.table_columns);
+        int headerColor = ((android.graphics.drawable.ColorDrawable) columns.getBackground()).getColor();
+        for (int index = 0; index < columns.getChildCount(); index++) {
+            if (!(columns.getChildAt(index) instanceof TextView)) continue;
+            TextView label = (TextView) columns.getChildAt(index);
+            assertNull("Table labels have no flame icons", label.getCompoundDrawablesRelative()[0]);
+            assertTrue("Header labels remain readable on teal", androidx.core.graphics.ColorUtils.calculateContrast(
+                    label.getCurrentTextColor(), headerColor) >= 4.5);
+        }
         TextView description = activity.findViewById(R.id.screen_description);
         assertFalse(description.getText().toString().contains("Dealer:"));
-        assertFalse(description.getText().toString().contains("Scoring:"));
+        assertTrue(description.getText().toString().contains(context.getString(R.string.scoring_selected,
+                plus ? "Aggressive" : "Default")));
         assertEquals("FIXED".equals(trumpMode), description.getText().toString().contains("Trump:"));
         assertFalse(description.getText().toString().contains("Trump chosen at table"));
         List<String> bids = Arrays.asList("0", "1", "", "—", "—");
