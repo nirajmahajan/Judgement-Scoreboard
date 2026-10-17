@@ -45,7 +45,8 @@ The named tests below exercise the repaired behavior. JVM tests are under `app/s
 | D31 | Deferred Start and Quick-add commands read a replacement draft from mutable screen state | Capture the original draft ID; `oldStartConfirmationCannotStartAReplacementDraft`; `queuedQuickAddCannotRetargetAReplacementDraft` |
 | D32 | Command completion navigates a destroyed Activity after rotation | Observable ViewModel navigation; five `ReviewFlowRegressionTest` cases cover New game, Start, Apply, replay and restore |
 | D33 | Restoring an inactive participant twice creates duplicate staged IDs | Filter and guard stable IDs; `restoredPlayerIsNotOfferedAgainInTheStagedRoster` |
-| D34 | Scoring validation scroll restoration hides numeric errors; dark Back icon lacks contrast | Preserve reachable input errors and use `colorOnSurface`; native 320dp/200% font/dark/keyboard strategy regression |
+| D34 | Scoring and player forms hide validation errors after keyboard resizing; dark Back icon lacks contrast | Reveal errors after viewport changes and use `colorOnSurface`; native strategy and `invalidNameAndSaveRemainReachableWithKeyboardActuallyOpen` regressions |
+| D35 | Opening a new screen inherits the previous screen's scroll anchor and hides its heading | Reset the list anchor on screen changes; setup navigation regressions |
 
 ## Accepted legacy limitation
 

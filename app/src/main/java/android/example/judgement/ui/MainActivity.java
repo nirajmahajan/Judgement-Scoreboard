@@ -214,7 +214,10 @@ public final class MainActivity extends AppCompatActivity {
         headerAdapter.notifyItemChanged(0); footerAdapter.notifyItemChanged(0);
         boolean revealScoringError = "SCORING".equals(screen) && model.strategyRequest() != null
                 && model.strategyRequest().error != null;
-        if (scroll != null && !revealScoringError) list.getLayoutManager().onRestoreInstanceState(scroll);
+        if (changed) {
+            list.stopScroll();
+            ((LinearLayoutManager) list.getLayoutManager()).scrollToPositionWithOffset(0, 0);
+        } else if (scroll != null && !revealScoringError) list.getLayoutManager().onRestoreInstanceState(scroll);
     }
     private void header(String heading, String subtitle) {
         headingText = heading; descriptionText = subtitle;
@@ -850,6 +853,14 @@ public final class MainActivity extends AppCompatActivity {
         if (request.kind == FormRequest.Kind.ADD_PLAYER) form.addView(check);
         androidx.core.widget.NestedScrollView scrollingForm = new androidx.core.widget.NestedScrollView(this);
         scrollingForm.addView(form);
+        View.OnLayoutChangeListener revealError = (view, left, top, right, bottom,
+                oldLeft, oldTop, oldRight, oldBottom) -> {
+            if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) {
+                revealFormError(field);
+            }
+        };
+        field.addOnLayoutChangeListener(revealError);
+        scrollingForm.addOnLayoutChangeListener(revealError);
         input.setMaxLines(number ? 1 : 6);
         AlertDialog dialog = new MaterialAlertDialogBuilder(this).setTitle(heading).setView(scrollingForm).setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, null).setNeutralButton(R.string.use_saved_player, null).create();
         dialog.setOnShowListener(ignored -> {
@@ -876,6 +887,8 @@ public final class MainActivity extends AppCompatActivity {
             updateFormControls(request);
         });
         dialog.setOnDismissListener(ignored -> {
+            field.removeOnLayoutChangeListener(revealError);
+            scrollingForm.removeOnLayoutChangeListener(revealError);
             if (!destroyingForms && !isChangingConfigurations()
                     && request.token.equals(activeFormToken)) model.finishForm(request.token);
             if (inputDialog == dialog) { inputError = null; inputDialog = null; activeFormToken = null; }
@@ -898,6 +911,7 @@ public final class MainActivity extends AppCompatActivity {
     private void updateFormControls(FormRequest request) {
         if (inputDialog == null || !request.token.equals(activeFormToken)) return;
         inputError.setError(request.error);
+        if (request.error != null) revealFormError(inputError);
         inputDialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(!model.submittingForm(request.token));
         android.widget.Button existing = inputDialog.getButton(AlertDialog.BUTTON_NEUTRAL);
         existing.setVisibility(request.kind == FormRequest.Kind.ADD_PLAYER
@@ -908,6 +922,19 @@ public final class MainActivity extends AppCompatActivity {
             try { useExistingProfile(current); }
             catch (IllegalArgumentException exception) { model.formError(current.token, exception.getMessage(), null); }
         });
+    }
+
+    private void revealFormError(TextInputLayout field) {
+        if (field.getError() == null) return;
+        androidx.core.view.OneShotPreDrawListener.add(field, () -> field.post(() -> {
+            if (field != inputError || inputDialog == null || !inputDialog.isShowing()
+                    || field.getError() == null) return;
+            View error = field.findViewById(com.google.android.material.R.id.textinput_error);
+            if (error == null) return;
+            android.graphics.Rect bounds = new android.graphics.Rect();
+            error.getDrawingRect(bounds);
+            error.requestRectangleOnScreen(bounds, true);
+        }));
     }
 
     private void submitForm(FormRequest request) {

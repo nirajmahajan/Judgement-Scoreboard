@@ -133,7 +133,7 @@ public class FeatureUiRegressionTest {
         assertNull(inspector.snapshot().draftPlayers.get(0).savedPlayerId);
         assertEquals(Long.valueOf(inspector.snapshot().savedPlayers.get(0).id),
                 inspector.snapshot().draftPlayers.get(1).savedPlayerId);
-        clickId(R.id.primary_action); awaitView(withText(R.string.setup_settings));
+        clickId(R.id.primary_action); awaitView(withText(R.string.setup_settings)); assertScreenStartsAtTop();
         clickId(R.id.primary_action); awaitView(withId(R.id.bottom_navigation));
         option(R.string.new_game);
         awaitState(s -> s.draft != null);
@@ -304,7 +304,7 @@ public class FeatureUiRegressionTest {
         addGamePlayer("New player A"); awaitState(s -> s.draftPlayers.size() == 1);
         addGamePlayer("New player B"); awaitState(s -> s.draftPlayers.size() == 2);
         clickId(R.id.primary_action);
-        awaitView(withText(R.string.setup_settings));
+        awaitView(withText(R.string.setup_settings)); assertScreenStartsAtTop();
         clickId(R.id.primary_action);
         awaitView(withText(R.string.replace_game_title)); clickLabel(R.string.cancel);
         assertUnchangedRound(original);
@@ -325,7 +325,7 @@ public class FeatureUiRegressionTest {
                 new PlayerSpec("Original setup A"), new PlayerSpec("Original setup B")),
                 "ASCENDING", "FIXED", null));
         launch(); clickLabel(R.string.continue_setup);
-        clickId(R.id.primary_action); awaitView(withText(R.string.setup_settings));
+        clickId(R.id.primary_action); awaitView(withText(R.string.setup_settings)); assertScreenStartsAtTop();
         clickId(R.id.primary_action); awaitView(withText(R.string.replace_game_title));
         ScoreViewModel model = activityModel();
         AtomicLong replacementDraft = new AtomicLong();
@@ -590,6 +590,20 @@ public class FeatureUiRegressionTest {
             }
         } while (SystemClock.uptimeMillis() < deadline);
         throw last == null ? new AssertionError("Visible screen did not arrive") : last;
+    }
+    private static void assertScreenStartsAtTop() {
+        onView(withId(R.id.screen_list)).check((view, missing) -> {
+            if (missing != null) throw missing;
+            androidx.recyclerview.widget.RecyclerView list = (androidx.recyclerview.widget.RecyclerView) view;
+            androidx.recyclerview.widget.LinearLayoutManager layout =
+                    (androidx.recyclerview.widget.LinearLayoutManager) list.getLayoutManager();
+            assertEquals("Footer navigation must show the new screen from its heading", 0,
+                    layout.findFirstVisibleItemPosition());
+            View header = layout.findViewByPosition(0);
+            assertNotNull("The new screen heading is attached", header);
+            assertEquals("The heading starts at the top of the viewport", list.getPaddingTop(),
+                    layout.getDecoratedTop(header));
+        });
     }
     private static void awaitRowCount(int count) {
         long deadline = SystemClock.uptimeMillis() + 10_000;

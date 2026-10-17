@@ -28,8 +28,19 @@ final class StrategyEditor extends RecyclerView.Adapter<StrategyEditor.Holder> {
     private final Listener listener;
     private StrategyRequest request;
     private Holder bound;
+    private final View.OnLayoutChangeListener viewportChanged = (view, left, top, right, bottom,
+            oldLeft, oldTop, oldRight, oldBottom) -> {
+        if ((right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop)
+                && request.error != null) focusFirstError();
+    };
     StrategyEditor(StrategyRequest request, Listener listener) {
         this.request = request; this.listener = listener; setHasStableIds(true);
+    }
+    @Override public void onAttachedToRecyclerView(@NonNull RecyclerView list) {
+        super.onAttachedToRecyclerView(list); list.addOnLayoutChangeListener(viewportChanged);
+    }
+    @Override public void onDetachedFromRecyclerView(@NonNull RecyclerView list) {
+        list.removeOnLayoutChangeListener(viewportChanged); super.onDetachedFromRecyclerView(list);
     }
     @Override public long getItemId(int position) { return 0; }
     @Override public int getItemCount() { return 1; }

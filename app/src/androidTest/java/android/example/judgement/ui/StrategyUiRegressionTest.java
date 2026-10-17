@@ -127,7 +127,11 @@ public final class StrategyUiRegressionTest {
         clickId(R.id.primary_action);
         await(() -> ScoringStrategy.defaults().encode().equals(repository.snapshot().game.pendingScoringConfig));
         await(() -> screen().equals("GAME") && hasAppearance(true));
-        assertTrue(text(R.id.screen_description).contains(context.getString(R.string.strategy_pending,"Default",2)));
+        await(() -> ScoringStrategy.defaults().encode().equals(uiSnapshot().game.pendingScoringConfig));
+        showHeader();
+        onView(withId(R.id.screen_description)).check(androidx.test.espresso.assertion.ViewAssertions.matches(
+                androidx.test.espresso.matcher.ViewMatchers.withText(org.hamcrest.Matchers.containsString(
+                        context.getString(R.string.strategy_pending,"Default",2)))));
         scenario.recreate(); await(() -> hasAppearance(true));
         assertEquals(ScoringStrategy.defaults().encode(),repository.snapshot().game.pendingScoringConfig);
         completeRound(); refreshUi();
@@ -327,6 +331,15 @@ public final class StrategyUiRegressionTest {
                 : snapshot.round == null ? context.getString(R.string.game_complete)
                 : context.getResources().getQuantityString(R.plurals.round_heading,
                         snapshot.round.cards,snapshot.round.number,snapshot.round.cards);
+        showHeader();
+        try { await(() -> screen().equals(target) && text(R.id.screen_title).equals(heading)); }
+        catch(AssertionError timeout) {
+            recordLaunch(target,"failed");
+            throw new AssertionError("Expected "+target+" / "+heading+
+                    "; displayed "+screen()+" / "+text(R.id.screen_title),timeout);
+        }
+    }
+    private void showHeader() {
         onView(withId(R.id.screen_list)).perform(new ViewAction() {
             @Override public Matcher<View> getConstraints(){return isAssignableFrom(RecyclerView.class);}
             @Override public String getDescription(){return "show the initial screen heading";}
@@ -334,12 +347,6 @@ public final class StrategyUiRegressionTest {
                 ((RecyclerView)view).scrollToPosition(0);controller.loopMainThreadUntilIdle();
             }
         });
-        try { await(() -> screen().equals(target) && text(R.id.screen_title).equals(heading)); }
-        catch(AssertionError timeout) {
-            recordLaunch(target,"failed");
-            throw new AssertionError("Expected "+target+" / "+heading+
-                    "; displayed "+screen()+" / "+text(R.id.screen_title),timeout);
-        }
     }
     private void recordLaunch(String target,String phase) {
         scenario.onActivity(activity -> {
