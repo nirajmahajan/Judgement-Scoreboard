@@ -118,7 +118,7 @@ public final class StrategyUiRegressionTest {
         await(() -> repository.snapshot().round.scoringConfig.equals(ScoringStrategy.aggressive().encode()));
         await(() -> screen().equals("GAME") && hasAppearance(true));
         Snapshot initial=repository.snapshot();
-        onView(withId(R.id.screen_list)).perform(findAndClick(withText(context.getString(R.string.quick_bid,0))));
+        onView(withId(R.id.screen_list)).perform(findAndClick(withText("0")));
         await(() -> uiSnapshot().roundPlayers.get(0).bid!=null);
         option(R.string.change_scoring); clickId(R.id.strategy_default);
         await(() -> hasAppearance(false)); // Chooser preview only.

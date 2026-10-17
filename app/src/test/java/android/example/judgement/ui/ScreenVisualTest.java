@@ -14,6 +14,7 @@ import android.example.judgement.domain.ScoringStrategy;
 import android.graphics.Rect;
 import android.os.Looper;
 import android.text.Layout;
+import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
@@ -102,14 +103,52 @@ public class ScreenVisualTest {
         capture("home_dark_320");
     }
 
-    @Test public void setupWrapsSpacedAndUnbrokenNamesWithoutObscuringControls() throws Exception {
+    @Test public void setupEllipsizesLongNamesWhileRetainingFullTextAndControls() throws Exception {
         launch(true, false, false);
         open("PLAYERS", "ROUND");
         assertEachNameAndRowLayout(Arrays.asList(LONG_NAME, UNBROKEN_NAME, "محمد नीरज 🙂"));
         capture("setup_long_names_320");
     }
 
-    @Test public void setupAtTwoHundredPercentFontPreservesAllNames() throws Exception {
+    @Test public void setupShowsEightPlayersTogetherWithCompactAccessibleControls() throws Exception {
+        List<String> names = Arrays.asList("Alice", "Ben", "Charlie", LONG_NAME, "Elena", "Farah", "George", "Hana");
+        databaseWorker.submit(() -> {
+            try (ScoreRepository repository = new ScoreRepository(context)) {
+                List<PlayerSpec> players = new ArrayList<>();
+                for (String name : names) players.add(new PlayerSpec(name));
+                repository.saveDraft(new DraftSpec(0, players, "ASCENDING", "FIXED", null));
+            }
+        }).get(10, TimeUnit.SECONDS);
+        launch(false, false, false);
+        open("PLAYERS", "ROUND");
+        RecyclerView list = activity.findViewById(R.id.screen_list);
+        assertEquals(8, contentAdapter(list).getItemCount());
+        int rowHeight = -1;
+        for (int index = 0; index < names.size(); index++) {
+            RecyclerView.ViewHolder holder = list.findViewHolderForAdapterPosition(index + contentOffset(list));
+            assertNotNull("All eight players fit together without scrolling", holder);
+            TextView name = holder.itemView.findViewById(R.id.row_name);
+            assertEquals(names.get(index), name.getText().toString());
+            assertCompactRosterName(name);
+            if (index == 3) assertTrue("Very long names use ellipsis within the fixed row", name.getLayout().getEllipsisCount(0) > 0);
+            if (rowHeight < 0) rowHeight = holder.itemView.getHeight();
+            assertEquals("Long names never increase roster row height", rowHeight, holder.itemView.getHeight());
+            assertFullyVisible(name);
+            assertRowLayout(holder.itemView);
+            View handle = holder.itemView.findViewById(R.id.row_drag_handle);
+            assertRosterTarget(handle);
+            ViewGroup actions = holder.itemView.findViewById(R.id.row_actions);
+            assertEquals("Rename and Remove remain available for each player", 2, actions.getChildCount());
+            for (int action = 0; action < actions.getChildCount(); action++) {
+                View button = actions.getChildAt(action);
+                assertRosterTarget(button);
+                assertEquals((action == 0 ? "Rename " : "Remove ") + names.get(index), button.getContentDescription());
+            }
+        }
+        capture("setup_compact_320");
+    }
+
+    @Test public void setupAtTwoHundredPercentFontRetainsFullNameDataInFixedRows() throws Exception {
         RuntimeEnvironment.setFontScale(2f);
         launch(true, false, false);
         open("PLAYERS", "ROUND");
@@ -119,7 +158,7 @@ public class ScreenVisualTest {
     }
 
     @Test @Config(qualifiers = "ar-rEG-ldrtl-w320dp-h740dp-notnight-mdpi")
-    public void rtlRosterPreservesCompleteNamesAndLabelledControls() throws Exception {
+    public void rtlRosterRetainsFullNameDataAndLabelledControls() throws Exception {
         launch(true, false, false);
         open("PLAYERS", "ROUND");
         assertEquals(View.LAYOUT_DIRECTION_RTL, activity.findViewById(R.id.score_root).getLayoutDirection());
@@ -128,12 +167,12 @@ public class ScreenVisualTest {
     }
 
     @Test @Config(qualifiers = "w800dp-h1280dp-notnight-mdpi")
-    public void tabletScoreboardUsesSeparateRowsForTiesAndFullNames() throws Exception {
+    public void tabletScoreboardUsesSeparateRowsForTiesAndRetainsFullNameData() throws Exception {
         launch(true, true, false);
         open("GAME", "SCOREBOARD");
         assertEachNameAndRowLayout(Arrays.asList(activity.getString(R.string.ranking_format, 1, LONG_NAME),
                 activity.getString(R.string.ranking_format, 1, UNBROKEN_NAME),
-                activity.getString(R.string.ranking_format, 1, "محمد नीरज 🙂")));
+                activity.getString(R.string.ranking_format, 1, "محمد नीरज 🙂")), true);
         assertFixedControlsReachable();
         capture("scoreboard_tablet_800");
     }
@@ -160,7 +199,7 @@ public class ScreenVisualTest {
         launch(true, true, false);
         open("GAME", "ROUND");
         assertFixedControlsReachable();
-        assertEachNameAndRowLayout(Arrays.asList(LONG_NAME, UNBROKEN_NAME, "محمد नीरज 🙂"));
+        assertEachNameAndRowLayout(Arrays.asList(LONG_NAME, UNBROKEN_NAME, "محمد नीरज 🙂"), true);
         capture("round_dark_320");
     }
 
@@ -394,6 +433,10 @@ public class ScreenVisualTest {
     }
 
     private void assertEachNameAndRowLayout(List<String> expectedNames) {
+        assertEachNameAndRowLayout(expectedNames, false);
+    }
+
+    private void assertEachNameAndRowLayout(List<String> expectedNames, boolean compactGameNames) {
         RecyclerView list = activity.findViewById(R.id.screen_list);
         assertEquals(expectedNames.size(), contentAdapter(list).getItemCount());
         for (int position = 0; position < expectedNames.size(); position++) {
@@ -402,7 +445,9 @@ public class ScreenVisualTest {
             assertNotNull("Player row " + position + " remains reachable by scrolling", holder);
             TextView name = holder.itemView.findViewById(R.id.row_name);
             assertEquals(expectedNames.get(position), name.getText().toString());
-            assertCompleteText(name);
+            if (holder.itemView.findViewById(R.id.row_drag_handle) != null) assertCompactRosterName(name);
+            else if (compactGameNames) assertSingleLineNameData(name);
+            else assertCompleteText(name);
             assertRowLayout(holder.itemView);
         }
         scrollTo(0);
@@ -412,18 +457,48 @@ public class ScreenVisualTest {
         TextView name = row.findViewById(R.id.row_name);
         View detail = row.findViewById(R.id.row_detail);
         View actions = row.findViewById(R.id.row_actions);
-        ViewGroup content = (ViewGroup) name.getParent();
-        Rect nameBounds = new Rect(0, 0, name.getWidth(), name.getHeight());
+        ViewGroup content = (ViewGroup) row;
+        Rect nameBounds = new Rect(); name.getDrawingRect(nameBounds);
         content.offsetDescendantRectToMyCoords(name, nameBounds);
+        View handle = row.findViewById(R.id.row_drag_handle);
+        Rect actionBounds = new Rect(0, 0, actions.getWidth(), actions.getHeight());
+        content.offsetDescendantRectToMyCoords(actions, actionBounds);
+        if (handle != null) {
+            Rect handleBounds = new Rect(0, 0, handle.getWidth(), handle.getHeight());
+            content.offsetDescendantRectToMyCoords(handle, handleBounds);
+            assertFalse("Displayed name never overlaps its drag handle", Rect.intersects(nameBounds, handleBounds));
+            assertFalse("Displayed name never overlaps Rename or Remove", Rect.intersects(nameBounds, actionBounds));
+            assertEquals("Compact roster omits redundant seat text", View.GONE, detail.getVisibility());
+            assertTrue("Drag handle has a 48dp touch target", handle.getWidth() >= dp(48) && handle.getHeight() >= dp(48));
+            assertButtons((ViewGroup) actions);
+            return;
+        }
+        View tableBody = row.findViewById(R.id.compact_score_body);
+        if (tableBody != null) {
+            assertEquals("Compact table rows have a 48dp body", dp(48), tableBody.getHeight());
+            assertSingleLineNameData(name);
+            if (detail.getVisibility() == View.VISIBLE) {
+                Rect detailBounds = new Rect(); detail.getDrawingRect(detailBounds);
+                content.offsetDescendantRectToMyCoords(detail, detailBounds);
+                assertFalse("Player and bid/score columns never overlap: " + nameBounds + " / " + detailBounds, Rect.intersects(nameBounds, detailBounds));
+                assertEquals("Bid/score column stays aligned across rows", dp(88), detail.getWidth());
+                assertSingleLineNameData((TextView) detail);
+            }
+            if (actions.getHeight() > 0) {
+                assertTrue("Bid/result controls stay below the table body", actionBounds.top >= tableBody.getBottom());
+            }
+            assertButtons((ViewGroup) actions);
+            return;
+        }
         if (detail.getVisibility() == View.VISIBLE) {
-            Rect detailBounds = new Rect(0, 0, detail.getWidth(), detail.getHeight());
+            Rect detailBounds = new Rect(); detail.getDrawingRect(detailBounds);
             content.offsetDescendantRectToMyCoords(detail, detailBounds);
             assertTrue("Full name never overlaps score or dealer text", nameBounds.bottom <= detailBounds.top);
             if (actions.getHeight() > 0) {
-                assertTrue("Controls stay below score/dealer text", detailBounds.bottom <= actions.getTop());
+                assertTrue("Controls stay below score/dealer text", detailBounds.bottom <= actionBounds.top);
             }
         } else if (actions.getHeight() > 0) {
-            assertTrue("Controls stay below the full name", nameBounds.bottom <= actions.getTop());
+            assertTrue("Controls stay below the full name", nameBounds.bottom <= actionBounds.top);
         }
         assertButtons((ViewGroup) actions);
     }
@@ -437,7 +512,7 @@ public class ScreenVisualTest {
                 assertTrue("Button label or content description is available",
                         button.getText().length() > 0 || (button.getContentDescription() != null
                                 && button.getContentDescription().length() > 0));
-                assertCompleteText(button);
+                if (button.getText().length() > 0) assertCompleteText(button);
                 if ("Rename".contentEquals(button.getText()) || "Remove".contentEquals(button.getText())) {
                     assertEquals("Single-word roster actions stay intact at large fonts", 1,
                             button.getLayout().getLineCount());
@@ -447,6 +522,34 @@ public class ScreenVisualTest {
                 assertButtons((ViewGroup) child);
             }
         }
+    }
+
+    private void assertRosterTarget(View control) {
+        assertNotNull("Compact row retains every control", control);
+        assertTrue("Compact controls retain 48dp touch targets", control.getWidth() >= dp(48) && control.getHeight() >= dp(48));
+        assertTrue("Icon-only control is labelled", control.getContentDescription() != null && control.getContentDescription().length() > 0);
+        assertFullyVisible(control);
+    }
+
+    private void assertCompactRosterName(TextView name) {
+        assertSingleLineNameData(name);
+        assertEquals("Roster row content stays 48dp for every name", dp(48), ((View) name.getParent()).getHeight());
+        assertEquals("Name stays inside its fixed row", dp(48), name.getHeight());
+    }
+
+    private void assertSingleLineNameData(TextView name) {
+        assertNotNull("Full player name remains available in a tooltip", name.getTooltipText());
+        assertEquals("Tooltip preserves the full player name", name.getText().toString(), name.getTooltipText().toString());
+        assertEquals("Compact player names use a single line", 1, name.getMaxLines());
+        assertEquals("Long compact names end with ellipsis", TextUtils.TruncateAt.END, name.getEllipsize());
+        assertNotNull("Compact player name has a measured layout", name.getLayout());
+        assertEquals(1, name.getLayout().getLineCount());
+    }
+
+    private void assertFullyVisible(View view) {
+        Rect visible = new Rect();
+        assertTrue("Every compact row name and control is visible together", view.getGlobalVisibleRect(visible));
+        assertTrue("Compact row content is fully visible", visible.width() >= view.getWidth() && visible.height() >= view.getHeight());
     }
 
     private void assertNavigationText(ViewGroup parent) {

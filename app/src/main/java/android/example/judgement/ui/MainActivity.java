@@ -61,6 +61,8 @@ public final class MainActivity extends AppCompatActivity {
     private ChromeAdapter headerAdapter, footerAdapter;
     private RecyclerView.Adapter<?> contentAdapter;
     private String headingText = "", descriptionText = "", errorText;
+    private int tableDetailLabel;
+    private boolean rosterColumns;
     private final List<FooterAction> footerActions = new ArrayList<>();
     private String renderedScreen = "";
     private String pickerReturn = "SETTINGS";
@@ -182,6 +184,7 @@ public final class MainActivity extends AppCompatActivity {
             adapter = new ScoreAdapter(); setContent(adapter); renderedScreen = screen;
         }
         footerActions.clear();
+        tableDetailLabel = 0; rosterColumns = false;
         boolean game = "GAME".equals(screen);
         navigation.setVisibility(game ? View.VISIBLE : View.GONE);
         toolbar.getMenu().clear();
@@ -248,15 +251,59 @@ public final class MainActivity extends AppCompatActivity {
         TextView heading = view.findViewById(R.id.screen_title); heading.setText(headingText); ViewCompat.setAccessibilityHeading(heading, true);
         TextView description = view.findViewById(R.id.screen_description); description.setText(descriptionText); description.setVisibility(descriptionText.isEmpty() ? View.GONE : View.VISIBLE);
         TextView error = view.findViewById(R.id.inline_error); error.setText(errorText); error.setVisibility(errorText == null ? View.GONE : View.VISIBLE);
+        LinearLayout columns = view.findViewById(R.id.table_columns);
+        columns.removeAllViews();
+        columns.setVisibility(rosterColumns || tableDetailLabel != 0 ? View.VISIBLE : View.GONE);
+        columns.setPaddingRelative(rosterColumns ? 0 : dp(8), 0, rosterColumns ? 0 : dp(8), 0);
+        if (rosterColumns) {
+            TextView move = columnLabel(R.string.table_move, false);
+            move.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+            columns.addView(move, new LinearLayout.LayoutParams(dp(48), -2));
+        }
+        if (rosterColumns || tableDetailLabel != 0) {
+            columns.addView(columnLabel(R.string.table_player, false), new LinearLayout.LayoutParams(0, -2, 1));
+            if (rosterColumns) {
+                TextView edit = columnLabel(R.string.table_edit, false);
+                TextView delete = columnLabel(R.string.table_delete, false);
+                edit.setTextAlignment(View.TEXT_ALIGNMENT_CENTER); delete.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+                columns.addView(edit, new LinearLayout.LayoutParams(dp(48), -2));
+                columns.addView(delete, new LinearLayout.LayoutParams(dp(48), -2));
+            } else columns.addView(columnLabel(tableDetailLabel, true), new LinearLayout.LayoutParams(dp(88), -2));
+        }
+    }
+    private TextView columnLabel(int label, boolean endAligned) {
+        TextView text = new TextView(this);
+        text.setText(label);
+        text.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelLarge);
+        text.setTextAlignment(endAligned ? View.TEXT_ALIGNMENT_VIEW_END : View.TEXT_ALIGNMENT_VIEW_START);
+        ViewCompat.setAccessibilityHeading(text, true);
+        return text;
     }
     private void bindFooter(View view) {
         LinearLayout footer = (LinearLayout) view; footer.removeAllViews();
-        for (FooterAction action : footerActions) {
-            MaterialButton button = new MaterialButton(this);
-            button.setText(action.label); button.setId(action.id); button.setMinHeight(dp(48)); button.setMaxLines(10);
-            button.setSingleLine(false); button.setEnabled(action.enabled); button.setOnClickListener(v -> action.run.run());
-            footer.addView(button, new LinearLayout.LayoutParams(-1, -2));
+        for (int index = 0; index < footerActions.size(); index++) {
+            FooterAction action = footerActions.get(index);
+            if (action.id == R.id.add_player && index + 1 < footerActions.size()
+                    && footerActions.get(index + 1).id == R.id.quick_add) {
+                LinearLayout addActions = new LinearLayout(this);
+                addActions.setOrientation(LinearLayout.HORIZONTAL);
+                addActions.setBaselineAligned(false);
+                LinearLayout.LayoutParams first = new LinearLayout.LayoutParams(0, -2, 1);
+                first.setMarginEnd(dp(4));
+                addActions.addView(footerButton(action, true), first);
+                LinearLayout.LayoutParams second = new LinearLayout.LayoutParams(0, -2, 1);
+                second.setMarginStart(dp(4));
+                addActions.addView(footerButton(footerActions.get(++index), true), second);
+                footer.addView(addActions, new LinearLayout.LayoutParams(-1, -2));
+            } else footer.addView(footerButton(action, false), new LinearLayout.LayoutParams(-1, -2));
         }
+    }
+    private MaterialButton footerButton(FooterAction action, boolean outlined) {
+        MaterialButton button = outlined ? new MaterialButton(this, null,
+                com.google.android.material.R.attr.materialButtonOutlinedStyle) : new MaterialButton(this);
+        button.setText(action.label); button.setId(action.id); button.setMinHeight(dp(48)); button.setMaxLines(10);
+        button.setSingleLine(false); button.setEnabled(action.enabled); button.setOnClickListener(v -> action.run.run());
+        return button;
     }
     private static final class FooterAction {
         final int label, id; final Runnable run; boolean enabled = true;
@@ -295,7 +342,8 @@ public final class MainActivity extends AppCompatActivity {
     }
     private void players(boolean manage) {
         if (!manage && state.draft == null) { open("HOME"); return; }
-        header(getString(manage ? R.string.manage_players : R.string.setup_players), getString(manage ? R.string.manage_description : R.string.setup_description));
+        header(getString(manage ? R.string.manage_players : R.string.setup_players), "");
+        rosterColumns = true;
         List<PlayerSpec> players = manage ? model.staged() : draftPlayers();
         Long dealer = manage ? model.stagedDealer() : state.draft.dealerId;
         if (roster == null) {
@@ -509,20 +557,27 @@ public final class MainActivity extends AppCompatActivity {
         action(R.string.how_scoring_works, R.id.round_scoring_help, () -> showScoringHelp(strategy, "GAME"));
     }
     private void bidding(Records.Round round) {
+        tableDetailLabel = R.string.table_bid;
         List<ScoreAdapter.Row> rows = new ArrayList<>();
         int firstMissing = state.roundPlayers.size();
-        for (int i = 0; i < state.roundPlayers.size(); i++) if (state.roundPlayers.get(i).bid == null) { firstMissing = i; break; }
+        int submittedTotal = 0;
+        for (int i = 0; i < state.roundPlayers.size(); i++) {
+            Integer bid = state.roundPlayers.get(i).bid;
+            if (bid != null) submittedTotal += bid;
+            else if (firstMissing == state.roundPlayers.size()) firstMissing = i;
+        }
         for (int i = 0; i < state.roundPlayers.size(); i++) {
             Records.RoundPlayer player = state.roundPlayers.get(i);
             boolean current = i == firstMissing;
             ScoreAdapter.Row row = new ScoreAdapter.Row(player.playerId, player.nameSnapshot,
-                    player.bid == null ? getString(current ? R.string.current_bidder : R.string.bid_pending) : getString(R.string.bid_format, player.bid));
+                    player.bid == null ? (current ? getString(R.string.table_bidding) : "—") : Integer.toString(player.bid)).compactName();
             if (current) {
                 row.action(getString(R.string.enter_bid), () -> bidDialog(round, player));
                 // Quick bids carry this bidder's stable ID, independent of attached row views.
-                for (int bid = 0; bid <= Math.min(round.cards, 3); bid++) {
+                for (int bid = 0; bid <= 3; bid++) {
                     final int value = bid;
-                    row.action(getString(R.string.quick_bid, bid), () -> model.run(() -> model.repository.submitBid(round.id, player.playerId, value)));
+                    boolean allowed = bid <= round.cards && (player.playerId != round.dealerId || submittedTotal + bid != round.cards);
+                    row.quickBid(bid, allowed, () -> model.run(() -> model.repository.submitBid(round.id, player.playerId, value)));
                 }
             } else if (i == firstMissing - 1) row.action(getString(R.string.edit_bid), () -> bidDialog(round, player));
             rows.add(row);
@@ -536,10 +591,12 @@ public final class MainActivity extends AppCompatActivity {
                 round.gameId, player.playerId, round.id, 0, round.cards));
     }
     private void results(Records.Round round) {
+        tableDetailLabel = R.string.table_result;
         List<ScoreAdapter.Row> rows = new ArrayList<>();
         for (Records.RoundPlayer player : state.roundPlayers) {
             String selection = player.outcome == null ? getString(R.string.outcome_pending) : getString("WON".equals(player.outcome) ? R.string.won : R.string.lost);
-            rows.add(new ScoreAdapter.Row(player.playerId, player.nameSnapshot, getString(R.string.outcome_detail, player.bid, selection))
+            rows.add(new ScoreAdapter.Row(player.playerId, player.nameSnapshot, getString(R.string.table_result_value, player.bid, selection))
+                    .compactName()
                     .action(getString(R.string.won), !"WON".equals(player.outcome), () -> model.run(() -> model.repository.setOutcome(round.id, player.playerId, Outcome.WON)))
                     .action(getString(R.string.lost), !"LOST".equals(player.outcome), () -> model.run(() -> model.repository.setOutcome(round.id, player.playerId, Outcome.LOST))));
         }
@@ -550,6 +607,7 @@ public final class MainActivity extends AppCompatActivity {
     private String roundHeading(int number, int cards) { return getResources().getQuantityString(R.plurals.round_heading, cards, number, cards); }
     private void scoreboard() { header(getString(R.string.scoreboard_tab), ""); scoreboardRows(); }
     private void scoreboardRows() {
+        tableDetailLabel = R.string.table_score;
         List<Records.GamePlayer> players = new ArrayList<>(state.players);
         players.addAll(state.inactivePlayers);
         players.sort(Comparator.<Records.GamePlayer>comparingLong(player -> state.total(player.id)).reversed().thenComparing(player -> !player.active).thenComparingInt(player -> player.seat).thenComparingLong(player -> player.id));
@@ -558,7 +616,7 @@ public final class MainActivity extends AppCompatActivity {
         for (Records.GamePlayer player : players) {
             long total = state.total(player.id); if (previous == null || previous != total) rank++;
             previous = total;
-            rows.add(new ScoreAdapter.Row(player.id, getString(R.string.ranking_format, rank, player.name), player.active ? points(total) : getString(R.string.removed_player_score, points(total))));
+            rows.add(new ScoreAdapter.Row(player.id, getString(R.string.ranking_format, rank, player.name), player.active ? points(total) : getString(R.string.removed_player_score, points(total))).compactName());
         }
         rows(rows);
     }

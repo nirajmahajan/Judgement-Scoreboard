@@ -119,7 +119,7 @@ public class LifecycleFixtureTest {
         repository.recordBids(state.round.id);
         repository.setOutcome(state.round.id, state.roundPlayers.get(0).playerId, Outcome.LOST);
         repository.setOutcome(state.round.id, state.roundPlayers.get(1).playerId, Outcome.WON);
-        repository.close(); marker("Bid 0 · Lost");
+        repository.close(); marker("0 · Lost");
     }
     @Test public void seedCompleted() {
         ScoreRepository repository = fresh();

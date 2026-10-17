@@ -12,6 +12,8 @@ Saved players form an optional library. Add, search and select profiles to quick
 
 Drag a player's handle to change seating, or use its accessible Move up / Move down actions. In-game changes are staged until Apply. Structural changes after bidding starts require restarting the current round; completed rounds stay intact.
 
+Player tables use compact, fixed-height rows with labeled columns. Long names end with an ellipsis; editing and long-press tooltips retain the full name. The 0, 1, 2 and 3 bid buttons submit directly for the current bidder; illegal bids are disabled.
+
 Choose **Default**, **Aggressive**, or **Custom** scoring before starting. Aggressive rewards an exact zero with 7 points and adds a majority bonus only for an exact bid strictly above half the hand. The bonus is capped at 10; total points are not capped. Custom scoring provides live examples. Strategy changes apply immediately before bidding or at the next round once bidding starts. Each completed round retains its own rules.
 
 Open a completed round from History to correct bids and outcomes, preview score changes, and save an audited correction. Final statistics include exact-bid rates, successful bids, streaks, significant table awards and selectable cumulative/per-round graphs. Play again prepares the same table and settings for review before starting a new game.

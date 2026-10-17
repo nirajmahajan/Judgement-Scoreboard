@@ -15,7 +15,6 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.content.res.AppCompatResources;
 import androidx.core.view.ViewCompat;
 import androidx.recyclerview.widget.ConcatAdapter;
 import androidx.recyclerview.widget.ItemTouchHelper;
@@ -117,7 +116,7 @@ final class RosterAdapter extends RecyclerView.Adapter<RosterAdapter.Holder> {
         }
     }
 
-    @SuppressLint("NotifyDataSetChanged") // At most 52 rows; rebinds dealer labels and available move actions together.
+    @SuppressLint("NotifyDataSetChanged") // At most 52 rows; rebinds names and available move actions together.
     void update(List<PlayerSpec> players, Long newDealerId) {
         if (players == null) {
             throw new IllegalArgumentException("The staged roster is required.");
@@ -181,30 +180,16 @@ final class RosterAdapter extends RecyclerView.Adapter<RosterAdapter.Holder> {
 
     @NonNull @Override public Holder onCreateViewHolder(@NonNull ViewGroup parent, int type) {
         return new Holder(LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.score_row, parent, false));
+                .inflate(R.layout.roster_row, parent, false));
     }
 
     @Override public void onBindViewHolder(@NonNull Holder holder, int position) {
         PlayerSpec player = rows.get(position).player;
         holder.name.setText(player.name);
-        holder.detail.setText(seatDescription(position));
-        holder.actions.removeAllViews();
-        LinearLayout controls = new LinearLayout(holder.itemView.getContext());
-        boolean stacked = context.getResources().getConfiguration().fontScale >= 1.5f
-                && context.getResources().getConfiguration().screenWidthDp < 480;
-        controls.setOrientation(stacked ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
-        holder.actions.addView(controls, new LinearLayout.LayoutParams(-1, -2));
-
-        holder.handle = button(holder, R.string.drag_handle,
-                context.getString(R.string.drag_player, player.name));
-        if (!stacked) holder.handle.setText(null);
-        holder.handle.setIcon(AppCompatResources.getDrawable(context,
-                android.R.drawable.ic_menu_sort_by_size));
-        holder.handle.setIconPadding(0);
-        if (stacked) {
-            holder.handle.setIconPadding(dp(8));
-            holder.handle.setIconGravity(MaterialButton.ICON_GRAVITY_TEXT_START);
-        }
+        holder.name.setTooltipText(player.name);
+        holder.detail.setText("");
+        holder.detail.setVisibility(View.GONE);
+        holder.handle.setContentDescription(context.getString(R.string.drag_player, player.name));
         holder.handle.setFocusableInTouchMode(true);
         holder.handle.setOnTouchListener((view, event) -> {
             if (event.getActionMasked() == MotionEvent.ACTION_DOWN
@@ -219,31 +204,22 @@ final class RosterAdapter extends RecyclerView.Adapter<RosterAdapter.Holder> {
             // Accessibility users use the labelled Move up / Move down actions below.
         });
         holder.handle.setEnabled(rows.size() > 1);
-        controls.addView(holder.handle, new LinearLayout.LayoutParams(stacked ? -1 : dp(48), -2));
-
-        MaterialButton rename = button(holder, R.string.rename,
-                context.getString(R.string.rename) + " " + player.name);
+        MaterialButton rename = holder.rename;
+        rename.setContentDescription(context.getString(R.string.rename) + " " + player.name);
         rename.setOnClickListener(view -> {
             int current = holder.getBindingAdapterPosition();
             if (current != RecyclerView.NO_POSITION && beforeDrag == null) {
                 listener.rename(rows.get(current).player);
             }
         });
-        LinearLayout.LayoutParams renameLayout = new LinearLayout.LayoutParams(stacked ? -1 : 0, -2, stacked ? 0 : 1);
-        if (stacked) renameLayout.topMargin = dp(8); else renameLayout.setMarginStart(dp(8));
-        controls.addView(rename, renameLayout);
-
-        MaterialButton remove = button(holder, R.string.remove,
-                context.getString(R.string.remove) + " " + player.name);
+        MaterialButton remove = holder.remove;
+        remove.setContentDescription(context.getString(R.string.remove) + " " + player.name);
         remove.setOnClickListener(view -> {
             int current = holder.getBindingAdapterPosition();
             if (current != RecyclerView.NO_POSITION && beforeDrag == null) {
                 listener.remove(rows.get(current).player);
             }
         });
-        LinearLayout.LayoutParams removeLayout = new LinearLayout.LayoutParams(stacked ? -1 : 0, -2, stacked ? 0 : 1);
-        if (stacked) removeLayout.topMargin = dp(8); else removeLayout.setMarginStart(dp(8));
-        controls.addView(remove, removeLayout);
         bindMoveActions(holder, position);
     }
 
@@ -284,27 +260,6 @@ final class RosterAdapter extends RecyclerView.Adapter<RosterAdapter.Holder> {
         return true;
     }
 
-    private MaterialButton button(Holder holder, int textResource, String description) {
-        MaterialButton button = new MaterialButton(holder.itemView.getContext(), null,
-                com.google.android.material.R.attr.materialButtonOutlinedStyle);
-        button.setText(textResource);
-        button.setContentDescription(description);
-        button.setMinWidth(0);
-        button.setMinimumWidth(0);
-        button.setMinHeight(dp(48));
-        button.setMinimumHeight(dp(48));
-        button.setSingleLine(false);
-        button.setMaxLines(20);
-        button.setPaddingRelative(dp(8), button.getPaddingTop(), dp(8), button.getPaddingBottom());
-        return button;
-    }
-
-    private String seatDescription(int position) {
-        PlayerSpec player = rows.get(position).player;
-        return context.getString(dealerId != null && dealerId == player.id
-                ? R.string.seat_dealer_format : R.string.seat_format, position + 1);
-    }
-
     private void updateVisibleSeats() {
         if (recyclerView == null) {
             return;
@@ -313,7 +268,6 @@ final class RosterAdapter extends RecyclerView.Adapter<RosterAdapter.Holder> {
             RecyclerView.ViewHolder visible = recyclerView.findViewHolderForAdapterPosition(globalPosition(position));
             if (visible instanceof Holder) {
                 Holder holder = (Holder) visible;
-                holder.detail.setText(seatDescription(position));
                 bindMoveActions(holder, position);
             }
         }
@@ -570,7 +524,7 @@ final class RosterAdapter extends RecyclerView.Adapter<RosterAdapter.Holder> {
         final TextView name;
         final TextView detail;
         final LinearLayout actions;
-        MaterialButton handle;
+        final MaterialButton handle, rename, remove;
         int moveUpAction = -1;
         int moveDownAction = -1;
         Holder(View item) {
@@ -578,6 +532,9 @@ final class RosterAdapter extends RecyclerView.Adapter<RosterAdapter.Holder> {
             name = item.findViewById(R.id.row_name);
             detail = item.findViewById(R.id.row_detail);
             actions = item.findViewById(R.id.row_actions);
+            handle = item.findViewById(R.id.row_drag_handle);
+            rename = item.findViewById(R.id.roster_rename);
+            remove = item.findViewById(R.id.roster_remove);
         }
     }
 }

@@ -61,7 +61,7 @@ public class CriticalUiRegressionTest {
     @Test public void quickBidsFollowCurrentPlayerAndSelectionsSurviveScoreboardReturn() {
         seed(3, false, 0); launchGame();
         for (int player = 0; player < 3; player++) {
-            rowAction(player, "Bid 0"); final int filled = player + 1;
+            rowAction(player, "0"); final int filled = player + 1;
             awaitState(s -> s.roundPlayers.stream().filter(row -> row.bid != null).count() == filled);
         }
         clickFooter(R.id.primary_action);
@@ -72,10 +72,10 @@ public class CriticalUiRegressionTest {
         awaitView(allOf(withId(R.id.screen_title), withText(R.string.scoreboard_tab)));
         onView(withId(R.id.tab_round)).perform(click());
         onView(withId(R.id.screen_list)).perform(RecyclerViewActions.scrollToPosition(1));
-        awaitView(withText("Bid 0 · Lost"));
+        awaitView(withText("0 · Lost"));
         assertEquals("LOST", inspector.snapshot().roundPlayers.get(0).outcome);
         scenario.recreate();
-        awaitView(withText("Bid 0 · Lost"));
+        awaitView(withText("0 · Lost"));
     }
 
     @Test public void scrollingEightPlayerResultsFinishFromBottomWithoutVisibleFirstRow() {

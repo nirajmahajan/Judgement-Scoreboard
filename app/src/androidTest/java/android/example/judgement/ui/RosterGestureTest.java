@@ -11,6 +11,8 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.ConcatAdapter;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -72,12 +74,13 @@ public class RosterGestureTest {
             RosterAdapter.Holder dealer = (RosterAdapter.Holder)
                     recycler.findViewHolderForAdapterPosition(1 + rosterOffset);
             assertNotNull(dealer);
-            assertEquals("Seat 2 · Dealer", dealer.detail.getText().toString());
+            assertEquals("Player 1", dealer.name.getText().toString());
+            assertEquals(View.GONE, dealer.detail.getVisibility());
             RosterAdapter.Holder first = (RosterAdapter.Holder)
                     recycler.findViewHolderForAdapterPosition(rosterOffset);
             assertNotNull(first);
-            assertTrue(clickLabel(first.actions, "Rename"));
-            assertTrue(clickLabel(first.actions, "Remove"));
+            assertTrue(clickLabel(first.actions, "Rename Player 2"));
+            assertTrue(clickLabel(first.actions, "Remove Player 2"));
         });
         assertEquals("Callbacks carry the reordered player's ID before any storage snapshot",
                 101L, renamed.get().id);
@@ -101,7 +104,7 @@ public class RosterGestureTest {
                     recycler.findViewHolderForAdapterPosition(rosterOffset);
             assertNotNull(first);
             assertEquals("Player 1", first.name.getText().toString());
-            assertEquals("Seat 1 · Dealer", first.detail.getText().toString());
+            assertEquals(View.GONE, first.detail.getVisibility());
         });
     }
 
@@ -122,8 +125,11 @@ public class RosterGestureTest {
     @Test public void handleAtTheBottomAutoScrollsBeyondInitiallyVisiblePlayers() {
         launch(14);
         float[] start = handleCenter(0);
+        AtomicInteger initiallyVisibleLast = new AtomicInteger();
         AtomicReference<float[]> edge = new AtomicReference<>();
         scenario.onActivity(activity -> {
+            initiallyVisibleLast.set(((LinearLayoutManager) recycler.getLayoutManager())
+                    .findLastVisibleItemPosition() - rosterOffset);
             int[] location = new int[2];
             recycler.getLocationOnScreen(location);
             edge.set(new float[] {start[0], location[1] + recycler.getHeight() - 12});
@@ -147,7 +153,7 @@ public class RosterGestureTest {
                 destination = index;
             }
         }
-        assertTrue("Dragged player must pass initially hidden rows", destination >= 4);
+        assertTrue("Dragged player must pass initially hidden rows", destination > initiallyVisibleLast.get());
         assertEquals(14, committed.get().size());
     }
 
@@ -250,12 +256,18 @@ public class RosterGestureTest {
         scenario = ActivityScenario.launch(MainActivity.class);
         scenario.onActivity(activity -> {
             FrameLayout root = new FrameLayout(activity);
+            ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
+                androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+                view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                return insets;
+            });
             recycler = new RecyclerView(activity);
             recycler.setLayoutManager(new LinearLayoutManager(activity));
             recycler.setItemAnimator(null);
             root.addView(recycler, new FrameLayout.LayoutParams(-1,
                     Math.round(480 * activity.getResources().getDisplayMetrics().density)));
             activity.setContentView(root);
+            ViewCompat.requestApplyInsets(root);
             List<PlayerSpec> players = new ArrayList<>();
             for (int index = 0; index < playerCount; index++) {
                 players.add(new PlayerSpec(100L + index, "Player " + (index + 1)));
@@ -341,7 +353,7 @@ public class RosterGestureTest {
     private static boolean clickLabel(ViewGroup parent, String label) {
         for (int index = 0; index < parent.getChildCount(); index++) {
             View child = parent.getChildAt(index);
-            if (child instanceof TextView && label.contentEquals(((TextView) child).getText())) {
+            if (child.getContentDescription() != null && label.contentEquals(child.getContentDescription())) {
                 return child.performClick();
             }
             if (child instanceof ViewGroup && clickLabel((ViewGroup) child, label)) return true;

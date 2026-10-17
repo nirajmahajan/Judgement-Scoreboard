@@ -1,12 +1,16 @@
 <resources>
     <string name="round_tab">Round</string><string name="scoreboard_tab">Scoreboard</string><string name="history_tab">History</string>
+    <string name="table_player">Player</string><string name="table_bid">Bid</string>
+    <string name="table_move">Move</string><string name="table_edit">Edit</string><string name="table_delete">Delete</string>
+    <string name="table_result">Bid / result</string><string name="table_score">Score</string>
+    <string name="table_bidding">Bidding</string><string name="table_result_value">%1$d · %2$s</string>
     <string name="home_title">Judgement Scoreboard</string>
     <string name="new_game">New game</string><string name="resume_game">Resume game</string><string name="continue_setup">Continue setup</string>
     <string name="saved_players">Saved players</string><string name="help">Help</string><string name="completed_results">Completed results</string>
     <string name="back">Back</string><string name="home">Home</string><string name="cancel">Cancel</string><string name="save">Save</string>
-    <string name="setup_players">1 · Players</string><string name="setup_settings">2 · Game settings</string>
+    <string name="setup_players">Players</string><string name="setup_settings">2 · Game settings</string>
     <string name="setup_description">Add 2–52 players in seating order. Drag a handle or use Move up and Move down.</string>
-    <string name="add_player">Add player</string><string name="quick_add">Quick-add saved players</string><string name="next_settings">Game settings</string>
+    <string name="add_player">Add player</string><string name="quick_add">Saved players</string><string name="next_settings">Game settings</string>
     <string name="save_future">Save for future games</string>
     <string name="rename">Rename</string><string name="remove">Remove</string><string name="move_up">Move up</string><string name="move_down">Move down</string>
     <string name="seat_format">Seat %1$d</string><string name="seat_dealer_format">Seat %1$d · Dealer</string>

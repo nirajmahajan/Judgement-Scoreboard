@@ -22,7 +22,7 @@ The named tests below exercise the repaired behavior. JVM tests are under `app/s
 | D14 | Repeated round completion advances dealer/history repeatedly | Idempotent completion by round ID | `concurrentRepeatedCompletionHasExactlyOneEffect` |
 | D15 | Dealer/settings choices reset on recreation | Persist draft configuration | `partialDraftAndActiveRoundSurviveCloseReopenIndependently`; `independentConcurrentSetupChoicesMergeWithoutLosingDirectionOrTrump` |
 | D16 | Blank-looking names are accepted | Shared Unicode name validation | `rejectsEmptyWhitespaceControlAndInvisibleOnlyNames`; `newGameFormPreservesInvalidInputAndAcceptsFullUnicodeLongName` |
-| D17 | Long names overlap controls; controls are tiny or unlabelled | Wrapping layouts, 48dp targets and accessible actions | 13 `ScreenVisualTest` cases; `accessibleMovesDoNotWrapAndRestoreFocusAfterSnapshotRebinding`; keyboard-open UI regression |
+| D17 | Long names overlap controls; controls are tiny or unlabelled | Fixed-height name columns, full-name editing/tooltips, 48dp targets and accessible actions | `ScreenVisualTest` compact/long-name cases; `accessibleMovesDoNotWrapAndRestoreFocusAfterSnapshotRebinding`; keyboard-open UI regression |
 | D18 | History numbers players using the round index | Immutable ordered round participant snapshots | `historyNumbersParticipantsWithinEachRound` |
 | D19 | Help awards 12 points for a successful bid of three | Explain 10 + bid, including 13-point example | `helpFromEmptyHomeReturnsSafelyAndExplainsThirteenPointBid`; `scoringUsesCheckedNonnegativeLongTotalsAndCorrectBidThreeExample` |
 | D20 | Incompatible historical databases all use version 1 | Recover all 4/6/7-column shapes without inventing game state | `fourColumnLegacyRecoversRawValuesThroughFinalSchema`, six/seven equivalents; `interruptedMigrationRollsBackAndRetryPreservesExactlyOneCopy`; unknown-schema and v2 upgrade cases |
@@ -41,7 +41,7 @@ The named tests below exercise the repaired behavior. JVM tests are under `app/s
 | D27 | Saving a staged participant writes a profile before Apply | Commit save intent inside the roster transaction; three repository save-intent regressions and managed-player UI cases |
 | D28 | Navigation immediately after drop discards an accepted order | Commit on successful release; `releasedDropCommitsBeforeImmediateNavigationDetachesTheRoster` |
 | D29 | Removed setup entries become inactive game participants | Exclude draft-only removals at Start; `startingGameExcludesRemovedSetupEntriesButKeepsTheirSavedProfiles` |
-| D30 | Narrow large-font roster actions split their final letters | Stack actions when space is constrained; assert complete single-line labels in visual layout tests |
+| D30 | Narrow large-font roster actions split their final letters | Use labeled 48dp edit/remove icons; assert fixed columns and preserved name data in visual layout tests |
 | D31 | Deferred Start and Quick-add commands read a replacement draft from mutable screen state | Capture the original draft ID; `oldStartConfirmationCannotStartAReplacementDraft`; `queuedQuickAddCannotRetargetAReplacementDraft` |
 | D32 | Command completion navigates a destroyed Activity after rotation | Observable ViewModel navigation; five `ReviewFlowRegressionTest` cases cover New game, Start, Apply, replay and restore |
 | D33 | Restoring an inactive participant twice creates duplicate staged IDs | Filter and guard stable IDs; `restoredPlayerIsNotOfferedAgainInTheStagedRoster` |
