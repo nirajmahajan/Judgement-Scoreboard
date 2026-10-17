@@ -3,7 +3,7 @@ name: Android checks
 on:
   pull_request:
   push:
-    branches: [master]
+    branches: [master, main]
   workflow_call:
     inputs:
       commit:
@@ -31,6 +31,8 @@ jobs:
           ref: ${{ inputs.commit || github.sha }}
       - run: python3 tools/ci/verify_wrapper.py
       - run: python3 tools/ci/test_required_gate.py
+      - run: python3 tools/ci/test_prepare_release.py
+      - run: python3 tools/ci/test_publish_release.py
       - uses: gradle/actions/wrapper-validation@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
   build:
     name: Build, unit regressions, and Lint

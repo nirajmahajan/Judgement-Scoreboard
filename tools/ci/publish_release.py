@@ -17,9 +17,9 @@ root = Path("release")
 assert (root / "judgement-scoreboard.apk").is_file()
 body = f"""Judgement Scoreboard 2.0
 
-- Repaired bidding, scoring, lifecycle state, and legacy data recovery.
+- Repaired predictions, scoring, lifecycle state, and legacy data recovery.
 - Added a saved-player library and accessible drag ordering.
-- Rebuilt navigation and introduced slate/teal light and dark themes.
+- Rebuilt the compact interface with blue headers, card artwork, and light/dark themes.
 
 Exact tested commit: `{commit}`
 
@@ -40,20 +40,37 @@ created by chatgpt-codex
 headers = {"Authorization": "Bearer " + os.environ["GITHUB_TOKEN"],
            "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
 api = f"https://api.github.com/repos/{repository}"
-try:
-    urllib.request.urlopen(urllib.request.Request(api + "/releases/tags/" + urllib.parse.quote(tag, safe=""), headers=headers))
-except urllib.error.HTTPError as error:
-    if error.code != 404:
-        raise
-else:
-    raise SystemExit("Release tag already exists; refusing to overwrite it")
+release = None
+page = 1
+while release is None:
+    releases = json.load(urllib.request.urlopen(urllib.request.Request(
+        api + f"/releases?per_page=100&page={page}", headers=headers)))
+    release = next((item for item in releases if item["tag_name"] == tag), None)
+    if len(releases) < 100:
+        break
+    page += 1
+if release is not None and (not release["draft"] or release["target_commitish"] != commit):
+    raise SystemExit("Release already published or draft targets another commit; refusing to overwrite it")
 payload = json.dumps({"tag_name": tag, "target_commitish": commit,
                       "name": f"Judgement Scoreboard {tag}", "body": body,
                       "draft": True, "prerelease": False}).encode()
-request = urllib.request.Request(api + "/releases", data=payload,
-                                 headers=headers | {"Content-Type": "application/json"}, method="POST")
-release = json.load(urllib.request.urlopen(request))
+if release is None:
+    request = urllib.request.Request(api + "/releases", data=payload,
+                                     headers=headers | {"Content-Type": "application/json"}, method="POST")
+    release = json.load(urllib.request.urlopen(request))
+else:
+    request = urllib.request.Request(api + "/releases/" + str(release["id"]), data=payload,
+                                     headers=headers | {"Content-Type": "application/json"}, method="PATCH")
+    release = json.load(urllib.request.urlopen(request))
+draft_only_assets = {"RELEASE_NOTES.md", "release-evidence.json", "original-certificate.txt",
+                     f"Judgement-Scoreboard-{tag}-debug-test.apk", f"Judgement-Scoreboard-{tag}-release-unsigned.apk"}
+for asset in release["assets"]:
+    if asset["name"] in draft_only_assets:
+        urllib.request.urlopen(urllib.request.Request(asset["url"], headers=headers, method="DELETE")).read()
 for name in ["judgement-scoreboard.apk", "SHA256SUMS", "CHANGELOG.md", "test-evidence.json", "certificate.txt"]:
+    for asset in release["assets"]:
+        if asset["name"] == name:
+            urllib.request.urlopen(urllib.request.Request(asset["url"], headers=headers, method="DELETE")).read()
     content = (root / name).read_bytes()
     upload = release["upload_url"].split("{")[0] + "?name=" + urllib.parse.quote(name)
     request = urllib.request.Request(upload, data=content,

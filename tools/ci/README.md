@@ -27,6 +27,10 @@ All emulator scripts retain Logcat, hierarchy, screenshots, runtime properties, 
 
 ## Release gates
 
+For a quick release draft, open **Actions → Create release → Run workflow**, select `main` (or `master`), and enter the app version, for example `2.0.0`. Pushing a matching `v2.0.0` tag starts the same action. It builds both APK variants, checks their package/version identities, and creates a draft with checksums and release notes. The debug APK is a separate test app; the production APK is unsigned. Draft preparation does not require account changes or a signing key. It never presents a test-signed APK as an update to the original app.
+
+The original APK was signed by Niraj Mahajan with certificate SHA-256 `93:E3:66:B9:3C:CD:1C:53:1E:9A:28:2A:09:6C:CA:A9:BB:D7:19:D9:B8:C1:27:1E:7E:53:84:F7:48:4B:DA:50`. A certificate or APK cannot recreate its private key. To ship an install-over update, locate the original `.jks`/`.keystore` and supply its signing secrets to the protected production workflow below.
+
 Dispatch **Release candidate and approved publication** with the exact 40-character commit SHA. It reruns the full PR suite and an install-over test using a disposable CI key. The upgrade test re-signs both the bundled original APK and the candidate with that same temporary key, verifies an unchanged application UID, and checks exact recovered names/scores. It does not prove possession of the production key.
 
 Unsigned release APKs and debug APKs are downloadable from ordinary build artifacts. A production-compatible release requires the original signing key. Configure a protected GitHub environment named `release`, restrict its approving reviewer to the repository owner, and add these environment secrets:
