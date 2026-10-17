@@ -83,4 +83,8 @@
     <style name="TextAppearance.Score.AggressiveHeadline" parent="TextAppearance.Material3.HeadlineMedium">
         <item name="android:fontFamily">sans-serif-medium</item>
     </style>
+    <style name="ShapeAppearance.Score.Circle" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
 </resources>

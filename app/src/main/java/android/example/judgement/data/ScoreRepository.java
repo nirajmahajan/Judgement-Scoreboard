@@ -527,7 +527,10 @@ public final class ScoreRepository implements AutoCloseable {
             return null;
         });
     }
-    public void removeSavedPlayer(long id) { write(() -> { dao.deleteSavedPlayer(id); return null; }); }
+    public void removeSavedPlayer(long id) { removeSavedPlayers(java.util.Collections.singletonList(id)); }
+    public void removeSavedPlayers(List<Long> ids) {
+        write(() -> { for (long id : ids) dao.deleteSavedPlayer(id); return null; });
+    }
 
     /** Adds the whole selection or nothing. Existing seats retain their IDs and order. */
     public void addSavedPlayersToDraft(long draftId, List<Long> profileIds) {

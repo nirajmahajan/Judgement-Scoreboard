@@ -54,6 +54,7 @@ public final class MainActivity extends AppCompatActivity {
     private ScoreAdapter adapter;
     private BidAdapter bids;
     private LinearLayout fixedActions;
+    private View addSavedPlayer;
     private boolean biddingColumns;
     private RosterAdapter roster;
     private StrategyEditor strategyEditor;
@@ -122,6 +123,9 @@ public final class MainActivity extends AppCompatActivity {
         fixedActions = findViewById(R.id.fixed_actions);
         adapter = new ScoreAdapter(); setContent(adapter);
         model = new ViewModelProvider(this).get(ScoreViewModel.class);
+        addSavedPlayer = findViewById(R.id.add_saved_player);
+        addSavedPlayer.setOnClickListener(view -> model.beginForm(new FormRequest(
+                FormRequest.Kind.ADD_SAVED, "", false, 0, 0, 0, 0, 0)));
         navigation.setOnItemSelectedListener(item -> {
             String next = item.getItemId() == R.id.tab_history ? "HISTORY" : item.getItemId() == R.id.tab_scoreboard ? "SCOREBOARD" : "ROUND";
             if (!next.equals(model.tab())) { model.tab(next); render(); }
@@ -208,6 +212,9 @@ public final class MainActivity extends AppCompatActivity {
         footerActions.clear();
         tableDetailLabel = 0; rosterColumns = false; biddingColumns = false;
         fixedActions.setVisibility(View.GONE);
+        boolean savedPicker = "SAVED".equals(screen) || "QUICK_ADD".equals(screen);
+        addSavedPlayer.setVisibility(savedPicker ? View.VISIBLE : View.GONE);
+        list.setPaddingRelative(dp(16), 0, dp(16), dp(savedPicker ? 88 : 16));
         boolean game = "GAME".equals(screen);
         navigation.setVisibility(game ? View.VISIBLE : View.GONE);
         toolbar.getMenu().clear();
@@ -345,11 +352,14 @@ public final class MainActivity extends AppCompatActivity {
         return button;
     }
     private static final class FooterAction {
-        final int label, id; final Runnable run; boolean enabled = true;
-        FooterAction(int label, int id, Runnable run) { this.label = label; this.id = id; this.run = run; }
+        final String label; final int id; final Runnable run; boolean enabled = true;
+        FooterAction(String label, int id, Runnable run) { this.label = label; this.id = id; this.run = run; }
         void setEnabled(boolean enabled) { this.enabled = enabled; }
     }
     private FooterAction action(int label, int id, Runnable run) {
+        return action(getString(label), id, run);
+    }
+    private FooterAction action(String label, int id, Runnable run) {
         FooterAction action = new FooterAction(label, id, run); footerActions.add(action); return action;
     }
     private int dp(int value) { return Math.round(getResources().getDisplayMetrics().density * value); }
@@ -452,9 +462,9 @@ public final class MainActivity extends AppCompatActivity {
                         .action(getString(R.string.choose_scoring), () -> model.beginStrategy(new StrategyRequest(
                                 StrategyRequest.Target.DRAFT, scoringDraftId, "SETTINGS", scoring)))
                         .action(getString(R.string.how_scoring_works), () -> showScoringHelp(scoring, "SETTINGS")),
-                new ScoreAdapter.Row(1, getString(R.string.direction), getString("ASCENDING".equals(state.draft.direction) ? R.string.ascending : R.string.descending))
-                        .action(getString(R.string.ascending), () -> config("ASCENDING", null))
-                        .action(getString(R.string.descending), () -> config("DESCENDING", null)),
+                new ScoreAdapter.Row(1, getString(R.string.direction), dealOrderLabel("ASCENDING".equals(state.draft.direction)))
+                        .action(dealOrderLabel(true), () -> config("ASCENDING", null))
+                        .action(dealOrderLabel(false), () -> config("DESCENDING", null)),
                 new ScoreAdapter.Row(2, getString(R.string.trump_mode), getString("FIXED".equals(state.draft.trumpMode) ? R.string.fixed_trump : R.string.custom_trump))
                         .action(getString(R.string.fixed_trump), () -> config(null, "FIXED"))
                         .action(getString(R.string.custom_trump), () -> config(null, "CUSTOM")),
@@ -566,10 +576,19 @@ public final class MainActivity extends AppCompatActivity {
         if (state.draft == null) { open("PLAYERS"); return; }
         header(getString(R.string.choose_deal_order), ""); rows(new ArrayList<ScoreAdapter.Row>());
         long draftId = state.draft.id; String signature = setupRosterSignature();
-        action(R.string.start_one_card, R.id.deal_order_ascending,
+        action(dealOrderLabel(true), R.id.deal_order_ascending,
                 () -> model.chooseSetupDirection(draftId, signature, "ASCENDING"));
-        action(R.string.start_max_cards, R.id.deal_order_descending,
+        action(dealOrderLabel(false), R.id.deal_order_descending,
                 () -> model.chooseSetupDirection(draftId, signature, "DESCENDING"));
+    }
+    private String dealOrderLabel(boolean ascending) {
+        if (state.draftPlayers.size() < GameRules.MIN_PLAYERS)
+            return getString(ascending ? R.string.ascending : R.string.descending);
+        int maximum = GameRules.maximumCards(state.draftPlayers.size());
+        String oneCard = getResources().getQuantityString(R.plurals.card_count, 1, 1);
+        String maximumCards = getResources().getQuantityString(R.plurals.card_count, maximum, maximum);
+        return getString(ascending ? R.string.start_one_card : R.string.start_max_cards,
+                ascending ? oneCard : maximumCards, ascending ? maximumCards : oneCard);
     }
     private void pickDealer(boolean required) {
         header(getString(R.string.choose_dealer), "");
@@ -879,23 +898,44 @@ public final class MainActivity extends AppCompatActivity {
         try { query = Names.key(search); } catch (IllegalArgumentException blank) { query = ""; }
         List<SavedPlayerPickerAdapter.Item> items = new ArrayList<>();
         Set<Long> eligible = new HashSet<>();
+        Set<Long> addable = new HashSet<>();
         for (Records.SavedPlayer profile : state.savedPlayers) {
             boolean present = false, conflict = false;
             for (PlayerSpec current : currentPlayers) {
                 present |= current.savedPlayerId != null && current.savedPlayerId == profile.id;
                 conflict |= Names.key(current.name).equals(profile.nameKey);
             }
-            boolean enabled = !present && !conflict;
+            boolean canAdd = !present && !conflict;
+            boolean enabled = !picker || canAdd;
+            if (canAdd) addable.add(profile.id);
             if (enabled) eligible.add(profile.id);
             if (profile.nameKey.contains(query)) items.add(new SavedPlayerPickerAdapter.Item(profile.id, profile.name,
                     selectedProfiles.contains(profile.id) && enabled, enabled,
-                    enabled ? "" : getString(present ? R.string.already_added : R.string.name_conflict)));
+                    canAdd ? "" : getString(present ? R.string.already_added : R.string.name_conflict)));
         }
         selectedProfiles.retainAll(eligible);
         SavedPlayerPickerAdapter pickerAdapter = new SavedPlayerPickerAdapter(profileId -> {
             if (!selectedProfiles.add(profileId)) selectedProfiles.remove(profileId); render();
         });
         pickerAdapter.submit(items); setContent(pickerAdapter);
+        android.view.MenuItem delete = toolbar.getMenu().add(android.view.Menu.NONE,
+                R.id.delete_saved_players, 0, R.string.delete_selected_players);
+        android.graphics.drawable.Drawable bin = androidx.appcompat.content.res.AppCompatResources
+                .getDrawable(this, R.drawable.ic_roster_remove).mutate();
+        bin.setTint(getColor(R.color.score_table_on_header));
+        bin.setAlpha(selectedProfiles.isEmpty() ? 96 : 255);
+        delete.setIcon(bin).setEnabled(!selectedProfiles.isEmpty())
+                .setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_ALWAYS);
+        delete.setOnMenuItemClickListener(item -> {
+            List<Long> selected = new ArrayList<>(selectedProfiles);
+            new MaterialAlertDialogBuilder(this).setTitle(getResources().getQuantityString(
+                    R.plurals.delete_saved_players, selected.size(), selected.size()))
+                    .setMessage(R.string.delete_profile_message)
+                    .setPositiveButton(R.string.remove, (dialog, which) -> model.run(
+                            () -> model.repository.removeSavedPlayers(selected)))
+                    .setNegativeButton(R.string.cancel, null).show();
+            return true;
+        });
         toolbar.getMenu().add(android.view.Menu.NONE, R.id.search_saved_action, 0, R.string.search_saved)
                 .setOnMenuItemClickListener(item -> {
                     model.beginForm(new FormRequest(FormRequest.Kind.SEARCH, search, false, 0, 0, 0, 0, 0)); return true;
@@ -904,7 +944,7 @@ public final class MainActivity extends AppCompatActivity {
                 .setOnMenuItemClickListener(item -> { savedManageReturn = picker ? "QUICK_ADD" : "SAVED"; open("SAVED_MANAGE"); return true; });
         fixedActions.removeAllViews(); fixedActions.setVisibility(View.VISIBLE);
         MaterialButton add = new MaterialButton(this); add.setId(R.id.primary_action); add.setText(R.string.add_selected);
-        add.setEnabled(!selectedProfiles.isEmpty());
+        add.setEnabled(!selectedProfiles.isEmpty() && addable.containsAll(selectedProfiles));
         add.setOnClickListener(view -> {
             List<Long> selected = new ArrayList<>(selectedProfiles);
             if (stagedPicker) {

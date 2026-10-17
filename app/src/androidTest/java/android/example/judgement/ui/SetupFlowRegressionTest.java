@@ -46,7 +46,8 @@ public final class SetupFlowRegressionTest {
         addPlayer("Alice", 1); addPlayer("Ben", 2);
         clickId(R.id.primary_action);
         awaitView(allOf(withId(R.id.screen_title), withText(R.string.choose_deal_order)));
-        onView(withId(R.id.deal_order_descending)).perform(click());
+        onView(withId(R.id.deal_order_ascending)).check(matches(withText("1 card → 26 cards")));
+        onView(withId(R.id.deal_order_descending)).check(matches(withText("26 cards → 1 card"))).perform(click());
         awaitView(allOf(withId(R.id.screen_title), withText(R.string.choose_dealer)));
         scenario.recreate();
         awaitView(allOf(withId(R.id.screen_title), withText(R.string.choose_dealer)));
@@ -79,6 +80,44 @@ public final class SetupFlowRegressionTest {
         assertEquals(7L, ScoringStrategy.decode(repository.snapshot().draft.scoringConfig).zeroReward);
         onView(withId(R.id.setup_strategy_default)).check(matches(org.hamcrest.Matchers.not(isChecked())));
         onView(withId(R.id.setup_strategy_aggressive)).check(matches(org.hamcrest.Matchers.not(isChecked())));
+    }
+
+    @Test public void savedPlayerPlusCreatesProfileWithoutAddingItToTheGame() {
+        newGame(); clickId(R.id.quick_add);
+        onView(withId(R.id.add_saved_player)).perform(click());
+        onView(withId(R.id.edit_value)).perform(replaceText("Charlotte"), closeSoftKeyboard());
+        onView(withText(R.string.save)).perform(click());
+        awaitState(state -> state.savedPlayers.size() == 1);
+        assertTrue("Saving a profile does not add it to the game", repository.snapshot().draftPlayers.isEmpty());
+        scenario.recreate();
+        awaitView(allOf(withId(R.id.saved_player_checkbox), hasSibling(withText("Charlotte"))));
+        onView(allOf(withId(R.id.saved_player_checkbox), hasSibling(withText("Charlotte")))).perform(click());
+        onView(allOf(withId(R.id.primary_action), isDisplayed())).perform(click());
+        awaitState(state -> state.draftPlayers.size() == 1);
+        assertEquals("Charlotte", repository.snapshot().draftPlayers.get(0).name);
+    }
+
+    @Test public void savedPlayerBinDeletesSelectionAndPreservesExistingRoster() {
+        long alice = repository.addSavedPlayer("Alice"); repository.addSavedPlayer("Ben");
+        repository.saveDraft(new android.example.judgement.data.DraftSpec(0, java.util.Arrays.asList(
+                new android.example.judgement.data.PlayerSpec(0, "Alice", alice)), "ASCENDING", "CUSTOM", null));
+        long participantId = repository.snapshot().draftPlayers.get(0).id;
+        scenario = ActivityScenario.launch(MainActivity.class);
+        awaitView(withText(R.string.home_title));
+        onView(withId(R.id.screen_list)).perform(RecyclerViewActions.scrollTo(hasDescendant(withText(R.string.saved_players))));
+        onView(allOf(withText(R.string.saved_players), isClickable())).perform(click());
+        onView(withId(R.id.delete_saved_players)).check(matches(org.hamcrest.Matchers.not(isEnabled())));
+        onView(allOf(withId(R.id.saved_player_checkbox), hasSibling(withText("Alice")))).perform(click());
+        onView(allOf(withId(R.id.saved_player_checkbox), hasSibling(withText("Ben")))).perform(click());
+        onView(withId(R.id.delete_saved_players)).perform(click());
+        onView(withText(R.string.cancel)).perform(click());
+        assertEquals(2, repository.snapshot().savedPlayers.size());
+        onView(withId(R.id.delete_saved_players)).perform(click());
+        onView(withId(android.R.id.button1)).perform(click());
+        awaitState(state -> state.savedPlayers.isEmpty());
+        assertEquals(participantId, repository.snapshot().draftPlayers.get(0).id);
+        assertEquals("Alice", repository.snapshot().draftPlayers.get(0).name);
+        onView(withId(R.id.primary_action)).check(matches(org.hamcrest.Matchers.not(isEnabled())));
     }
 
     @Test public void savedPlayerCheckboxesAddTheWholeSelectionOnExplicitBottomAction() {

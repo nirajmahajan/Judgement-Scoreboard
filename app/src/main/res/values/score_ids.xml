@@ -10,4 +10,5 @@
     <item name="strategy_bonus" type="id"/><item name="strategy_error" type="id"/><item name="strategy_rules" type="id"/>
     <item name="strategy_examples" type="id"/><item name="strategy_help" type="id"/><item name="strategy_cancel" type="id"/>
     <item name="round_scoring_help" type="id"/><item name="play_again" type="id"/>
+    <item name="delete_saved_players" type="id"/>
 </resources>

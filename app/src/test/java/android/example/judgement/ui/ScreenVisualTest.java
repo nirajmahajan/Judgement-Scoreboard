@@ -327,7 +327,10 @@ public class ScreenVisualTest {
     @Test public void requiredSetupPromptsKeepSixNamesTogether() throws Exception {
         seedEnglishSetup(false); launch(false, false, false); open("PLAYERS", "ROUND");
         showFooter(); activity.findViewById(R.id.primary_action).performClick(); layout();
-        assertEquals("SETUP_DIRECTION", model.screen()); capture("setup_deal_order_320");
+        assertEquals("SETUP_DIRECTION", model.screen());
+        assertEquals("1 card → 8 cards", ((TextView) activity.findViewById(R.id.deal_order_ascending)).getText().toString());
+        assertEquals("8 cards → 1 card", ((TextView) activity.findViewById(R.id.deal_order_descending)).getText().toString());
+        capture("setup_deal_order_320");
         activity.findViewById(R.id.deal_order_descending).performClick();
         await(() -> "SETUP_DEALER".equals(model.screen())); layout();
         RecyclerView list = activity.findViewById(R.id.screen_list);
@@ -347,9 +350,15 @@ public class ScreenVisualTest {
             View row = list.findViewHolderForAdapterPosition(contentOffset(list) + index).itemView;
             row.findViewById(R.id.saved_player_checkbox).performClick(); layout();
         }
+        assertFullyVisible(activity.findViewById(R.id.delete_saved_players));
+        assertTrue(activity.findViewById(R.id.delete_saved_players).isEnabled());
         View add = activity.findViewById(R.id.primary_action);
         assertTrue(add.isEnabled()); assertFullyVisible(add);
         assertEquals(6, contentAdapter(list).getItemCount());
+        View plus = activity.findViewById(R.id.add_saved_player);
+        assertFullyVisible(plus);
+        assertEquals(activity.getString(R.string.add_saved), plus.getContentDescription());
+        assertTrue("Plus stays above the selection action", plus.getBottom() <= list.getHeight());
         assertEquals(0, model.state.getValue().draftPlayers.size());
         capture("saved_players_picker_320");
     }

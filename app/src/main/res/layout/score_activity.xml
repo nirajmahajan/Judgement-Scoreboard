@@ -10,11 +10,19 @@
         android:layout_height="?attr/actionBarSize" app:title="@string/app_name"
         android:background="@color/score_table_header"
         app:titleTextColor="@color/score_table_on_header" app:navigationIconTint="@color/score_table_on_header" />
-    <androidx.recyclerview.widget.RecyclerView android:id="@+id/screen_list"
-        android:layout_width="match_parent" android:layout_height="0dp"
-        android:layout_weight="1" android:clipToPadding="false"
-        android:paddingHorizontal="16dp" android:paddingBottom="16dp"
-        android:scrollbars="vertical" />
+    <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <androidx.recyclerview.widget.RecyclerView android:id="@+id/screen_list"
+            android:layout_width="match_parent" android:layout_height="match_parent"
+            android:clipToPadding="false" android:paddingHorizontal="16dp" android:paddingBottom="16dp"
+            android:scrollbars="vertical" />
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/add_saved_player" android:layout_width="56dp" android:layout_height="56dp"
+            android:layout_gravity="bottom|end" android:layout_margin="16dp"
+            android:contentDescription="@string/add_saved" android:src="@drawable/ic_score_add"
+            android:visibility="gone" app:fabSize="normal" app:useCompatPadding="false"
+            app:backgroundTint="?attr/colorPrimary" app:tint="?attr/colorOnPrimary"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.Score.Circle" />
+    </FrameLayout>
     <LinearLayout android:id="@+id/fixed_actions"
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="horizontal" android:gravity="center_vertical"

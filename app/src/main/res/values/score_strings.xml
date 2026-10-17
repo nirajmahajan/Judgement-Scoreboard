@@ -1,7 +1,7 @@
 <resources>
     <string name="dealer_not_selected">Not selected</string>
-    <string name="start_one_card">1 card → maximum</string>
-    <string name="start_max_cards">Maximum → 1 card</string>
+    <string name="start_one_card">%1$s → %2$s</string>
+    <string name="start_max_cards">%1$s → %2$s</string>
     <string name="choose_deal_order">Choose deal order</string>
     <string name="manage_saved_players">Manage saved players</string>
     <string name="dealer_tag">Dealer</string>
@@ -22,7 +22,7 @@
     <string name="seat_format">Seat %1$d</string><string name="seat_dealer_format">Seat %1$d · Dealer</string>
     <string name="move_announcement">%1$s moved to seat %2$d</string><string name="drag_player">Drag to reorder %1$s</string>
     <string name="choose_dealer">Choose dealer</string><string name="dealer_format">Dealer: %1$s</string>
-    <string name="ascending">Ascending · 1 card to maximum</string><string name="descending">Descending · maximum cards to 1</string>
+    <string name="ascending">Ascending</string><string name="descending">Descending</string>
     <string name="fixed_trump">Cyclic trumps · Spades, Diamonds, Clubs, Hearts</string><string name="custom_trump">Custom trumps</string>
     <string name="direction">Deal direction</string><string name="trump_mode">Trump mode</string><string name="start_game">Start game</string>
     <string name="replace_game_title">Start this game?</string><string name="replace_game_message">This replaces the current game and its scores and history. Saved players stay in your library.</string>
@@ -55,4 +55,13 @@
     <plurals name="score_points"><item quantity="one">%1$d point</item><item quantity="other">%1$d points</item></plurals>
     <plurals name="round_heading"><item quantity="one">Round %1$d · %2$d card</item><item quantity="other">Round %1$d · %2$d cards</item></plurals>
     <plurals name="adjustment_detail"><item quantity="one">%1$d → %2$d point</item><item quantity="other">%1$d → %2$d points</item></plurals>
+    <string name="delete_selected_players">Delete selected saved players</string>
+    <plurals name="delete_saved_players">
+        <item quantity="one">Remove %d saved player?</item>
+        <item quantity="other">Remove %d saved players?</item>
+    </plurals>
+    <plurals name="card_count">
+        <item quantity="one">%d card</item>
+        <item quantity="other">%d cards</item>
+    </plurals>
 </resources>
