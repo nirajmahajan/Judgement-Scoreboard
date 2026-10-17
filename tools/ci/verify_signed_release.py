@@ -50,6 +50,9 @@ def verify():
             or int(manifest.get(android + "versionCode", "0")) <= 2
             or manifest.find("application").get(android + "debuggable", "false") != "false"):
         raise ValueError("APK must be the non-debug production package and matching version")
+    badging = subprocess.check_output([str(signer.with_name("aapt")), "dump", "badging", str(source)], text=True)
+    if "application-label:'Judgement Scoreboard'" not in badging:
+        raise ValueError("Launcher app name must be Judgement Scoreboard")
     output = Path("release")
     output.mkdir(exist_ok=True)
     shutil.copyfile(source, output / "judgement-scoreboard.apk")
@@ -58,6 +61,7 @@ def verify():
     (output / "SHA256SUMS").write_text(f"{digest}  judgement-scoreboard.apk\n")
     (output / "verification.json").write_text(json.dumps({
         "commit": commit, "version": tag, "apkSha256": digest,
+        "applicationLabel": "Judgement Scoreboard",
         "signingCertificateSha256": expected, "payloadMatchesCommitBuild": True,
         "excludedBuildMetadata": ["META-INF/version-control-info.textproto"],
         "productionSigned": True, "installOverOriginal": False,

@@ -235,7 +235,7 @@ public final class MainActivity extends AppCompatActivity {
         boolean game = "GAME".equals(screen);
         navigation.setVisibility(game ? View.VISIBLE : View.GONE);
         toolbar.getMenu().clear();
-        toolbar.setTitle(R.string.app_name);
+        toolbar.setTitle(R.string.toolbar_title);
         if (game) {
             options();
             int tab = "HISTORY".equals(model.tab()) ? R.id.tab_history : "SCOREBOARD".equals(model.tab()) ? R.id.tab_scoreboard : R.id.tab_round;

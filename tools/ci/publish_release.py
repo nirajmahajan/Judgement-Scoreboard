@@ -38,10 +38,13 @@ if new_key:
 - Compact blue interface, saved players, drag ordering, and fast 0/1/2/3 predictions.
 - Scoring strategies, durable game state, editable round history, and cumulative score graph.
 - Repaired scoring, results validation, lifecycle behavior, and large-score/graph layouts.
+- Launcher app name: **Judgement Scoreboard**.
 
 Download **judgement-scoreboard.apk** below. Requires Android 8 or later.
 
 **Installation:** uninstall the original Judgement app first, then install this APK. This release uses a new signing key and cannot update the old installation. Uninstalling removes the old app's local data. Future releases will reuse the new key so they can update v2 normally.
+
+Already using v2.0.0? Install this APK over it to update without uninstalling.
 
 Source commit: `{commit}`
 APK signature, production identity, version, and payload matching the source build were verified by the [release action]({os.environ['EVIDENCE_RUN']}). Checksums and the signing certificate are attached. Physical-device/TalkBack acceptance is not claimed.

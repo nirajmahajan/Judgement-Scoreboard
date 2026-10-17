@@ -56,7 +56,7 @@ def prepare(root, tag, commit, manifest, original_certificate):
 This draft is awaiting an APK signed with the new release key.
 
 - **debug-test.apk** is installable for testing as a separate app. It does **not** update the old Judgement app.
-- **release-unsigned.apk** retains the original package ID, with version code 3. It must be signed before installation. The owner approved a new key; uninstall the original app before installing the new-key release.
+- **release-unsigned.apk** retains the original package ID, with version code {manifest.get(android + 'versionCode')}. It must be signed before installation. The owner approved a new key; uninstall the original app before installing the new-key release.
 - No original signing key, passwords, or private credentials are included.
 
 Source commit: `{commit}`. SHA-256 checksums and packaging evidence are attached.
