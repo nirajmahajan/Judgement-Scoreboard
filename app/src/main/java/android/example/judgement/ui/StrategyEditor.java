@@ -69,6 +69,7 @@ final class StrategyEditor extends RecyclerView.Adapter<StrategyEditor.Holder> {
             android.graphics.Rect rect = new android.graphics.Rect(); target.getDrawingRect(rect);
             if (!(ancestor instanceof RecyclerView)) { target.requestRectangleOnScreen(rect, true); return; }
             RecyclerView list = (RecyclerView) ancestor;
+            list.stopScroll();
             list.offsetDescendantRectToMyCoords(target, rect);
             int top = list.getPaddingTop(), bottom = list.getHeight() - list.getPaddingBottom();
             int distance = rect.bottom > bottom ? rect.bottom - bottom : rect.top < top ? rect.top - top : 0;
