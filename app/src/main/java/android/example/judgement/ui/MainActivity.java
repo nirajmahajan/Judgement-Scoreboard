@@ -89,14 +89,20 @@ public final class MainActivity extends AppCompatActivity {
         }
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         boolean light = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) != android.content.res.Configuration.UI_MODE_NIGHT_YES;
-        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightStatusBars(light);
+        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightStatusBars(false);
         WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightNavigationBars(light);
+        getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
         setContentView(R.layout.score_activity);
         View root = findViewById(R.id.score_root);
         ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
             Insets keyboard = insets.getInsets(WindowInsetsCompat.Type.ime());
-            view.setPadding(bars.left, bars.top, bars.right, Math.max(bars.bottom, keyboard.bottom));
+            view.setPadding(bars.left, 0, bars.right, Math.max(bars.bottom, keyboard.bottom));
+            View statusBackground = view.findViewById(R.id.status_bar_background);
+            if (statusBackground.getLayoutParams().height != bars.top) {
+                android.view.ViewGroup.LayoutParams layout = statusBackground.getLayoutParams();
+                layout.height = bars.top; statusBackground.setLayoutParams(layout);
+            }
             return insets;
         });
         list = findViewById(R.id.screen_list);
@@ -105,6 +111,11 @@ public final class MainActivity extends AppCompatActivity {
         headerAdapter = new ChromeAdapter(R.layout.score_header, this::bindHeader);
         footerAdapter = new ChromeAdapter(R.layout.score_footer, this::bindFooter);
         toolbar = findViewById(R.id.toolbar);
+        android.graphics.drawable.Drawable overflow = toolbar.getOverflowIcon();
+        if (overflow != null) {
+            overflow = overflow.mutate(); overflow.setTint(getColor(R.color.score_table_on_header));
+            toolbar.setOverflowIcon(overflow);
+        }
         navigation = findViewById(R.id.bottom_navigation);
         bidShortcuts = findViewById(R.id.bid_shortcuts);
         adapter = new ScoreAdapter(); setContent(adapter);

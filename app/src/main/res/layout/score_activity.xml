@@ -3,10 +3,13 @@
     android:id="@+id/score_root"
     android:layout_width="match_parent" android:layout_height="match_parent"
     android:orientation="vertical">
+    <View android:id="@+id/status_bar_background" android:layout_width="match_parent"
+        android:layout_height="0dp" android:background="@color/score_table_header" />
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar" android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize" app:title="@string/app_name"
-        app:titleTextColor="?attr/colorOnSurface" app:navigationIconTint="?attr/colorOnSurface" />
+        android:background="@color/score_table_header"
+        app:titleTextColor="@color/score_table_on_header" app:navigationIconTint="@color/score_table_on_header" />
     <androidx.recyclerview.widget.RecyclerView android:id="@+id/screen_list"
         android:layout_width="match_parent" android:layout_height="0dp"
         android:layout_weight="1" android:clipToPadding="false"
