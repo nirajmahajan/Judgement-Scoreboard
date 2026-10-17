@@ -45,6 +45,7 @@ import androidx.test.espresso.Espresso;
 import androidx.test.espresso.UiController;
 import androidx.test.espresso.ViewAction;
 import androidx.test.espresso.contrib.RecyclerViewActions;
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.UiDevice;
@@ -136,7 +137,7 @@ public class FeatureUiRegressionTest {
         assertEquals(Long.valueOf(inspector.snapshot().savedPlayers.get(0).id),
                 inspector.snapshot().draftPlayers.get(1).savedPlayerId);
         completeSetupChoices(); assertScreenStartsAtTop();
-        clickId(R.id.primary_action); awaitView(withId(R.id.bottom_navigation));
+        awaitView(withId(R.id.bottom_navigation));
         option(R.string.new_game);
         awaitState(s -> s.draft != null);
         assertTrue(inspector.snapshot().draftPlayers.isEmpty());
@@ -308,10 +309,9 @@ public class FeatureUiRegressionTest {
         addGamePlayer("New player A"); awaitState(s -> s.draftPlayers.size() == 1);
         addGamePlayer("New player B"); awaitState(s -> s.draftPlayers.size() == 2);
         completeSetupChoices(); assertScreenStartsAtTop();
-        clickId(R.id.primary_action);
         awaitView(withText(R.string.replace_game_title)); clickLabel(R.string.cancel);
         assertUnchangedRound(original);
-        clickId(R.id.primary_action); clickDialogPositive();
+        completeSetupChoices(); clickId(R.id.primary_action);
         awaitState(s -> s.game.id != original.game.id);
         Snapshot replacement = inspector.snapshot();
         assertEquals(2, replacement.players.size());
@@ -329,7 +329,7 @@ public class FeatureUiRegressionTest {
                 "ASCENDING", "FIXED", null));
         launch(); clickLabel(R.string.continue_setup);
         completeSetupChoices(); assertScreenStartsAtTop();
-        clickId(R.id.primary_action); awaitView(withText(R.string.replace_game_title));
+        awaitView(withText(R.string.replace_game_title));
         ScoreViewModel model = activityModel();
         AtomicLong replacementDraft = new AtomicLong();
         model.repository.execute(() -> {
@@ -340,9 +340,10 @@ public class FeatureUiRegressionTest {
         });
         awaitExecutor(model.repository);
         awaitActivityDraft(model, replacementDraft.get());
+        awaitListUpdates();
         Snapshot expected = inspector.snapshot();
         assertEquals(originalDraft, expected.game.id);
-        clickDialogPositive();
+        clickId(R.id.primary_action);
         awaitExecutor(model.repository);
         Snapshot after = inspector.snapshot();
         assertEquals("The old confirmation must keep the independently started game", originalDraft, after.game.id);
@@ -476,6 +477,22 @@ public class FeatureUiRegressionTest {
         fail("Activity did not observe replacement draft " + draftId);
     }
 
+    private void awaitListUpdates() {
+        AtomicReference<Boolean> settled = new AtomicReference<>(false);
+        long deadline = SystemClock.uptimeMillis() + 10_000;
+        do {
+            scenario.onActivity(activity -> {
+                RecyclerView list = activity.findViewById(R.id.screen_list);
+                RecyclerView.ItemAnimator animator = list.getItemAnimator();
+                settled.set(!list.hasPendingAdapterUpdates() && !list.isComputingLayout()
+                        && (animator == null || !animator.isRunning()));
+            });
+            if (settled.get()) return;
+            SystemClock.sleep(20);
+        } while (SystemClock.uptimeMillis() < deadline);
+        fail("RecyclerView snapshot updates did not settle");
+    }
+
     private void launch() {
         scenario = ActivityScenario.launch(MainActivity.class);
         awaitView(withText(R.string.home_title));
@@ -537,7 +554,9 @@ public class FeatureUiRegressionTest {
         List<Records.GamePlayer> players = inspector.snapshot().draftPlayers;
         onView(allOf(withId(R.id.dealer_choice_radio), hasSibling(withText(players.get(players.size() - 1).name))))
                 .perform(click());
-        awaitView(allOf(withId(R.id.screen_title), withText(R.string.setup_settings)));
+        if (inspector.snapshot().game != null && inspector.snapshot().draft != null) {
+            awaitView(allOf(withId(R.id.screen_title), withText(R.string.replace_game_title)));
+        } else awaitView(withId(R.id.bottom_navigation));
     }
     private static ViewAction clickInList(Matcher<View> target) {
         return new ViewAction() {

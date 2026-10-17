@@ -63,16 +63,38 @@ public final class ScoreViewModel extends AndroidViewModel {
         repository.execute(() -> {
             try {
                 command.run();
+                boolean started = dealer && repository.snapshot().game == null;
+                if (started) repository.startGame(draftId);
                 main.post(() -> {
                     submittingForms.remove(token);
                     Long currentOwner = saved.get("setupDraft");
-                    if (currentOwner == null || currentOwner != draftId || !roster.equals(saved.get("setupRoster"))
-                            || !(dealer ? "SETUP_DEALER" : "SETUP_DIRECTION").equals(screen())) return;
+                    if (currentOwner == null || currentOwner != draftId || !roster.equals(saved.get("setupRoster"))) return;
+                    if (!started && !(dealer ? "SETUP_DEALER" : "SETUP_DIRECTION").equals(screen())) return;
                     saved.set(dealer ? "setupConfirmed" : "setupDirectionChosen", true);
-                    screen(dealer ? "SETTINGS" : "SETUP_DEALER");
+                    if (started) tab("ROUND");
+                    screen(started ? "GAME" : dealer ? "CONFIRM_START" : "SETUP_DEALER");
                 });
             } catch (RuntimeException exception) {
                 main.post(() -> { submittingForms.remove(token); error.setValue(exception.getMessage() == null ? "Could not save this choice. Try again." : exception.getMessage()); });
+            }
+        });
+    }
+    Long confirmedSetupDraft() {
+        return Boolean.TRUE.equals(saved.get("setupConfirmed")) ? saved.get("setupDraft") : null;
+    }
+    void startConfirmedSetup(long draftId) {
+        Long owner = confirmedSetupDraft();
+        if (owner == null || owner != draftId) { screen("PLAYERS"); return; }
+        String token = "start:" + draftId;
+        if (!submittingForms.add(token)) return;
+        error.setValue(null);
+        repository.execute(() -> {
+            try {
+                repository.startGame(draftId);
+                main.post(() -> { submittingForms.remove(token); tab("ROUND"); screen("GAME"); });
+            } catch (RuntimeException exception) {
+                main.post(() -> { submittingForms.remove(token); error.setValue(exception.getMessage() == null
+                        ? "Could not start this game. Try again." : exception.getMessage()); });
             }
         });
     }

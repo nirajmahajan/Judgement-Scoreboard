@@ -5,6 +5,7 @@ import android.example.judgement.R;
 import android.example.judgement.data.ScoreDatabase;
 import android.example.judgement.data.ScoreRepository;
 import android.example.judgement.data.Snapshot;
+import android.example.judgement.domain.ScoringStrategy;
 import android.os.SystemClock;
 import android.view.View;
 import androidx.test.core.app.ActivityScenario;
@@ -39,7 +40,7 @@ public final class SetupFlowRegressionTest {
 
     @After public void close() { RepositoryTestCleanup.close(scenario, repository); }
 
-    @Test public void playersNextRequiresDirectionThenExplicitDealerBeforeSettings() {
+    @Test public void startRequiresDirectionThenExplicitDealerAndOpensGame() {
         newGame();
         assertEquals("CUSTOM", repository.snapshot().draft.trumpMode);
         addPlayer("Alice", 1); addPlayer("Ben", 2);
@@ -50,11 +51,34 @@ public final class SetupFlowRegressionTest {
         scenario.recreate();
         awaitView(allOf(withId(R.id.screen_title), withText(R.string.choose_dealer)));
         onView(allOf(withId(R.id.dealer_choice_radio), hasSibling(withText("Ben")))).perform(click());
-        awaitView(allOf(withId(R.id.screen_title), withText(R.string.setup_settings)));
+        awaitView(withId(R.id.bottom_navigation));
+        awaitState(state -> state.game != null && state.draft == null);
         Snapshot state = repository.snapshot();
-        assertEquals("DESCENDING", state.draft.direction);
-        assertEquals(Long.valueOf(state.draftPlayers.get(1).id), state.draft.dealerId);
-        assertEquals("CUSTOM", state.draft.trumpMode);
+        assertEquals("DESCENDING", state.game.direction);
+        assertEquals(Long.valueOf(state.players.get(1).id), state.game.dealerId);
+        assertEquals("CUSTOM", state.game.trumpMode);
+    }
+
+    @Test public void playerStrategyChoicesShowDetailsPersistAndReturnFromCustomEditor() {
+        newGame();
+        onView(withId(R.id.setup_strategy_default)).check(matches(isChecked()));
+        onView(withId(R.id.default_strategy_info)).perform(click());
+        awaitView(withText(org.hamcrest.Matchers.containsString(context.getString(R.string.strategy_default_rules))));
+        androidx.test.espresso.Espresso.pressBack();
+        onView(withId(R.id.setup_strategy_aggressive)).perform(click());
+        awaitState(state -> ScoringStrategy.decode(state.draft.scoringConfig).preset == ScoringStrategy.Preset.AGGRESSIVE);
+        awaitView(allOf(withId(R.id.setup_strategy_aggressive), isChecked()));
+        scenario.recreate();
+        awaitView(allOf(withId(R.id.setup_strategy_aggressive), isChecked()));
+        onView(withId(R.id.create_custom_strategy)).perform(click());
+        awaitView(allOf(withId(R.id.strategy_custom), isChecked()));
+        onView(withId(R.id.strategy_zero)).perform(replaceText("7"), closeSoftKeyboard());
+        clickId(R.id.primary_action);
+        awaitState(state -> ScoringStrategy.decode(state.draft.scoringConfig).preset == ScoringStrategy.Preset.CUSTOM);
+        awaitView(allOf(withId(R.id.screen_title), withText(R.string.setup_players)));
+        assertEquals(7L, ScoringStrategy.decode(repository.snapshot().draft.scoringConfig).zeroReward);
+        onView(withId(R.id.setup_strategy_default)).check(matches(org.hamcrest.Matchers.not(isChecked())));
+        onView(withId(R.id.setup_strategy_aggressive)).check(matches(org.hamcrest.Matchers.not(isChecked())));
     }
 
     @Test public void savedPlayerCheckboxesAddTheWholeSelectionOnExplicitBottomAction() {

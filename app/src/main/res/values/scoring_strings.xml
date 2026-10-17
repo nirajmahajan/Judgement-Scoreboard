@@ -39,4 +39,9 @@
     <string name="strategy_trick_short">Points per trick</string>
     <string name="strategy_cancel_pending">Keeping %1$s cancels the scheduled change. The current round keeps its rules.</string>
     <string name="strategy_unchanged">%1$s is already active. Saving keeps the current rules.</string>
+    <string name="setup_strategy_label">Scoring strategy</string>
+    <string name="create_custom_strategy">Create custom</string>
+    <string name="edit_custom_strategy">Custom · Edit</string>
+    <string name="default_strategy_info">Default scoring details</string>
+    <string name="aggressive_strategy_info">Aggressive scoring details</string>
 </resources>

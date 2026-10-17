@@ -108,13 +108,36 @@ public class ReviewFlowRegressionTest {
         clickFooter(R.id.deal_order_ascending);
         await(() -> "SETUP_DEALER".equals(model.screen())); layout();
         RecyclerView list = activity.findViewById(R.id.screen_list);
-        list.findViewHolderForAdapterPosition(2).itemView.findViewById(R.id.dealer_choice_radio).performClick();
-        await(() -> "SETTINGS".equals(model.screen())); layout();
+        View dealer = list.findViewHolderForAdapterPosition(2).itemView.findViewById(R.id.dealer_choice_radio);
         model.tab("HISTORY");
-        completeAfterRecreation(() -> clickFooter(R.id.primary_action));
+        completeAfterRecreation(dealer::performClick);
         assertNotNull(model.state.getValue().game);
         assertEquals("GAME", field("renderedScreen"));
         assertEquals("ROUND", model.tab());
+    }
+
+    @Test public void replacementWaitsForConfirmationAndStartsAfterRecreation() throws Exception {
+        prepareGame(true, false);
+        worker.submit(() -> {
+            try (ScoreRepository repository = new ScoreRepository(context)) {
+                repository.saveDraft(new DraftSpec(0, Arrays.asList(new PlayerSpec("New A"),
+                        new PlayerSpec("New B")), "ASCENDING", "CUSTOM", null));
+            }
+        }).get(10, TimeUnit.SECONDS);
+        launch(); long originalGame = model.state.getValue().game.id;
+        invoke("open", "PLAYERS"); clickFooter(R.id.primary_action); layout();
+        clickFooter(R.id.deal_order_descending);
+        await(() -> "SETUP_DEALER".equals(model.screen())); layout();
+        RecyclerView list = activity.findViewById(R.id.screen_list);
+        list.findViewHolderForAdapterPosition(2).itemView.findViewById(R.id.dealer_choice_radio).performClick();
+        await(() -> "CONFIRM_START".equals(model.screen())); layout();
+        assertEquals(originalGame, model.state.getValue().game.id);
+        controller.recreate(); activity = controller.get(); layout();
+        assertEquals("CONFIRM_START", field("renderedScreen"));
+        completeAfterRecreation(() -> clickFooter(R.id.primary_action));
+        assertEquals("GAME", field("renderedScreen"));
+        assertNotEquals(originalGame, model.state.getValue().game.id);
+        assertEquals("DESCENDING", model.state.getValue().game.direction);
     }
 
     @Test public void applyingRosterNavigatesTheRecreatedActivity() throws Exception {

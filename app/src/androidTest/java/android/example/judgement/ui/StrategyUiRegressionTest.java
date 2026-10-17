@@ -183,8 +183,8 @@ public final class StrategyUiRegressionTest {
         onView(withId(R.id.screen_list)).perform(findAndClick(org.hamcrest.Matchers.allOf(
                 withId(R.id.dealer_choice_radio), androidx.test.espresso.matcher.ViewMatchers.hasSibling(
                         withText(replay.draftPlayers.get(replay.draftPlayers.size()-1).name)))));
-        await(() -> screen().equals("SETTINGS"));
-        clickId(R.id.primary_action); onView(withText(R.string.cancel)).perform(click());
+        await(() -> screen().equals("CONFIRM_START"));
+        onView(withText(R.string.cancel)).perform(click());
         assertEquals(completed.game.id,repository.snapshot().game.id);
     }
 

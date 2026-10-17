@@ -10,6 +10,7 @@
         android:layout_height="wrap_content" android:paddingHorizontal="4dp"
         android:paddingVertical="8dp" android:textColor="?attr/colorError"
         android:accessibilityLiveRegion="polite" android:visibility="gone" />
+    <include layout="@layout/setup_strategy" />
     <LinearLayout android:id="@+id/table_columns" android:layout_width="match_parent"
         android:layout_height="wrap_content" android:orientation="horizontal"
         android:gravity="center_vertical" android:minHeight="32dp" android:visibility="gone" />

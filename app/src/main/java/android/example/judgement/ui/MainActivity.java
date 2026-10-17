@@ -183,6 +183,7 @@ public final class MainActivity extends AppCompatActivity {
             confirm(R.string.discard_title, R.string.discard_message, R.string.discard, () -> open("GAME"));
         } else if ("SETTINGS".equals(screen) || "SETUP_DIRECTION".equals(screen)) open("PLAYERS");
         else if ("SETUP_DEALER".equals(screen)) open("SETUP_DIRECTION");
+        else if ("CONFIRM_START".equals(screen)) open("PLAYERS");
         else if ("SAVED_MANAGE".equals(screen)) open(savedManageReturn);
         else if ("PICK_DEALER".equals(screen)) open(pickerReturn);
         else if ("QUICK_ADD".equals(screen)) open(pickerReturn);
@@ -224,6 +225,7 @@ public final class MainActivity extends AppCompatActivity {
             case "SETUP_DIRECTION": setupDirection(); break;
             case "SETUP_DEALER": pickDealer(true); break;
             case "SETTINGS": settings(); break;
+            case "CONFIRM_START": confirmStart(); break;
             case "SCORING": scoring(); break;
             case "SCORING_HELP": scoringHelp(); break;
             case "ROUND_DETAILS": roundDetails(); break;
@@ -274,6 +276,11 @@ public final class MainActivity extends AppCompatActivity {
         @Override public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) { bind.accept(holder.itemView); }
     }
     private void bindHeader(View view) {
+        View strategy = view.findViewById(R.id.setup_strategy);
+        boolean choosingPlayers = "PLAYERS".equals(model.screen()) && state.draft != null;
+        strategy.setVisibility(choosingPlayers ? View.VISIBLE : View.GONE);
+        if (choosingPlayers) SetupStrategyHeader.bind(strategy, model, state.draft.id,
+                ScoringStrategy.decode(state.draft.scoringConfig));
         TextView heading = view.findViewById(R.id.screen_title); heading.setText(headingText); ViewCompat.setAccessibilityHeading(heading, true);
         TextView description = view.findViewById(R.id.screen_description); description.setText(descriptionText); description.setVisibility(descriptionText.isEmpty() ? View.GONE : View.VISIBLE);
         TextView error = view.findViewById(R.id.inline_error); error.setText(errorText); error.setVisibility(errorText == null ? View.GONE : View.VISIBLE);
@@ -410,13 +417,16 @@ public final class MainActivity extends AppCompatActivity {
             action(R.string.choose_dealer, View.generateViewId(), () -> { pickerReturn = "MANAGE"; open("PICK_DEALER"); });
             if (!state.inactivePlayers.isEmpty()) action(R.string.restore_players, View.generateViewId(), () -> open("RESTORE"));
             action(R.string.apply, R.id.primary_action, this::applyRoster);
-        } else action(R.string.next_settings, R.id.primary_action, () -> {
+        } else {
+            toolbar.getMenu().add(R.string.setup_settings).setOnMenuItemClickListener(item -> { open("SETTINGS"); return true; });
+            action(R.string.start_game, R.id.primary_action, () -> {
             try {
                 GameRules.validatePlayerCount(state.draftPlayers.size());
                 model.beginSetup(state.draft.id, setupRosterSignature());
             }
             catch (IllegalArgumentException exception) { model.error.setValue(exception.getMessage()); }
-        });
+            });
+        }
     }
     private void editPlayer(boolean manage, PlayerSpec selected) {
         List<PlayerSpec> players = manage ? model.staged() : draftPlayers();
@@ -455,9 +465,16 @@ public final class MainActivity extends AppCompatActivity {
             if (!model.setupConfirmed(draftId, setupRosterSignature())) {
                 model.beginSetup(draftId, setupRosterSignature()); return;
             }
-            Runnable start = () -> model.run(() -> model.repository.startGame(draftId), "GAME", "ROUND");
-            if (state.game != null) confirm(R.string.replace_game_title, R.string.replace_game_message, R.string.start_game, start); else start.run();
+            if (state.game != null) open("CONFIRM_START"); else model.startConfirmedSetup(draftId);
         });
+    }
+    private void confirmStart() {
+        Long draftId = model.confirmedSetupDraft();
+        if (draftId == null) { open("PLAYERS"); return; }
+        header(getString(R.string.replace_game_title), getString(R.string.replace_game_message));
+        rows(new ArrayList<ScoreAdapter.Row>());
+        action(R.string.start_game, R.id.primary_action, () -> model.startConfirmedSetup(draftId));
+        action(R.string.cancel, View.generateViewId(), () -> open("PLAYERS"));
     }
     private void scoring() {
         StrategyRequest request = model.strategyRequest();
@@ -523,7 +540,7 @@ public final class MainActivity extends AppCompatActivity {
         if (("SCORING".equals(screen) || ("SCORING_HELP".equals(screen) && "SCORING".equals(model.scoringHelpReturn()))) && editing != null) {
             if (editing.preset == ScoringStrategy.Preset.AGGRESSIVE) strategy = ScoringStrategy.aggressive();
         } else if ("SCORING_HELP".equals(screen) && model.scoringHelpConfig() != null) strategy = ScoringStrategy.decode(model.scoringHelpConfig());
-        else if (state.draft != null && ("PLAYERS".equals(screen) || "SETTINGS".equals(screen) || "SETUP_DIRECTION".equals(screen) || "SETUP_DEALER".equals(screen)
+        else if (state.draft != null && ("PLAYERS".equals(screen) || "SETTINGS".equals(screen) || "SETUP_DIRECTION".equals(screen) || "SETUP_DEALER".equals(screen) || "CONFIRM_START".equals(screen)
                 || (("PICK_DEALER".equals(screen) || "QUICK_ADD".equals(screen)) && !"MANAGE".equals(pickerReturn)))) {
             strategy = ScoringStrategy.decode(state.draft.scoringConfig);
         } else if (state.game != null && ("GAME".equals(screen) || "MANAGE".equals(screen)
