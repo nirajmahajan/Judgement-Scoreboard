@@ -140,7 +140,8 @@ public class ScoreGraphViewTest {
                 .createAccessibilityNodeInfo(0);
         String description = node.getContentDescription().toString();
         assertTrue(description.contains(fullName));
-        assertTrue(description.contains("prediction 0, Won, earned 10 points"));
+        assertTrue(description.contains("deal 1 card each, 1 hand to be won"));
+        assertTrue(description.contains("prediction 0 hands, Won, earned 10 points"));
         assertFalse(description.contains("actual tricks"));
         Rect bounds = new Rect();
         node.getBoundsInParent(bounds);

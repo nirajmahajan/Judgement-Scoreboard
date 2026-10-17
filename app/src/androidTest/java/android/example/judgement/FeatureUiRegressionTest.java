@@ -217,7 +217,7 @@ public class FeatureUiRegressionTest {
         awaitView(withId(R.id.bottom_navigation));
         assertUnchangedRound(original);
         option(R.string.manage_players); addGamePlayer("Dana");
-        clickId(R.id.primary_action);
+        clickId(R.id.primary_action); confirmCurrentRosterDealer(original);
         awaitView(withText(R.string.restart_title)); clickLabel(R.string.cancel);
         assertUnchangedRound(original);
         awaitRowCount(4);
@@ -245,7 +245,8 @@ public class FeatureUiRegressionTest {
         assertUnchangedRound(original);
         option(R.string.manage_players);
         addStagedSavedPlayer("Reusable at this table");
-        clickId(R.id.primary_action); awaitView(withText(R.string.restart_title));
+        clickId(R.id.primary_action); confirmCurrentRosterDealer(original);
+        awaitView(withText(R.string.restart_title));
         clickDialogPositive();
         awaitState(s -> s.players.size() == 4 && s.savedPlayers.size() == 1);
         Snapshot applied = inspector.snapshot();
@@ -268,7 +269,8 @@ public class FeatureUiRegressionTest {
         assertRowText(3, "Élodie");
         assertUnchangedRound(original);
         assertEquals(1, inspector.snapshot().savedPlayers.size());
-        clickId(R.id.primary_action); clickDialogPositive();
+        clickId(R.id.primary_action); confirmCurrentRosterDealer(original);
+        awaitView(withText(R.string.restart_title)); clickDialogPositive();
         awaitState(s -> s.players.size() == 4);
         Snapshot applied = inspector.snapshot();
         assertEquals("Élodie", applied.players.get(3).name);
@@ -441,7 +443,9 @@ public class FeatureUiRegressionTest {
                     @Override public String getDescription() { return "verify scoring instructions"; }
                     @Override public void perform(UiController controller, View row) {
                         TextView detail = row.findViewById(R.id.row_detail);
-                        assertTrue(detail.getText().toString().contains("three earns 13 points"));
+                        assertTrue(detail.getText().toString().contains("Predict 3 and win 3 → 13 points"));
+                        assertTrue(detail.getText().toString().contains(
+                                "mark Won if the hands a player won matched their prediction, otherwise Lost"));
                     }
                 }));
         pressBack(); awaitView(withText(R.string.home_title));
@@ -549,6 +553,18 @@ public class FeatureUiRegressionTest {
     private static void toggleSaved(String name) {
         onView(allOf(withId(R.id.saved_player_checkbox), hasSibling(withText(name)))).perform(click());
     }
+    private void confirmCurrentRosterDealer(Snapshot original) {
+        awaitView(allOf(withId(R.id.screen_title), withText(R.string.choose_dealer)));
+        String dealer = null;
+        for (Records.GamePlayer player : original.players)
+            if (player.id == original.round.dealerId) dealer = player.name;
+        assertNotNull("The existing dealer stays available for confirmation", dealer);
+        onView(allOf(withId(R.id.dealer_choice_radio), hasSibling(withText(dealer))))
+                .check(matches(isChecked()));
+        assertUnchangedRound(original);
+        clickId(R.id.primary_action);
+    }
+
     private void completeSetupChoices() {
         clickId(R.id.primary_action);
         awaitView(allOf(withId(R.id.screen_title), withText(R.string.choose_deal_order)));

@@ -91,6 +91,50 @@ public class CriticalUiRegressionTest {
         assertNull(inspector.snapshot().roundPlayers.get(2).bid);
     }
 
+    @Test public void predictionKeyboardKeepsNavigationCompactAndPlayerInputReachable() throws Exception {
+        androidx.test.uiautomator.UiDevice device = androidx.test.uiautomator.UiDevice.getInstance(
+                androidx.test.platform.app.InstrumentationRegistry.getInstrumentation());
+        String previous = device.executeShellCommand("settings get secure show_ime_with_hard_keyboard").trim();
+        device.executeShellCommand("settings put secure show_ime_with_hard_keyboard 1");
+        try {
+            seed(8, false, 0); launchGame();
+            int[] navigationHeight = new int[1];
+            scenario.onActivity(activity -> navigationHeight[0] = activity.findViewById(R.id.bottom_navigation).getHeight());
+            onView(allOf(withId(R.id.bid_input), isDisplayed())).perform(replaceText("1"));
+            scenario.onActivity(activity -> {
+                View input = activity.findViewById(R.id.bid_input);
+                input.requestFocus();
+                ((android.view.inputmethod.InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE))
+                        .showSoftInput(input, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            });
+            long deadline = SystemClock.uptimeMillis() + 10000;
+            boolean[] shown = new boolean[1];
+            do {
+                scenario.onActivity(activity -> {
+                    androidx.core.view.WindowInsetsCompat insets = androidx.core.view.ViewCompat.getRootWindowInsets(
+                            activity.findViewById(R.id.score_root));
+                    shown[0] = insets != null && insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime());
+                });
+                if (shown[0]) break;
+                SystemClock.sleep(30);
+            } while (SystemClock.uptimeMillis() < deadline);
+            assertTrue("The real software keyboard is open", shown[0]);
+            onView(withId(R.id.bottom_navigation)).check((view, missing) ->
+                    assertEquals("Keyboard space is reserved once, keeping navigation compact",
+                            navigationHeight[0], view.getHeight()));
+            onView(withId(R.id.screen_list)).check((view, missing) ->
+                    assertTrue("The player list retains room for multiple rows above the keyboard",
+                            view.getHeight() >= Math.round(120 * view.getResources().getDisplayMetrics().density)));
+            onView(allOf(withId(R.id.bid_input), isDisplayed())).check(matches(isDisplayingAtLeast(90)))
+                    .perform(pressImeActionButton());
+            awaitState(state -> Integer.valueOf(1).equals(state.roundPlayers.get(0).bid));
+            onView(allOf(withId(R.id.bid_input), isDisplayed())).check(matches(withText("")));
+        } finally {
+            device.executeShellCommand("settings " + ("null".equals(previous) ? "delete" : "put")
+                    + " secure show_ime_with_hard_keyboard" + ("null".equals(previous) ? "" : " " + previous));
+        }
+    }
+
     @Test public void scrollingEightPlayerResultsFinishFromBottomWithoutVisibleFirstRow() {
         seed(8, true, 0); launchGame();
         for (int player = 0; player < 8; player++) {
@@ -132,7 +176,7 @@ public class CriticalUiRegressionTest {
         onView(withId(R.id.screen_list)).perform(RecyclerViewActions.scrollToPosition(0));
         awaitView(allOf(withId(R.id.screen_title), withText(R.string.history_tab)));
         onView(withId(R.id.screen_list)).perform(RecyclerViewActions.scrollToPosition(26));
-        onView(withText("Round 26 · 26 cards")).check(matches(isDisplayed()));
+        onView(withText("Round 26 · Deal 26 cards")).check(matches(isDisplayed()));
     }
 
     private void launch() {

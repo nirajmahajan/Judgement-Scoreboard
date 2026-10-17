@@ -5,6 +5,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CheckBox;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DiffUtil;
@@ -12,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiConsumer;
+import java.util.function.LongConsumer;
 
 /** A compact selection list. The owning screen keeps the selected profile IDs. */
 final class SavedPlayerPickerAdapter extends RecyclerView.Adapter<SavedPlayerPickerAdapter.Holder> {
@@ -32,9 +34,11 @@ final class SavedPlayerPickerAdapter extends RecyclerView.Adapter<SavedPlayerPic
 
     private final List<Item> items = new ArrayList<>();
     private final BiConsumer<Long, Boolean> selectionChanged;
+    private final LongConsumer remove;
 
-    SavedPlayerPickerAdapter(BiConsumer<Long, Boolean> selectionChanged) {
+    SavedPlayerPickerAdapter(BiConsumer<Long, Boolean> selectionChanged, LongConsumer remove) {
         this.selectionChanged = selectionChanged;
+        this.remove = remove;
         setHasStableIds(true);
     }
 
@@ -69,12 +73,20 @@ final class SavedPlayerPickerAdapter extends RecyclerView.Adapter<SavedPlayerPic
         holder.checkbox.setChecked(item.checked);
         holder.checkbox.setEnabled(item.enabled);
         holder.name.setText(item.name); holder.name.setTooltipText(item.name);
+        holder.name.setEnabled(item.enabled);
+        holder.name.setOnClickListener(view -> holder.checkbox.performClick());
         holder.name.setAlpha(item.enabled ? 1f : 0.5f);
         String description = item.name + (item.disabledReason.isEmpty() ? "" : ", " + item.disabledReason);
         holder.checkbox.setContentDescription(description);
         holder.row.setTooltipText(description);
         holder.row.setEnabled(item.enabled);
         holder.row.setOnClickListener(view -> holder.checkbox.performClick());
+        holder.remove.setEnabled(true);
+        holder.remove.setContentDescription(holder.itemView.getContext().getString(R.string.remove_saved_player, item.name));
+        holder.remove.setOnClickListener(view -> {
+            int current = holder.getBindingAdapterPosition();
+            if (current != RecyclerView.NO_POSITION) remove.accept(items.get(current).id);
+        });
         holder.checkbox.setOnCheckedChangeListener((checkbox, checked) -> {
             int current = holder.getBindingAdapterPosition();
             if (!item.enabled || current == RecyclerView.NO_POSITION || items.get(current).id != item.id) return;
@@ -88,11 +100,13 @@ final class SavedPlayerPickerAdapter extends RecyclerView.Adapter<SavedPlayerPic
     static final class Holder extends RecyclerView.ViewHolder {
         final View row;
         final CheckBox checkbox;
+        final ImageButton remove;
         final TextView name;
         Holder(View view) {
             super(view);
             row = view.findViewById(R.id.saved_player_picker_body);
             checkbox = view.findViewById(R.id.saved_player_checkbox);
+            remove = view.findViewById(R.id.delete_saved_player);
             name = view.findViewById(R.id.row_name);
         }
     }

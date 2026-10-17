@@ -121,6 +121,10 @@ public final class MainActivity extends AppCompatActivity {
             toolbar.setOverflowIcon(overflow);
         }
         navigation = findViewById(R.id.bottom_navigation);
+        // The root owns system-bar and keyboard space. Material's legacy inset listener
+        // otherwise adds the keyboard height to the navigation bar a second time.
+        ViewCompat.setOnApplyWindowInsetsListener(navigation, (view, insets) -> insets);
+        navigation.setPaddingRelative(0, 0, 0, 0);
         fixedActions = findViewById(R.id.fixed_actions);
         adapter = new ScoreAdapter(); setContent(adapter);
         model = new ViewModelProvider(this).get(ScoreViewModel.class);
@@ -139,7 +143,14 @@ public final class MainActivity extends AppCompatActivity {
             @Override public void handleOnBackPressed() { back(); }
         });
         model.bidSubmitted.observe(this, roundId -> { if (state != null) render(); });
-        model.state.observe(this, snapshot -> { state = snapshot; render(); restoreForm(model.form()); });
+        model.state.observe(this, snapshot -> {
+            Snapshot previous = state;
+            state = snapshot;
+            if (canUpdateResultSelections(previous))
+                outcomes.submit(state.round.id, state.round.dealerId, state.roundPlayers);
+            else render();
+            restoreForm(model.form());
+        });
         model.screenState().observe(this, screen -> { if (state != null) render(); });
         model.strategyState().observe(this, request -> { if (state != null) render(); });
         model.roundEditorState().observe(this, request -> {
@@ -209,6 +220,19 @@ public final class MainActivity extends AppCompatActivity {
         else if ("PICK_SCORE".equals(screen)) open("GAME");
         else if ("HOME".equals(screen)) finish();
         else open("HOME");
+    }
+    /** Persisted radio changes update their rows without rebuilding the screen chrome. */
+    private boolean canUpdateResultSelections(Snapshot previous) {
+        if (previous == null || state == null || outcomes == null || contentAdapter != outcomes
+                || !"GAME".equals(model.screen()) || !"ROUND".equals(model.tab())
+                || previous.game == null || state.game == null || previous.game.id != state.game.id
+                || !"ACTIVE".equals(state.game.status) || previous.round == null || state.round == null)
+            return false;
+        Records.Round old = previous.round, current = state.round;
+        return "RESULTS".equals(old.phase) && "RESULTS".equals(current.phase)
+                && old.id == current.id && old.number == current.number && old.cards == current.cards
+                && old.dealerId == current.dealerId && old.scoringConfig.equals(current.scoringConfig)
+                && previous.game.trumpMode.equals(state.game.trumpMode);
     }
     private void render() {
         if (state == null || changingAppearance) return;
@@ -638,22 +662,23 @@ public final class MainActivity extends AppCompatActivity {
         for (PlayerSpec player : players) owner.append(':').append(player.id);
         String choiceOwner = owner.toString();
         Long selected = model.pendingDealer(choiceOwner, initial);
-        setContent(new DealerChoiceAdapter(players, selected, playerId -> {
-            model.selectDealer(choiceOwner, playerId); render();
-        }));
         boolean valid = false;
         for (PlayerSpec player : players) if (selected != null && player.id == selected) valid = true;
         fixedActions.removeAllViews(); fixedActions.setVisibility(View.VISIBLE);
         MaterialButton confirm = new MaterialButton(this);
         confirm.setId(R.id.primary_action); confirm.setText(R.string.confirm_dealer); confirm.setEnabled(valid);
+        setContent(new DealerChoiceAdapter(players, selected, playerId -> {
+            model.selectDealer(choiceOwner, playerId); confirm.setEnabled(true);
+        }));
         confirm.setOnClickListener(view -> {
+            Long confirmed = model.pendingDealer(choiceOwner, initial);
             if (manage) {
                 boolean applying = "CONFIRM_ROSTER_DEALER".equals(model.screen());
-                model.stagedDealer(selected); model.confirmStagedDealer(); open("MANAGE");
+                model.stagedDealer(confirmed); model.confirmStagedDealer(); open("MANAGE");
                 if (applying) applyRoster();
             }
-            else if (required) model.chooseSetupDealer(draftId, signature, selected);
-            else model.run(() -> model.repository.chooseDraftDealer(draftId, selected), "SETTINGS");
+            else if (required) model.chooseSetupDealer(draftId, signature, confirmed);
+            else model.run(() -> model.repository.chooseDraftDealer(draftId, confirmed), "SETTINGS");
         });
         fixedActions.addView(confirm, new LinearLayout.LayoutParams(-1, dp(56)));
     }
@@ -976,24 +1001,6 @@ public final class MainActivity extends AppCompatActivity {
                     canAdd ? "" : getString(present ? R.string.already_added : R.string.name_conflict)));
         }
         selectedProfiles.retainAll(eligible);
-        android.view.MenuItem delete = toolbar.getMenu().add(android.view.Menu.NONE,
-                R.id.delete_saved_players, 0, R.string.delete_selected_players);
-        android.graphics.drawable.Drawable bin = androidx.appcompat.content.res.AppCompatResources
-                .getDrawable(this, R.drawable.ic_roster_remove).mutate();
-        bin.setTint(getColor(R.color.score_table_on_header));
-        bin.setAlpha(selectedProfiles.isEmpty() ? 96 : 255);
-        delete.setIcon(bin).setEnabled(!selectedProfiles.isEmpty())
-                .setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_ALWAYS);
-        delete.setOnMenuItemClickListener(item -> {
-            List<Long> selected = new ArrayList<>(selectedProfiles);
-            new MaterialAlertDialogBuilder(this).setTitle(getResources().getQuantityString(
-                    R.plurals.delete_saved_players, selected.size(), selected.size()))
-                    .setMessage(R.string.delete_profile_message)
-                    .setPositiveButton(R.string.remove, (dialog, which) -> model.run(
-                            () -> model.repository.removeSavedPlayers(selected)))
-                    .setNegativeButton(R.string.cancel, null).show();
-            return true;
-        });
         toolbar.getMenu().add(android.view.Menu.NONE, R.id.search_saved_action, 0, R.string.search_saved)
                 .setOnMenuItemClickListener(item -> {
                     model.beginForm(new FormRequest(FormRequest.Kind.SEARCH, search, false, 0, 0, 0, 0, 0)); return true;
@@ -1024,10 +1031,9 @@ public final class MainActivity extends AppCompatActivity {
         fixedActions.addView(add, new LinearLayout.LayoutParams(-1, dp(56)));
         SavedPlayerPickerAdapter pickerAdapter = new SavedPlayerPickerAdapter((profileId, checked) -> {
             if (checked) selectedProfiles.add(profileId); else selectedProfiles.remove(profileId);
-            bin.setAlpha(selectedProfiles.isEmpty() ? 96 : 255);
-            delete.setEnabled(!selectedProfiles.isEmpty());
             add.setEnabled(!selectedProfiles.isEmpty() && addable.containsAll(selectedProfiles));
-        });
+        }, profileId -> confirm(R.string.delete_profile_title, R.string.delete_profile_message,
+                R.string.remove, () -> model.run(() -> model.repository.removeSavedPlayer(profileId))));
         pickerAdapter.submit(items); setContent(pickerAdapter);
     }
     private void manageSavedPlayers() {

@@ -28,7 +28,7 @@ public final class GameRules {
 
     public static void validateCards(int cards, int playerCount) {
         if (cards < 1 || cards > maximumCards(playerCount)) {
-            throw new IllegalArgumentException("There are not enough cards for this hand and roster.");
+            throw new IllegalArgumentException("There are not enough cards for this round and player count.");
         }
     }
 
@@ -43,7 +43,7 @@ public final class GameRules {
         requireDirection(direction);
         int maximum = maximumCards(playerCount);
         if (roundOrdinal < 1 || roundOrdinal > maximum) {
-            throw new IllegalArgumentException("This round is outside the game's hand sequence.");
+            throw new IllegalArgumentException("This round is outside the game’s round sequence.");
         }
         return direction == Direction.ASCENDING ? roundOrdinal : maximum - roundOrdinal + 1;
     }
@@ -203,7 +203,7 @@ public final class GameRules {
         }
         if (losers.isEmpty()) {
             return "At least one player must Lose\n(Players marked Won sum to "
-                    + handCount(wonTotal) + "; this deal has " + cards + ".)";
+                    + handCount(wonTotal) + "; this round has " + handCount(cards) + ".)";
         }
         if (losers.size() == 1) {
             return names[onlyLoser] + " cannot Lose\n(The remaining " + handCount(remaining)
@@ -293,7 +293,7 @@ public final class GameRules {
             }
         }
         if (total == cards) {
-            throw new IllegalArgumentException("The dealer's prediction cannot make total predictions equal the cards dealt.");
+            throw new IllegalArgumentException("The dealer’s prediction cannot make total predictions equal the hands available.");
         }
     }
 

@@ -124,7 +124,7 @@ public final class SetupFlowRegressionTest {
         assertEquals("Charlotte", repository.snapshot().draftPlayers.get(0).name);
     }
 
-    @Test public void savedPlayerBinDeletesSelectionAndPreservesExistingRoster() {
+    @Test public void savedPlayerRowDeletePreservesExistingRosterAndCanBeCancelled() {
         long alice = repository.addSavedPlayer("Alice"); repository.addSavedPlayer("Ben");
         repository.saveDraft(new android.example.judgement.data.DraftSpec(0, java.util.Arrays.asList(
                 new android.example.judgement.data.PlayerSpec(0, "Alice", alice),
@@ -137,13 +137,14 @@ public final class SetupFlowRegressionTest {
         awaitState(state -> state.draft != null);
         awaitView(allOf(withId(R.id.screen_title), withText(R.string.setup_players)));
         clickId(R.id.quick_add);
-        onView(withId(R.id.delete_saved_players)).check(matches(org.hamcrest.Matchers.not(isEnabled())));
-        onView(allOf(withId(R.id.saved_player_checkbox), hasSibling(withText("Alice")))).perform(click());
-        onView(allOf(withId(R.id.saved_player_checkbox), hasSibling(withText("Ben")))).perform(click());
-        onView(withId(R.id.delete_saved_players)).perform(click());
+        onView(withId(R.id.delete_saved_players)).check(androidx.test.espresso.assertion.ViewAssertions.doesNotExist());
+        onView(allOf(withId(R.id.delete_saved_player), hasSibling(withText("Alice")))).perform(click());
         onView(withText(R.string.cancel)).perform(click());
         assertEquals(2, repository.snapshot().savedPlayers.size());
-        onView(withId(R.id.delete_saved_players)).perform(click());
+        onView(allOf(withId(R.id.delete_saved_player), hasSibling(withText("Alice")))).perform(click());
+        onView(withId(android.R.id.button1)).perform(click());
+        awaitState(state -> state.savedPlayers.size() == 1);
+        onView(allOf(withId(R.id.delete_saved_player), hasSibling(withText("Ben")))).perform(click());
         onView(withId(android.R.id.button1)).perform(click());
         awaitState(state -> state.savedPlayers.isEmpty());
         assertEquals(participantId, repository.snapshot().players.get(0).id);

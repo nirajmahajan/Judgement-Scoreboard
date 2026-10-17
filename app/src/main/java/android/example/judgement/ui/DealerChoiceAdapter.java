@@ -14,7 +14,7 @@ import java.util.function.LongConsumer;
 
 final class DealerChoiceAdapter extends RecyclerView.Adapter<DealerChoiceAdapter.Holder> {
     private final List<PlayerSpec> players;
-    private final Long selected;
+    private Long selected;
     private final LongConsumer choose;
     DealerChoiceAdapter(List<PlayerSpec> players, Long selected, LongConsumer choose) {
         this.players = players; this.selected = selected; this.choose = choose; setHasStableIds(true);
@@ -29,8 +29,21 @@ final class DealerChoiceAdapter extends RecyclerView.Adapter<DealerChoiceAdapter
         holder.name.setText(player.name); holder.name.setTooltipText(player.name);
         holder.radio.setChecked(selected != null && selected == player.id);
         holder.radio.setContentDescription(player.name);
-        holder.radio.setOnClickListener(view -> choose.accept(player.id));
+        holder.radio.setOnClickListener(view -> {
+            Long previous = selected;
+            selected = player.id;
+            for (int i = 0; i < players.size(); i++) {
+                long id = players.get(i).id;
+                if ((previous != null && id == previous) || id == player.id)
+                    notifyItemChanged(i, Boolean.TRUE);
+            }
+            choose.accept(player.id);
+        });
         holder.itemView.setOnClickListener(view -> holder.radio.performClick());
+        holder.name.setOnClickListener(view -> holder.radio.performClick());
+    }
+    @Override public void onBindViewHolder(@NonNull Holder holder, int position, @NonNull List<Object> payloads) {
+        onBindViewHolder(holder, position);
     }
     static final class Holder extends RecyclerView.ViewHolder {
         final TextView name; final RadioButton radio;

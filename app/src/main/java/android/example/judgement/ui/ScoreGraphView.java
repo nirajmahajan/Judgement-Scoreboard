@@ -455,7 +455,10 @@ public final class ScoreGraphView extends View {
                     .append(event.adjustment.delta).append(" points.");
         } else {
             description.append("Round ").append(event.round.number).append(", ")
-                    .append(event.round.cards).append(" cards, ")
+                    .append("deal ").append(event.round.cards)
+                    .append(event.round.cards == 1 ? " card each, " : " cards each, ")
+                    .append(event.round.cards)
+                    .append(event.round.cards == 1 ? " hand to be won, " : " hands to be won, ")
                     .append(strategyName(event.round)).append(" scoring.");
             if (event.round.strategyChanged) description.append(" Strategy changed here.");
         }
@@ -467,7 +470,8 @@ public final class ScoreGraphView extends View {
                 if (performance == null) {
                     description.append("did not participate");
                 } else {
-                    description.append("prediction ").append(performance.bid).append(", ")
+                    description.append("prediction ").append(performance.bid)
+                            .append(performance.bid == 1 ? " hand, " : " hands, ")
                             .append(performance.outcome == Outcome.WON ? "Won" : "Lost")
                             .append(", earned ").append(performance.points).append(" points");
                 }

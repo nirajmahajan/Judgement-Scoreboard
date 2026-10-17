@@ -232,7 +232,7 @@ public class GameRulesTest {
 
         String unaccounted = GameRules.outcomeConflict(3, new int[] {1, 1, 0},
                 new Outcome[] {Outcome.WON, Outcome.WON, Outcome.WON}, names);
-        assertEquals("At least one player must Lose\n(Players marked Won sum to 2 hands; this deal has 3.)", unaccounted);
+        assertEquals("At least one player must Lose\n(Players marked Won sum to 2 hands; this round has 3 hands.)", unaccounted);
 
         String oneLeft = GameRules.outcomeConflict(1, new int[] {1, 1, 0},
                 new Outcome[] {Outcome.LOST, Outcome.LOST, Outcome.WON}, names);

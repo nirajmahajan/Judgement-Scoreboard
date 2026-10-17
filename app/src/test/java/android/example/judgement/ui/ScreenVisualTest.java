@@ -555,8 +555,13 @@ public class ScreenVisualTest {
             View row = list.findViewHolderForAdapterPosition(contentOffset(list) + index).itemView;
             row.findViewById(R.id.saved_player_checkbox).performClick(); layout();
         }
-        assertFullyVisible(activity.findViewById(R.id.delete_saved_players));
-        assertTrue(activity.findViewById(R.id.delete_saved_players).isEnabled());
+        assertNull(activity.findViewById(R.id.delete_saved_players));
+        for (int index = 0; index < 6; index++) {
+            View remove = list.findViewHolderForAdapterPosition(contentOffset(list) + index)
+                    .itemView.findViewById(R.id.delete_saved_player);
+            assertTrue(remove.isEnabled()); assertFullyVisible(remove);
+            assertEquals(dp(48), remove.getWidth()); assertEquals(dp(48), remove.getHeight());
+        }
         View add = activity.findViewById(R.id.primary_action);
         assertTrue(add.isEnabled()); assertFullyVisible(add);
         assertEquals(6, contentAdapter(list).getItemCount());
@@ -587,23 +592,23 @@ public class ScreenVisualTest {
             android.widget.CheckBox checkbox = row.findViewById(R.id.saved_player_checkbox);
             long selectedId = content.getItemId(13);
             View add = activity.findViewById(R.id.primary_action);
-            android.view.MenuItem delete = ((com.google.android.material.appbar.MaterialToolbar)
-                    activity.findViewById(R.id.toolbar)).getMenu().findItem(R.id.delete_saved_players);
+            View delete = row.findViewById(R.id.delete_saved_player);
+            assertNull(((com.google.android.material.appbar.MaterialToolbar)
+                    activity.findViewById(R.id.toolbar)).getMenu().findItem(R.id.delete_saved_players));
             int first = manager.findFirstVisibleItemPosition();
             int top = manager.findViewByPosition(first).getTop();
-            assertFalse(add.isEnabled()); assertFalse(delete.isEnabled());
+            assertFalse(add.isEnabled()); assertTrue(delete.isEnabled());
             checkbox.performClick(); layout();
             assertTrue(checkbox.isChecked()); assertTrue(add.isEnabled()); assertTrue(delete.isEnabled());
             assertSame("Selection never replaces the list", outer, list.getAdapter());
             assertSame("Selection never replaces player rows", row, list.findViewHolderForAdapterPosition(target).itemView);
             assertSame("Selection never replaces the Add action", add, activity.findViewById(R.id.primary_action));
-            assertSame("Selection never rebuilds the toolbar", delete,
-                    ((com.google.android.material.appbar.MaterialToolbar) activity.findViewById(R.id.toolbar))
-                            .getMenu().findItem(R.id.delete_saved_players));
+            assertSame("Selection never replaces a row delete action", delete,
+                    row.findViewById(R.id.delete_saved_player));
             assertEquals(first, manager.findFirstVisibleItemPosition());
             assertEquals(top, manager.findViewByPosition(first).getTop());
             row.findViewById(R.id.saved_player_picker_body).performClick(); layout();
-            assertFalse(checkbox.isChecked()); assertFalse(add.isEnabled()); assertFalse(delete.isEnabled());
+            assertFalse(checkbox.isChecked()); assertFalse(add.isEnabled()); assertTrue(delete.isEnabled());
             checkbox.performClick(); layout();
             scrollTo(0); scrollTo(25); scrollTo(13);
             checkbox = list.findViewHolderForAdapterPosition(target).itemView.findViewById(R.id.saved_player_checkbox);

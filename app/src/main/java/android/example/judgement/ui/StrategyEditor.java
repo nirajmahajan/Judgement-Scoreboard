@@ -68,21 +68,30 @@ final class StrategyEditor extends RecyclerView.Adapter<StrategyEditor.Holder> {
             if (bound.fields[i].getError() != null) {
                 bound.inputs[i].requestFocus();
                 View error = bound.fields[i].findViewById(com.google.android.material.R.id.textinput_error);
-                revealAfterLayout(error == null ? bound.fields[i] : error); return;
+                revealAfterLayout(bound.fields[i], error == null ? bound.fields[i] : error); return;
             }
         }
         revealAfterLayout(bound.error);
     }
     private static void revealAfterLayout(View target) {
-        androidx.core.view.OneShotPreDrawListener.add(target, () -> target.post(() -> {
-            android.view.ViewParent ancestor = target.getParent();
+        revealAfterLayout(target, target);
+    }
+    private static void revealAfterLayout(View field, View error) {
+        androidx.core.view.OneShotPreDrawListener.add(field, () -> field.post(() -> {
+            android.view.ViewParent ancestor = field.getParent();
             while (ancestor != null && !(ancestor instanceof RecyclerView)) ancestor = ancestor.getParent();
-            android.graphics.Rect rect = new android.graphics.Rect(); target.getDrawingRect(rect);
-            if (!(ancestor instanceof RecyclerView)) { target.requestRectangleOnScreen(rect, true); return; }
+            if (!(ancestor instanceof RecyclerView)) {
+                android.graphics.Rect rect = new android.graphics.Rect(); field.getDrawingRect(rect);
+                field.requestRectangleOnScreen(rect, true); return;
+            }
             RecyclerView list = (RecyclerView) ancestor;
             list.stopScroll();
-            list.offsetDescendantRectToMyCoords(target, rect);
             int top = list.getPaddingTop(), bottom = list.getHeight() - list.getPaddingBottom();
+            // Keep the floating label, entered value and error together whenever they fit.
+            // On a short viewport, the error remains the priority rather than being hidden.
+            View target = field.getHeight() <= bottom - top ? field : error;
+            android.graphics.Rect rect = new android.graphics.Rect(); target.getDrawingRect(rect);
+            list.offsetDescendantRectToMyCoords(target, rect);
             int distance = rect.bottom > bottom ? rect.bottom - bottom : rect.top < top ? rect.top - top : 0;
             if (distance != 0) list.scrollBy(0, distance);
         }));

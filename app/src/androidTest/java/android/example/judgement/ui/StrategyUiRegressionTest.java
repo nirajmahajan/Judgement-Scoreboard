@@ -112,6 +112,50 @@ public final class StrategyUiRegressionTest {
         await(() -> screen().equals("SETTINGS"));
     }
 
+    @Test public void scrolledCustomValidationRevealsWholeInvalidFieldAndRetainsInput() {
+        seed(false, ScoringStrategy.defaults()); launch("SETTINGS");
+        clickText(R.string.choose_scoring); clickId(R.id.strategy_custom);
+        String invalid = "999999999999999999999999999";
+        enter(R.id.strategy_zero, invalid);
+        onView(withId(R.id.screen_list)).perform(new ViewAction() {
+            @Override public Matcher<View> getConstraints() { return isAssignableFrom(RecyclerView.class); }
+            @Override public String getDescription() { return "scroll to the scoring Save action below all examples"; }
+            @Override public void perform(UiController controller, View view) {
+                RecyclerView list = (RecyclerView) view;
+                list.scrollToPosition(list.getAdapter().getItemCount() - 1);
+                controller.loopMainThreadUntilIdle();
+            }
+        });
+        clickId(R.id.primary_action);
+        await(() -> current() != null && current().error != null);
+        onView(withId(R.id.strategy_zero)).check((view, missing) -> {
+            assertNotNull(view);
+            assertEquals(invalid, ((TextView) view).getText().toString());
+            View field = (View) view.getParent();
+            while (!(field instanceof com.google.android.material.textfield.TextInputLayout))
+                field = (View) field.getParent();
+            View list = (View) field.getParent();
+            while (!(list instanceof RecyclerView)) list = (View) list.getParent();
+            assertTrue("This normal-font fixture has room for the complete invalid field",
+                    field.getHeight() <= list.getHeight() - list.getPaddingTop() - list.getPaddingBottom());
+            int[] fieldPosition = new int[2], listPosition = new int[2];
+            field.getLocationOnScreen(fieldPosition); list.getLocationOnScreen(listPosition);
+            assertTrue("The field top and floating label stay below the toolbar",
+                    fieldPosition[1] >= listPosition[1] + list.getPaddingTop());
+            assertTrue("The complete field and inline error fit above the list bottom",
+                    fieldPosition[1] + field.getHeight() <= listPosition[1] + list.getHeight() - list.getPaddingBottom());
+            Rect visible = new Rect();
+            assertTrue(field.getGlobalVisibleRect(visible));
+            assertEquals("The whole invalid field is visible", field.getHeight(), visible.height());
+            View error = field.findViewById(com.google.android.material.R.id.textinput_error);
+            assertNotNull(error);
+            assertTrue("The inline validation error is visible without another user scroll",
+                    androidx.test.espresso.matcher.ViewMatchers.isDisplayingAtLeast(100).matches(error));
+        });
+        assertEquals(invalid, current().zero);
+        assertEquals(ScoringStrategy.defaults().encode(), repository.snapshot().draft.scoringConfig);
+    }
+
     @Test public void strategyChangesImmediatelyBeforeBidsAndChangesAppearanceOnlyWhenPendingBecomesActive() {
         seed(true,ScoringStrategy.defaults()); launch("GAME");
         option(R.string.change_scoring); clickId(R.id.strategy_aggressive); clickId(R.id.primary_action);
@@ -167,7 +211,8 @@ public final class StrategyUiRegressionTest {
         completeRound(); Snapshot completed=repository.snapshot();
         assertEquals("COMPLETE",completed.game.status);
         launch("GAME");
-        assertTrue(text(R.id.screen_description).contains("game ended"));
+        assertEquals(context.getString(R.string.game_complete), text(R.id.screen_title));
+        assertEquals("", text(R.id.screen_description));
         clickId(R.id.play_again);
         await(() -> repository.snapshot().draft!=null && screen().equals("PLAYERS"));
         Snapshot replay=repository.snapshot();
@@ -317,8 +362,8 @@ public final class StrategyUiRegressionTest {
             scenario.onActivity(activity -> {
                 com.google.android.material.appbar.MaterialToolbar toolbar=activity.findViewById(R.id.toolbar);
                 assertNotNull(toolbar.getNavigationIconTint());
-                assertTrue("The back control contrasts with the light surface",androidx.core.graphics.ColorUtils.calculateContrast(
-                        toolbar.getNavigationIconTint(),MaterialColors.getColor(toolbar,com.google.android.material.R.attr.colorSurface))>=4.5);
+                assertTrue("The back control contrasts with the dark header",androidx.core.graphics.ColorUtils.calculateContrast(
+                        toolbar.getNavigationIconTint(), activity.getColor(R.color.score_table_header))>=4.5);
             });
             device.executeShellCommand("mkdir -p /sdcard/judgement-test-evidence");
             device.executeShellCommand("screencap -p /sdcard/judgement-test-evidence/strategy-judgement-plus-light-320-font200.png");
@@ -572,7 +617,7 @@ public final class StrategyUiRegressionTest {
         catch (androidx.test.espresso.NoMatchingViewException missing) {
             onView(withId(R.id.screen_list)).perform(findAndClick(withId(id))); return;
         }
-        onView(visible).perform(click());
+        onView(visible).perform(reveal(), click());
     }
     private void clickText(int label) { onView(withId(R.id.screen_list)).perform(findAndClick(withText(label))); }
     private static ViewAction findAndClick(Matcher<View> target) {

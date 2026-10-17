@@ -22,3 +22,6 @@
 
 __pycache__/
 *.pyc
+
+# Ephemeral APK v4 signature sidecars created during local installation.
+*.idsig

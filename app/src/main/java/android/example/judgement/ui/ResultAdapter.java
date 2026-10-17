@@ -10,6 +10,8 @@ import android.widget.RadioGroup;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.DiffUtil;
+import java.util.Objects;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,8 +23,24 @@ final class ResultAdapter extends RecyclerView.Adapter<ResultAdapter.Holder> {
 
     ResultAdapter(ScoreViewModel model) { this.model = model; setHasStableIds(true); }
     void submit(long roundId, long dealerId, List<Records.RoundPlayer> players) {
+        List<Records.RoundPlayer> previous = new ArrayList<>(this.players);
+        boolean sameRound = this.roundId == roundId && this.dealerId == dealerId;
+        DiffUtil.DiffResult changes = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+            @Override public int getOldListSize() { return previous.size(); }
+            @Override public int getNewListSize() { return players.size(); }
+            @Override public boolean areItemsTheSame(int before, int after) {
+                return sameRound && previous.get(before).playerId == players.get(after).playerId;
+            }
+            @Override public boolean areContentsTheSame(int before, int after) {
+                Records.RoundPlayer old = previous.get(before), current = players.get(after);
+                return old.nameSnapshot.equals(current.nameSnapshot) && Objects.equals(old.bid, current.bid)
+                        && Objects.equals(old.outcome, current.outcome);
+            }
+            @Override public Object getChangePayload(int before, int after) { return Boolean.TRUE; }
+        });
         this.roundId = roundId; this.dealerId = dealerId;
-        this.players.clear(); this.players.addAll(players); notifyDataSetChanged();
+        this.players.clear(); this.players.addAll(players);
+        changes.dispatchUpdatesTo(this);
     }
     @Override public long getItemId(int position) { return players.get(position).playerId; }
     @Override public int getItemCount() { return players.size(); }
@@ -49,6 +67,9 @@ final class ResultAdapter extends RecyclerView.Adapter<ResultAdapter.Holder> {
             Outcome outcome = selected == R.id.result_won ? Outcome.WON : Outcome.LOST;
             model.run(() -> model.repository.setOutcome(owner, player.playerId, outcome));
         });
+    }
+    @Override public void onBindViewHolder(@NonNull Holder holder, int position, @NonNull List<Object> payloads) {
+        onBindViewHolder(holder, position);
     }
     static final class Holder extends RecyclerView.ViewHolder {
         final TextView name, prediction;

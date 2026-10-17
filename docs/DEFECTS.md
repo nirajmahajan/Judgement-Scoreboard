@@ -49,14 +49,24 @@ The named tests below exercise the repaired behavior. JVM tests are under `app/s
 | D35 | Opening a new screen inherits the previous screen's scroll anchor and hides its heading | Reset the list anchor on screen changes; setup navigation regressions |
 | D36 | Device tests delete the shared database before queued connection closure finishes | Await Activity and inspector repository shutdown during test cleanup; complete device suites exercise isolated fixtures |
 
+## UX pass for v2.0.3
+
+| ID | Confirmed defect | Repair and regression |
+|---|---|---|
+| D37 | Saved-player names ignore taps although their checkbox works | Forward name taps to the checkbox; `savedCheckboxAndRowTapsKeepRowsScrollAndActionsStableThroughRecyclingAndRotation` |
+| D38 | Choosing a dealer replaces the list, rows and confirmation control | Update only selected rows and read the latest staged choice at Confirm; `dealerRadioAndRowTapsKeepRowsScrollAndConfirmationStableUntilConfirmed` |
+| D39 | Result radio changes reset the list and rebuild Finish round | Diff persisted rows and retain screen controls; `resultRadioTapsKeepRowsScrollAndFinishStableAndPersistAcrossTabsAndRotation` |
+| D40 | Scrolled custom-scoring validation clips the invalid field and floating label | Reveal the complete field when it fits, prioritizing its error in short viewports; `scrolledCustomValidationRevealsWholeInvalidFieldAndRetainsInput` |
+| D41 | Prediction keyboard space is applied twice, collapsing the player list | Let the root own keyboard/system-bar space; `predictionKeyboardKeepsNavigationCompactAndPlayerInputReachable` |
+
+Saved players now have independent per-row delete buttons, including already-added names. `deletingAlreadyAddedSavedProfileLeavesGameParticipantScoresAndDraftUntouched` verifies cancellation/deletion and preservation of participant identity, score, round and draft. The global delete control was removed. User-facing copy consistently uses rounds, cards, hands and predictions.
+
 ## Accepted legacy limitation
 
 A malformed v1 database with mixed-case reserved table names such as `Game_Players` can fail recovery. The owner chose fresh installation over further migration edge-case work. The implemented and tested original 4/6/7-column recovery paths remain available.
 
 ## Delivery gates
 
-Production signing requires the original private signing key. Its certificate SHA-256 is `93:E3:66:B9:3C:CD:1C:53:1E:9A:28:2A:09:6C:CA:A9:BB:D7:19:D9:B8:C1:27:1E:7E:53:84:F7:48:4B:DA:50`.
-
-The release application ID and legacy shared-user contract remain compatible. Debug installs have a separate identity. A release is published only after owner approval of the exact tested commit.
+The owner approved a new signing key and fresh installation instead of the original key. Releases v2.0.0 onward reuse that new certificate; v2.0.3 updates those releases in place. The original app must be uninstalled first. The release workflow verifies the production package, version, signature and runtime payload against its source build. Debug installs retain a separate identity.
 
 created by chatgpt-codex
