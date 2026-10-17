@@ -13,14 +13,19 @@ import zipfile
 
 def payload(path):
     with zipfile.ZipFile(path) as archive:
+        # A checked-in APK cannot embed the hash of the commit that contains itself.
+        # This build-provenance file is not executable code or an application resource.
         return {name: hashlib.sha256(archive.read(name)).hexdigest() for name in archive.namelist()
-                if not name.endswith("/") and not re.fullmatch(
+                if not name.endswith("/") and name != "META-INF/version-control-info.textproto" and not re.fullmatch(
                     r"META-INF/(MANIFEST\.MF|[^/]+\.(SF|RSA|DSA|EC))", name, re.IGNORECASE)}
 
 
 def compare_payloads(signed, unsigned):
-    if payload(signed) != payload(unsigned):
-        raise ValueError("Signed APK payload differs from the release built from this commit")
+    signed_payload, unsigned_payload = payload(signed), payload(unsigned)
+    changed = sorted(name for name in signed_payload.keys() | unsigned_payload.keys()
+                     if signed_payload.get(name) != unsigned_payload.get(name))
+    if changed:
+        raise ValueError("Signed APK payload differs from the release built from this commit: " + ", ".join(changed))
 
 
 def verify():
@@ -54,6 +59,7 @@ def verify():
     (output / "verification.json").write_text(json.dumps({
         "commit": commit, "version": tag, "apkSha256": digest,
         "signingCertificateSha256": expected, "payloadMatchesCommitBuild": True,
+        "excludedBuildMetadata": ["META-INF/version-control-info.textproto"],
         "productionSigned": True, "installOverOriginal": False,
         "attribution": "created by chatgpt-codex",
     }, indent=2) + "\n")
@@ -61,4 +67,9 @@ def verify():
 
 
 if __name__ == "__main__":
-    verify()
+    try:
+        verify()
+    except Exception as error:
+        message = str(error).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+        print("::error::" + message, flush=True)
+        raise

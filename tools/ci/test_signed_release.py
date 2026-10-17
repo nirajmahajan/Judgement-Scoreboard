@@ -19,6 +19,9 @@ class SignedReleasePayloadTest(unittest.TestCase):
     def test_signing_metadata_does_not_change_app_payload(self):
         self.compare({"META-INF/RELEASE.SF": b"signature", "META-INF/RELEASE.RSA": b"certificate", "META-INF/MANIFEST.MF": b"manifest"})
 
+    def test_embedded_build_commit_metadata_does_not_change_app_payload(self):
+        self.compare({"META-INF/version-control-info.textproto": b"build commit before the signed APK was committed"})
+
     def test_changed_code_or_resources_or_library_metadata_are_rejected(self):
         for name in ["classes.dex", "resources.arsc", "META-INF/androidx.version"]:
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "payload differs"):
