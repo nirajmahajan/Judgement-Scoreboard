@@ -142,7 +142,7 @@ public class CriticalUiRegressionTest {
     }
     private void launchGame() {
         launch();
-        onView(allOf(withText(R.string.resume_game), isClickable())).perform(click());
+        onView(allOf(withId(R.id.resume_game), isClickable())).perform(click());
         awaitView(withId(R.id.bottom_navigation));
     }
     private void seed(int count, boolean results, int completed) {

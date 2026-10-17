@@ -175,7 +175,17 @@ public final class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
-    private void open(String screen) { model.screen(screen); }
+    @Override protected void onPause() {
+        rememberLastPlayed();
+        super.onPause();
+    }
+    private void rememberLastPlayed() {
+        if (state == null || state.game == null || !"ACTIVE".equals(state.game.status)
+                || !"GAME".equals(model.screen())) return;
+        getSharedPreferences("game_activity", MODE_PRIVATE).edit()
+                .putLong("last_played_" + state.game.id, System.currentTimeMillis()).apply();
+    }
+    private void open(String screen) { rememberLastPlayed(); model.screen(screen); }
     private void back() {
         String screen = model.screen();
         if ("SCORING".equals(screen)) {
@@ -203,6 +213,7 @@ public final class MainActivity extends AppCompatActivity {
     private void render() {
         if (state == null || changingAppearance) return;
         if ("STATISTICS".equals(model.screen())) model.screen("GAME");
+        rememberLastPlayed();
         if (updateAppearance()) return;
         String screen = model.screen();
         if ("GAME".equals(screen) && state.game == null) { model.screen("HOME"); screen = "HOME"; }
@@ -354,6 +365,12 @@ public final class MainActivity extends AppCompatActivity {
         MaterialButton button = outlined ? new MaterialButton(this, null,
                 com.google.android.material.R.attr.materialButtonOutlinedStyle) : new MaterialButton(this);
         button.setText(action.label); button.setId(action.id); button.setMinHeight(dp(48)); button.setMaxLines(10);
+        if (action.id == R.id.resume_game) {
+            android.text.SpannableString label = new android.text.SpannableString(action.label);
+            label.setSpan(new android.text.style.RelativeSizeSpan(0.8f), action.label.indexOf('\n') + 1,
+                    label.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            button.setText(label);
+        }
         button.setSingleLine(false); button.setEnabled(action.enabled); button.setOnClickListener(v -> action.run.run());
         return button;
     }
@@ -372,8 +389,22 @@ public final class MainActivity extends AppCompatActivity {
     private void home() {
         header(getString(R.string.home_title), "");
         List<ScoreAdapter.Row> rows = new ArrayList<>();
-        if (state.game != null) rows.add(new ScoreAdapter.Row(1, getString("COMPLETE".equals(state.game.status) ? R.string.completed_results : R.string.resume_game), "")
-                .action(getString("COMPLETE".equals(state.game.status) ? R.string.completed_results : R.string.resume_game), () -> open("GAME")));
+        if (state.game != null && "COMPLETE".equals(state.game.status))
+            rows.add(new ScoreAdapter.Row(1, getString(R.string.completed_results), "")
+                    .action(getString(R.string.completed_results), () -> open("GAME")));
+        else if (state.game != null) {
+            long knownPlayedAt = state.round == null ? state.game.createdAt : state.round.createdAt;
+            for (Records.ScoreAdjustment adjustment : state.adjustments)
+                knownPlayedAt = Math.max(knownPlayedAt, adjustment.createdAt);
+            for (Records.RoundEdit edit : state.roundEdits)
+                knownPlayedAt = Math.max(knownPlayedAt, edit.createdAt);
+            long playedAt = getSharedPreferences("game_activity", MODE_PRIVATE)
+                    .getLong("last_played_" + state.game.id, knownPlayedAt);
+            java.util.Date date = new java.util.Date(playedAt);
+            String time = new java.text.SimpleDateFormat("hh:mm a", java.util.Locale.ENGLISH).format(date);
+            String day = new java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.ENGLISH).format(date);
+            action(getString(R.string.resume_last_played, time, day), R.id.resume_game, () -> open("GAME"));
+        }
         if (!state.recoveries.isEmpty()) rows.add(new ScoreAdapter.Row(5, getString(R.string.recovery_title), "").action(getString(R.string.recovery_title), () -> open("RECOVERY")));
         rows(rows);
         action(R.string.new_game, R.id.primary_action, () -> {
@@ -824,6 +855,7 @@ public final class MainActivity extends AppCompatActivity {
                 .setOnMenuItemClickListener(item -> { gameOption(label); return true; });
     }
     private void gameOption(int label) {
+        rememberLastPlayed();
         if (label == R.string.manage_players || label == R.string.change_dealer) {
             if (state.round == null) return;
             List<PlayerSpec> players = new ArrayList<>();

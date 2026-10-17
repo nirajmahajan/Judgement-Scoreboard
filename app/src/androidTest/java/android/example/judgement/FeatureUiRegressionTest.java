@@ -499,7 +499,7 @@ public class FeatureUiRegressionTest {
         scenario = ActivityScenario.launch(MainActivity.class);
         awaitView(withText(R.string.home_title));
     }
-    private void launchGame() { launch(); clickLabel(R.string.resume_game); awaitView(withId(R.id.bottom_navigation)); }
+    private void launchGame() { launch(); clickId(R.id.resume_game); awaitView(withId(R.id.bottom_navigation)); }
     private void option(int label) {
         Espresso.openActionBarOverflowOrOptionsMenu(context);
         onView(withText(label)).perform(click());

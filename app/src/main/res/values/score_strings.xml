@@ -68,4 +68,5 @@
     <string name="result_choice_description">%1$s, %2$s, prediction %3$d</string>
     <string name="confirm_dealer">Confirm dealer</string>
     <plurals name="deal_heading"><item quantity="one">Deal %d card</item><item quantity="other">Deal %d cards</item></plurals>
+    <string name="resume_last_played">Resume game\n(Last played: %1$s on %2$s)</string>
 </resources>

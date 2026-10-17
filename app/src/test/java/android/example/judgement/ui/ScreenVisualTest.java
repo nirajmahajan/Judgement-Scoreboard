@@ -123,6 +123,51 @@ public class ScreenVisualTest {
         assertEquals(6, model.state.getValue().draftPlayers.size());
     }
 
+    @Test public void resumeButtonShowsPersistedLocalLastPlayedAndReopensTheSameGame() throws Exception {
+        java.util.TimeZone originalZone = java.util.TimeZone.getDefault();
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Kolkata"));
+        try {
+            seedEnglishSetup(false);
+            databaseWorker.submit(() -> {
+                try (ScoreRepository repository = new ScoreRepository(context)) {
+                    repository.startGame(repository.snapshot().draft.id);
+                }
+            }).get(10, TimeUnit.SECONDS);
+            long gameId = databaseWorker.submit(() -> {
+                try (ScoreRepository repository = new ScoreRepository(context)) { return repository.snapshot().game.id; }
+            }).get(10, TimeUnit.SECONDS);
+            android.content.SharedPreferences preferences = context.getSharedPreferences("game_activity", Context.MODE_PRIVATE);
+            String key = "last_played_" + gameId;
+            long previous = java.time.Instant.parse("2026-10-17T17:35:00Z").toEpochMilli();
+            assertTrue(preferences.edit().clear().putLong(key, previous).commit());
+            launch(false, false, false);
+            TextView resume = activity.findViewById(R.id.resume_game);
+            assertEquals("Resume game\n(Last played: 11:05 PM on 17 Oct 2026)", resume.getText().toString());
+            assertFullyVisible(resume);
+            capture("home_resume_last_played_320");
+            controller.recreate(); activity = controller.get();
+            model = new ViewModelProvider(activity).get(ScoreViewModel.class);
+            await(() -> model.state.getValue() != null); layout();
+            assertEquals(previous, preferences.getLong(key, 0));
+            long resumedAt = org.robolectric.shadows.ShadowSystem.currentTimeMillis();
+            activity.findViewById(R.id.resume_game).performClick();
+            await(() -> "GAME".equals(model.screen())); layout();
+            assertEquals(gameId, model.state.getValue().game.id);
+            assertTrue(preferences.getLong(key, 0) >= resumedAt);
+            assertTrue("Recorded time uses the app clock", preferences.getLong(key, 0)
+                    <= org.robolectric.shadows.ShadowSystem.currentTimeMillis());
+            assertTrue(preferences.getLong(key, 0) != previous);
+            activity.getOnBackPressedDispatcher().onBackPressed(); layout();
+            long playedAt = preferences.getLong(key, 0);
+            assertTrue(playedAt >= resumedAt);
+            controller.pause().stop().destroy(); controller = null;
+            launch(false, false, false);
+            assertEquals(playedAt, preferences.getLong(key, 0));
+            assertEquals(gameId, model.state.getValue().game.id);
+            assertTrue(((TextView) activity.findViewById(R.id.resume_game)).getText().toString().startsWith("Resume game\n(Last played:"));
+        } finally { java.util.TimeZone.setDefault(originalZone); }
+    }
+
     @Test public void launcherShowsFannedPlayingCards() throws Exception {
         launch(false, false, false);
         android.widget.FrameLayout preview = new android.widget.FrameLayout(activity);
