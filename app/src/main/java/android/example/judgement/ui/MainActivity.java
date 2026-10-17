@@ -278,7 +278,7 @@ public final class MainActivity extends AppCompatActivity {
                 TextView bid = columnLabel(tableDetailLabel, false);
                 bid.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
                 columns.addView(bid, new LinearLayout.LayoutParams(dp(104), -2));
-                columns.addView(new View(this), new LinearLayout.LayoutParams(dp(48), 1));
+                columns.addView(new View(this), new LinearLayout.LayoutParams(dp(32), 1));
             } else columns.addView(columnLabel(tableDetailLabel, true), new LinearLayout.LayoutParams(dp(88), -2));
         }
     }
@@ -557,10 +557,10 @@ public final class MainActivity extends AppCompatActivity {
             header(getString(R.string.game_complete), detail); scoreboardRows(); return;
         }
         Records.Round round = state.round;
-        String trump = "CUSTOM".equals(state.game.trumpMode) ? getString(R.string.trump_at_table) : getString(R.string.trump_format, getString(new int[]{R.string.spades, R.string.diamonds, R.string.clubs, R.string.hearts}[(round.number - 1) % 4]));
+        String trump = "CUSTOM".equals(state.game.trumpMode) ? "" : getString(R.string.trump_format, getString(new int[]{R.string.spades, R.string.diamonds, R.string.clubs, R.string.hearts}[(round.number - 1) % 4]));
         header(roundHeading(round.number, round.cards),
-                getString(R.string.round_description, getString(R.string.dealer_format, playerName(state.players, round.dealerId)), trump)
-                        + "\n" + getString(R.string.scoring_selected, StrategyEditor.label(this, ScoringStrategy.decode(round.scoringConfig)))
+                (trump.isEmpty() ? "" : trump + "\n")
+                        + getString(R.string.scoring_selected, StrategyEditor.label(this, ScoringStrategy.decode(round.scoringConfig)))
                         + (state.game.pendingScoringConfig == null ? "" : "\n" + getString(R.string.strategy_pending,
                                 StrategyEditor.label(this, ScoringStrategy.decode(state.game.pendingScoringConfig)), round.number + 1)));
         if ("BIDDING".equals(round.phase)) bidding(round); else results(round);
@@ -575,7 +575,7 @@ public final class MainActivity extends AppCompatActivity {
             else if (firstMissing == state.roundPlayers.size()) firstMissing = i;
         }
         if (bids == null) bids = new BidAdapter(model, this::render);
-        bids.submit(round.id, state.roundPlayers, firstMissing); setContent(bids);
+        bids.submit(round.id, round.dealerId, state.roundPlayers, firstMissing); setContent(bids);
         bidShortcuts.removeAllViews(); bidShortcuts.setVisibility(View.VISIBLE);
         Records.RoundPlayer current = firstMissing < state.roundPlayers.size() ? state.roundPlayers.get(firstMissing) : null;
         int[] ids = {R.id.quick_bid_0, R.id.quick_bid_1, R.id.quick_bid_2, R.id.quick_bid_3};
@@ -611,7 +611,7 @@ public final class MainActivity extends AppCompatActivity {
         for (Records.RoundPlayer player : state.roundPlayers) {
             String selection = player.outcome == null ? getString(R.string.outcome_pending) : getString("WON".equals(player.outcome) ? R.string.won : R.string.lost);
             rows.add(new ScoreAdapter.Row(player.playerId, player.nameSnapshot, getString(R.string.table_result_value, player.bid, selection))
-                    .compactName()
+                    .compactName().dealer(player.playerId == round.dealerId)
                     .action(getString(R.string.won), !"WON".equals(player.outcome), () -> model.run(() -> model.repository.setOutcome(round.id, player.playerId, Outcome.WON)))
                     .action(getString(R.string.lost), !"LOST".equals(player.outcome), () -> model.run(() -> model.repository.setOutcome(round.id, player.playerId, Outcome.LOST))));
         }

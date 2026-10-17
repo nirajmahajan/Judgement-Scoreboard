@@ -1,6 +1,8 @@
 package android.example.judgement.ui;
 
 import android.example.judgement.R;
+import android.graphics.Rect;
+import android.view.TouchDelegate;
 import android.example.judgement.data.Records;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -21,13 +23,13 @@ final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
     private final ScoreViewModel model;
     private final Runnable refresh;
     private final List<Records.RoundPlayer> players = new ArrayList<>();
-    private long roundId;
+    private long roundId, dealerId;
     private int current;
     BidAdapter(ScoreViewModel model, Runnable refresh) {
         this.model = model; this.refresh = refresh; setHasStableIds(true);
     }
-    void submit(long roundId, List<Records.RoundPlayer> players, int current) {
-        this.roundId = roundId; this.players.clear(); this.players.addAll(players); this.current = current;
+    void submit(long roundId, long dealerId, List<Records.RoundPlayer> players, int current) {
+        this.dealerId = dealerId; this.roundId = roundId; this.players.clear(); this.players.addAll(players); this.current = current;
         notifyDataSetChanged();
     }
     @Override public long getItemId(int position) { return players.get(position).playerId; }
@@ -41,6 +43,10 @@ final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
         boolean latest = position == current - 1;
         boolean editing = position == current || (latest && model.editingBid(owner, player.playerId));
         holder.name.setText(player.nameSnapshot);
+        boolean dealer = player.playerId == dealerId;
+        holder.itemView.findViewById(R.id.dealer_tag).setVisibility(dealer ? View.VISIBLE : View.GONE);
+        holder.name.setContentDescription(dealer ? player.nameSnapshot + ", "
+                + holder.itemView.getContext().getString(R.string.dealer_tag) : player.nameSnapshot);
         holder.name.setTooltipText(player.nameSnapshot);
         holder.name.setTypeface(null, position == current ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
         holder.detail.setText(player.bid == null ? "—" : player.bid.toString());
@@ -64,6 +70,8 @@ final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
             submit.run(); return true;
         });
         holder.confirm.setVisibility(editing || latest ? View.VISIBLE : View.INVISIBLE);
+        holder.confirm.setEnabled(editing || latest);
+        holder.expandActionTarget();
         holder.confirm.setImageResource(editing ? R.drawable.ic_bid_confirm : R.drawable.ic_roster_edit);
         holder.confirm.setContentDescription(holder.itemView.getContext().getString(editing ? R.string.enter_bid : R.string.edit_bid)
                 + ", " + player.nameSnapshot);
@@ -80,6 +88,17 @@ final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
         Holder(View view) {
             super(view); name = view.findViewById(R.id.row_name); detail = view.findViewById(R.id.row_detail);
             input = view.findViewById(R.id.bid_input); confirm = view.findViewById(R.id.bid_confirm);
+            confirm.addOnLayoutChangeListener((button, l, t, r, b, ol, ot, or, ob) -> expandActionTarget());
+        }
+        void expandActionTarget() {
+            View parent = (View) confirm.getParent();
+            if (confirm.getVisibility() != View.VISIBLE || confirm.getWidth() == 0) {
+                parent.setTouchDelegate(null); return;
+            }
+            Rect area = new Rect(); confirm.getHitRect(area);
+            int targetWidth = Math.round(48 * confirm.getResources().getDisplayMetrics().density);
+            area.inset(-Math.max(0, targetWidth - area.width()) / 2, 0);
+            parent.setTouchDelegate(new TouchDelegate(area, confirm));
         }
     }
 }

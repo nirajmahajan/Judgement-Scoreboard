@@ -196,12 +196,21 @@ public class ScreenVisualTest {
 
     @Test @Config(qualifiers = "w320dp-h740dp-night-mdpi")
     public void roundDarkShowsNamedTrumpAndDealer() throws Exception {
-        List<String> names = Arrays.asList("Alice", "Ben", "Charlie", "David", "Emma");
+        roundPreview("FIXED", "round_dark_320");
+    }
+
+    @Test @Config(qualifiers = "w320dp-h740dp-night-mdpi")
+    public void customTrumpRoundOmitsTheTrumpLine() throws Exception {
+        roundPreview("CUSTOM", "round_custom_320");
+    }
+
+    private void roundPreview(String trumpMode, String imageName) throws Exception {
+        List<String> names = Arrays.asList("Alice", "Benjamin Alexander", "Charlie", "David", "Emma");
         databaseWorker.submit(() -> {
             try (ScoreRepository repository = new ScoreRepository(context)) {
                 List<PlayerSpec> players = new ArrayList<>();
                 for (String name : names) players.add(new PlayerSpec(name));
-                long draft = repository.saveDraft(new DraftSpec(0, players, "ASCENDING", "FIXED", null));
+                long draft = repository.saveDraft(new DraftSpec(0, players, "ASCENDING", trumpMode, null));
                 repository.startGame(draft);
                 Snapshot round = repository.snapshot();
                 repository.submitBid(round.round.id, round.roundPlayers.get(0).playerId, 0);
@@ -211,10 +220,21 @@ public class ScreenVisualTest {
         launch(false, false, false);
         open("GAME", "ROUND");
         RecyclerView list = activity.findViewById(R.id.screen_list);
+        assertEquals(model.state.getValue().round.dealerId,
+                model.state.getValue().roundPlayers.get(names.size() - 1).playerId);
+        TextView description = activity.findViewById(R.id.screen_description);
+        assertFalse(description.getText().toString().contains("Dealer:"));
+        assertEquals("FIXED".equals(trumpMode), description.getText().toString().contains("Trump:"));
+        assertFalse(description.getText().toString().contains("Trump chosen at table"));
         List<String> bids = Arrays.asList("0", "1", "", "—", "—");
         for (int index = 0; index < names.size(); index++) {
             RecyclerView.ViewHolder holder = list.findViewHolderForAdapterPosition(index + contentOffset(list));
             assertNotNull("All five players stay visible while predicting", holder);
+            TextView dealerTag = holder.itemView.findViewById(R.id.dealer_tag);
+            assertEquals(index == names.size() - 1 ? View.VISIBLE : View.GONE, dealerTag.getVisibility());
+            if (index == names.size() - 1) {
+                assertEquals("Dealer", dealerTag.getText().toString()); assertFullyVisible(dealerTag);
+            }
             TextView name = holder.itemView.findViewById(R.id.row_name);
             assertEquals(names.get(index), name.getText().toString());
             assertFullyVisible(name);
@@ -225,7 +245,10 @@ public class ScreenVisualTest {
                 assertEquals(View.VISIBLE, input.getVisibility());
                 assertEquals(context.getString(R.string.table_bid), input.getHint().toString());
                 assertFullyVisible(input);
-                assertFullyVisible(holder.itemView.findViewById(R.id.bid_confirm));
+                View confirm = holder.itemView.findViewById(R.id.bid_confirm);
+                assertFullyVisible(confirm);
+                assertEquals(dp(32), confirm.getWidth());
+                assertNotNull(((View) confirm.getParent()).getTouchDelegate());
                 Rect nameBounds = new Rect(), inputBounds = new Rect();
                 name.getGlobalVisibleRect(nameBounds); input.getGlobalVisibleRect(inputBounds);
                 assertFalse("The editable bid stays beside the name", Rect.intersects(nameBounds, inputBounds));
@@ -237,7 +260,7 @@ public class ScreenVisualTest {
         for (int id : new int[]{R.id.quick_bid_0, R.id.quick_bid_1, R.id.quick_bid_2, R.id.quick_bid_3})
             assertFullyVisible(activity.findViewById(id));
         assertFixedControlsReachable();
-        capture("round_dark_320");
+        capture(imageName);
     }
 
     @Test public void gameAtTwoHundredPercentFontKeepsNavigationLabelsComplete() throws Exception {

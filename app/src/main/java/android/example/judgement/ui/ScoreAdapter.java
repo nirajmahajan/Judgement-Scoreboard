@@ -32,13 +32,14 @@ final class ScoreAdapter extends RecyclerView.Adapter<ScoreAdapter.Holder> {
         final long id;
         final String name;
         final String detail;
-        boolean compactName;
+        boolean compactName, dealer;
         final List<Action> actions = new ArrayList<>();
         final List<QuickBid> quickBids = new ArrayList<>();
         Row(long id, String name, String detail) { this.id = id; this.name = name; this.detail = detail; }
         Row action(String label, Runnable run) { return action(label, true, run); }
         Row action(String label, boolean enabled, Runnable run) { actions.add(new Action(label, enabled, run)); return this; }
         Row quickBid(int value, boolean enabled, Runnable run) { quickBids.add(new QuickBid(value, enabled, run)); return this; }
+        Row dealer(boolean value) { dealer = value; return this; }
         Row compactName() { compactName = true; return this; }
     }
     private final List<Row> rows = new ArrayList<>();
@@ -53,7 +54,7 @@ final class ScoreAdapter extends RecyclerView.Adapter<ScoreAdapter.Holder> {
                 Row old = previous.get(oldIndex), current = next.get(newIndex);
                 // Action callbacks capture the current round and must always be rebound.
                 return old.actions.isEmpty() && current.actions.isEmpty() && old.quickBids.isEmpty() && current.quickBids.isEmpty()
-                        && old.compactName == current.compactName && old.name.equals(current.name) && old.detail.equals(current.detail);
+                        && old.dealer == current.dealer && old.compactName == current.compactName && old.name.equals(current.name) && old.detail.equals(current.detail);
             }
         });
         rows.clear(); rows.addAll(next); difference.dispatchUpdatesTo(this);
@@ -68,6 +69,10 @@ final class ScoreAdapter extends RecyclerView.Adapter<ScoreAdapter.Holder> {
     @Override public void onBindViewHolder(@NonNull Holder holder, int position) {
         Row row = rows.get(position);
         holder.name.setText(row.name);
+        View dealerTag = holder.itemView.findViewById(R.id.dealer_tag);
+        if (dealerTag != null) dealerTag.setVisibility(row.dealer ? View.VISIBLE : View.GONE);
+        holder.name.setContentDescription(row.dealer ? row.name + ", "
+                + holder.itemView.getContext().getString(R.string.dealer_tag) : row.name);
         holder.name.setSingleLine(row.compactName);
         holder.name.setMaxLines(row.compactName ? 1 : Integer.MAX_VALUE);
         holder.name.setEllipsize(row.compactName ? TextUtils.TruncateAt.END : null);
