@@ -128,9 +128,8 @@ public final class StrategyUiRegressionTest {
         await(() -> screen().equals("GAME") && hasAppearance(true));
         await(() -> ScoringStrategy.defaults().encode().equals(uiSnapshot().game.pendingScoringConfig));
         showHeader();
-        onView(withId(R.id.screen_description)).check(androidx.test.espresso.assertion.ViewAssertions.matches(
-                androidx.test.espresso.matcher.ViewMatchers.withText(org.hamcrest.Matchers.containsString(
-                        context.getString(R.string.strategy_pending,"Default",2)))));
+        assertFalse(text(R.id.screen_description).contains(context.getString(R.string.strategy_pending,"Default",2)));
+        assertFalse(text(R.id.screen_description).contains(context.getString(R.string.scoring_selected,"Judgement+")));
         scenario.recreate(); await(() -> hasAppearance(true));
         assertEquals(ScoringStrategy.defaults().encode(),repository.snapshot().game.pendingScoringConfig);
         completeRound(); refreshUi();
@@ -183,7 +182,7 @@ public final class StrategyUiRegressionTest {
         assertEquals(completed.game.id,repository.snapshot().game.id);
     }
 
-    @Test public void darkNarrowCustomFormAtTwoHundredPercentKeepsLabelsAndErrorsReachableWithKeyboard() throws Exception {
+    @Test public void systemDarkModeKeepsAppLightAndNarrowLargeFontErrorsReachableWithKeyboard() throws Exception {
         UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         String font=device.executeShellCommand("settings get system font_scale").trim();
         String hardwareIme=device.executeShellCommand("settings get secure show_ime_with_hard_keyboard").trim();
@@ -206,7 +205,7 @@ public final class StrategyUiRegressionTest {
             scenario.onActivity(activity -> {
                 assertEquals(320,activity.getResources().getConfiguration().screenWidthDp,1);
                 assertEquals(2f,activity.getResources().getConfiguration().fontScale,.01f);
-                assertEquals(Configuration.UI_MODE_NIGHT_YES,activity.getResources().getConfiguration().uiMode&Configuration.UI_MODE_NIGHT_MASK);
+                assertEquals(Configuration.UI_MODE_NIGHT_NO,activity.getResources().getConfiguration().uiMode&Configuration.UI_MODE_NIGHT_MASK);
             });
             clickText(R.string.choose_scoring); await(() -> current()!=null && hasAppearance(true));
             clickId(R.id.strategy_aggressive);
@@ -214,11 +213,11 @@ public final class StrategyUiRegressionTest {
             scenario.onActivity(activity -> {
                 com.google.android.material.appbar.MaterialToolbar toolbar=activity.findViewById(R.id.toolbar);
                 assertNotNull(toolbar.getNavigationIconTint());
-                assertTrue("The back control contrasts with the dark surface",androidx.core.graphics.ColorUtils.calculateContrast(
+                assertTrue("The back control contrasts with the light surface",androidx.core.graphics.ColorUtils.calculateContrast(
                         toolbar.getNavigationIconTint(),MaterialColors.getColor(toolbar,com.google.android.material.R.attr.colorSurface))>=4.5);
             });
             device.executeShellCommand("mkdir -p /sdcard/judgement-test-evidence");
-            device.executeShellCommand("screencap -p /sdcard/judgement-test-evidence/strategy-aggressive-dark-320-font200.png");
+            device.executeShellCommand("screencap -p /sdcard/judgement-test-evidence/strategy-judgement-plus-light-320-font200.png");
             clickId(R.id.strategy_custom); await(() -> hasAppearance(false));
             for(int label:new int[]{R.string.strategy_zero_reward,R.string.strategy_base_reward,R.string.strategy_per_trick}) {
                 onView(withText(label)).perform(reveal()).check((view,noMatch) -> assertCompleteText((TextView)view));
@@ -235,7 +234,7 @@ public final class StrategyUiRegressionTest {
                         androidx.test.espresso.matcher.ViewMatchers.isDisplayingAtLeast(90).matches(view));
             });
             awaitKeyboard();
-            device.executeShellCommand("screencap -p /sdcard/judgement-test-evidence/strategy-custom-error-dark-320-font200-ime.png");
+            device.executeShellCommand("screencap -p /sdcard/judgement-test-evidence/strategy-custom-error-light-320-font200-ime.png");
             onView(withId(R.id.strategy_zero)).perform(reveal(),replaceText("7"));
             clickId(R.id.primary_action);
             await(() -> repository.snapshot().draft.scoringConfig.equals(ScoringStrategy.custom(7,10,1,true).encode()));

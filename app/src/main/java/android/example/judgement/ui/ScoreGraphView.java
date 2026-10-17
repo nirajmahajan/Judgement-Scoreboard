@@ -451,7 +451,7 @@ public final class ScoreGraphView extends View {
 
     private static String strategyName(GameStatistics.RoundStatistics round) {
         switch (round.strategy.preset) {
-            case AGGRESSIVE: return "Aggressive";
+            case AGGRESSIVE: return "Judgement+";
             case CUSTOM: return "Custom";
             default: return "Default";
         }

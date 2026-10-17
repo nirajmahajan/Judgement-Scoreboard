@@ -13,13 +13,14 @@
         <TextView android:id="@id/row_name" android:layout_width="0dp" android:layout_weight="1"
             android:layout_height="match_parent" android:gravity="center_vertical"
             android:singleLine="true" android:ellipsize="end" android:textAppearance="?attr/textAppearanceBodyLarge" />
-        <FrameLayout android:layout_width="104dp" android:layout_height="match_parent">
+        <FrameLayout android:layout_width="48dp" android:layout_height="match_parent">
             <TextView android:id="@id/row_detail" android:layout_width="match_parent" android:layout_height="match_parent"
                 android:gravity="center" android:textAppearance="?attr/textAppearanceBodyLarge" />
             <androidx.appcompat.widget.AppCompatEditText android:id="@+id/bid_input"
                 android:layout_width="match_parent" android:layout_height="match_parent"
                 android:inputType="number" android:singleLine="true" android:gravity="center"
-                android:imeOptions="actionDone" android:hint="@string/table_bid"
+                android:imeOptions="actionDone" android:maxLength="2"
+                android:paddingHorizontal="4dp"
                 android:saveEnabled="false" android:textAppearance="?attr/textAppearanceBodyLarge" />
         </FrameLayout>
         <androidx.appcompat.widget.AppCompatImageButton android:id="@+id/bid_confirm"

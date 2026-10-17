@@ -60,6 +60,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.hamcrest.Matchers.is;
 
@@ -196,21 +197,25 @@ public class ScreenVisualTest {
 
     @Test @Config(qualifiers = "w320dp-h740dp-night-mdpi")
     public void roundDarkShowsNamedTrumpAndDealer() throws Exception {
-        roundPreview("FIXED", "round_dark_320");
+        roundPreview("FIXED", false, "round_dark_320");
     }
 
     @Test @Config(qualifiers = "w320dp-h740dp-night-mdpi")
     public void customTrumpRoundOmitsTheTrumpLine() throws Exception {
-        roundPreview("CUSTOM", "round_custom_320");
+        roundPreview("CUSTOM", false, "round_custom_320");
     }
 
-    private void roundPreview(String trumpMode, String imageName) throws Exception {
+    @Test public void judgementPlusUsesFireHeadersWithoutScoringText() throws Exception {
+        roundPreview("FIXED", true, "round_judgement_plus_320");
+    }
+
+    private void roundPreview(String trumpMode, boolean plus, String imageName) throws Exception {
         List<String> names = Arrays.asList("Alice", "Benjamin Alexander", "Charlie", "David", "Emma");
         databaseWorker.submit(() -> {
             try (ScoreRepository repository = new ScoreRepository(context)) {
                 List<PlayerSpec> players = new ArrayList<>();
                 for (String name : names) players.add(new PlayerSpec(name));
-                long draft = repository.saveDraft(new DraftSpec(0, players, "ASCENDING", trumpMode, null));
+                long draft = repository.saveDraft(new DraftSpec(0, players, "ASCENDING", trumpMode, null, plus ? ScoringStrategy.aggressive() : ScoringStrategy.defaults()));
                 repository.startGame(draft);
                 Snapshot round = repository.snapshot();
                 repository.submitBid(round.round.id, round.roundPlayers.get(0).playerId, 0);
@@ -219,11 +224,23 @@ public class ScreenVisualTest {
         }).get(10, TimeUnit.SECONDS);
         launch(false, false, false);
         open("GAME", "ROUND");
+        if (plus) {
+            controller.recreate(); activity = controller.get();
+            model = new ViewModelProvider(activity).get(ScoreViewModel.class);
+            await(() -> model.state.getValue() != null); layout();
+        }
+        assertEquals(android.content.res.Configuration.UI_MODE_NIGHT_NO,
+                activity.getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK);
+        TextView title = activity.findViewById(R.id.screen_title);
+        assertEquals(plus, title.getCompoundDrawablesRelative()[0] != null);
+        assertEquals(plus ? "Judgement+" : "Judgement", ((com.google.android.material.appbar.MaterialToolbar)
+                activity.findViewById(R.id.toolbar)).getTitle().toString());
         RecyclerView list = activity.findViewById(R.id.screen_list);
         assertEquals(model.state.getValue().round.dealerId,
                 model.state.getValue().roundPlayers.get(names.size() - 1).playerId);
         TextView description = activity.findViewById(R.id.screen_description);
         assertFalse(description.getText().toString().contains("Dealer:"));
+        assertFalse(description.getText().toString().contains("Scoring:"));
         assertEquals("FIXED".equals(trumpMode), description.getText().toString().contains("Trump:"));
         assertFalse(description.getText().toString().contains("Trump chosen at table"));
         List<String> bids = Arrays.asList("0", "1", "", "—", "—");
@@ -243,7 +260,10 @@ public class ScreenVisualTest {
             if (index == 2) {
                 TextView input = holder.itemView.findViewById(R.id.bid_input);
                 assertEquals(View.VISIBLE, input.getVisibility());
-                assertEquals(context.getString(R.string.table_bid), input.getHint().toString());
+                assertNull("The column heading labels the compact numeric input", input.getHint());
+                assertEquals(dp(48), input.getWidth());
+                assertTrue("Two digits fit completely", input.getPaint().measureText("26")
+                        <= input.getWidth() - input.getCompoundPaddingLeft() - input.getCompoundPaddingRight());
                 assertFullyVisible(input);
                 View confirm = holder.itemView.findViewById(R.id.bid_confirm);
                 assertFullyVisible(confirm);

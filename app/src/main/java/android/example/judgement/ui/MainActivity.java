@@ -79,6 +79,7 @@ public final class MainActivity extends AppCompatActivity {
     @Override protected void onCreate(Bundle savedInstanceState) {
         aggressiveAppearance = savedInstanceState != null && savedInstanceState.getBoolean("aggressiveAppearance");
         setTheme(aggressiveAppearance ? R.style.Theme_Score_Aggressive : R.style.Theme_Score);
+        getDelegate().setLocalNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO);
         super.onCreate(savedInstanceState);
         if (savedInstanceState != null) {
             pickerReturn = savedInstanceState.getString("pickerReturn", "SETTINGS");
@@ -194,6 +195,7 @@ public final class MainActivity extends AppCompatActivity {
         boolean game = "GAME".equals(screen);
         navigation.setVisibility(game ? View.VISIBLE : View.GONE);
         toolbar.getMenu().clear();
+        toolbar.setTitle(aggressiveAppearance ? R.string.judgement_plus_title : R.string.app_name);
         if (game) {
             toolbar.getMenu().add(R.string.options).setOnMenuItemClickListener(item -> { options(); return true; });
             int tab = "HISTORY".equals(model.tab()) ? R.id.tab_history : "SCOREBOARD".equals(model.tab()) ? R.id.tab_scoreboard : R.id.tab_round;
@@ -255,10 +257,14 @@ public final class MainActivity extends AppCompatActivity {
     }
     private void bindHeader(View view) {
         TextView heading = view.findViewById(R.id.screen_title); heading.setText(headingText); ViewCompat.setAccessibilityHeading(heading, true);
+        heading.setCompoundDrawablesRelativeWithIntrinsicBounds(aggressiveAppearance ? R.drawable.ic_judgement_fire : 0, 0, 0, 0);
+        heading.setCompoundDrawablePadding(dp(6));
         TextView description = view.findViewById(R.id.screen_description); description.setText(descriptionText); description.setVisibility(descriptionText.isEmpty() ? View.GONE : View.VISIBLE);
         TextView error = view.findViewById(R.id.inline_error); error.setText(errorText); error.setVisibility(errorText == null ? View.GONE : View.VISIBLE);
         LinearLayout columns = view.findViewById(R.id.table_columns);
         columns.removeAllViews();
+        columns.setBackgroundColor(aggressiveAppearance ? com.google.android.material.color.MaterialColors.getColor(
+                columns, com.google.android.material.R.attr.colorPrimaryContainer) : android.graphics.Color.TRANSPARENT);
         columns.setVisibility(rosterColumns || tableDetailLabel != 0 ? View.VISIBLE : View.GONE);
         columns.setPaddingRelative(rosterColumns ? 0 : dp(8), 0, rosterColumns ? 0 : dp(8), 0);
         if (rosterColumns) {
@@ -276,15 +282,18 @@ public final class MainActivity extends AppCompatActivity {
                 columns.addView(delete, new LinearLayout.LayoutParams(dp(48), -2));
             } else if (biddingColumns) {
                 TextView bid = columnLabel(tableDetailLabel, false);
-                bid.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-                columns.addView(bid, new LinearLayout.LayoutParams(dp(104), -2));
-                columns.addView(new View(this), new LinearLayout.LayoutParams(dp(32), 1));
+                bid.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
+                columns.addView(bid, new LinearLayout.LayoutParams(dp(80), -2));
             } else columns.addView(columnLabel(tableDetailLabel, true), new LinearLayout.LayoutParams(dp(88), -2));
         }
     }
     private TextView columnLabel(int label, boolean endAligned) {
         TextView text = new TextView(this);
         text.setText(label);
+        if (aggressiveAppearance && label == R.string.table_player) {
+            text.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_judgement_fire, 0, 0, 0);
+            text.setCompoundDrawablePadding(dp(4));
+        }
         text.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelLarge);
         text.setTextAlignment(endAligned ? View.TEXT_ALIGNMENT_VIEW_END : View.TEXT_ALIGNMENT_VIEW_START);
         ViewCompat.setAccessibilityHeading(text, true);
@@ -558,11 +567,7 @@ public final class MainActivity extends AppCompatActivity {
         }
         Records.Round round = state.round;
         String trump = "CUSTOM".equals(state.game.trumpMode) ? "" : getString(R.string.trump_format, getString(new int[]{R.string.spades, R.string.diamonds, R.string.clubs, R.string.hearts}[(round.number - 1) % 4]));
-        header(roundHeading(round.number, round.cards),
-                (trump.isEmpty() ? "" : trump + "\n")
-                        + getString(R.string.scoring_selected, StrategyEditor.label(this, ScoringStrategy.decode(round.scoringConfig)))
-                        + (state.game.pendingScoringConfig == null ? "" : "\n" + getString(R.string.strategy_pending,
-                                StrategyEditor.label(this, ScoringStrategy.decode(state.game.pendingScoringConfig)), round.number + 1)));
+        header(roundHeading(round.number, round.cards), trump);
         if ("BIDDING".equals(round.phase)) bidding(round); else results(round);
 
     }

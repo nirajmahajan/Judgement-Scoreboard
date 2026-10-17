@@ -108,7 +108,7 @@ public class ScoreGraphViewTest {
         AccessibilityNodeProvider provider = graph.getAccessibilityNodeProvider();
         AccessibilityNodeInfo middle = provider.createAccessibilityNodeInfo(1);
         assertTrue(middle.getContentDescription().toString().contains("did not participate"));
-        assertTrue(middle.getContentDescription().toString().contains("Aggressive scoring"));
+        assertTrue(middle.getContentDescription().toString().contains("Judgement+ scoring"));
         assertTrue(middle.getContentDescription().toString().contains("Strategy changed here"));
         Rect bounds = new Rect();
         middle.getBoundsInParent(bounds);
@@ -210,7 +210,7 @@ public class ScoreGraphViewTest {
         Rect bounds = new Rect();
         tenth.getBoundsInParent(bounds);
         assertTrue(bounds.bottom < graph.getHeight());
-        assertTrue(tenth.getContentDescription().toString().contains("Aggressive scoring"));
+        assertTrue(tenth.getContentDescription().toString().contains("Judgement+ scoring"));
     }
 
     @Test

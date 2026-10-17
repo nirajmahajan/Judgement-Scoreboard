@@ -4,14 +4,14 @@
     <string name="change_scoring">Change scoring strategy</string>
     <string name="save_scoring">Save scoring strategy</string>
     <string name="strategy_default">Default</string>
-    <string name="strategy_aggressive">Aggressive</string>
+    <string name="strategy_aggressive">Judgement+</string>
     <string name="strategy_custom">Custom</string>
     <string name="strategy_default_rules">An exact prediction, including zero, earns 10 + the prediction. A missed prediction earns 0.\n\nExact zero → 10 points. An exact prediction of three earns 13 points.</string>
     <string name="strategy_aggressive_rules">Exact zero earns 7 points. Another exact prediction earns 10 + the prediction. A missed prediction earns 0.\n\nIf an exact prediction is strictly greater than half the cards dealt, add a majority bonus of min(cards dealt, 10). Exactly half earns no bonus. Only the bonus is capped at 10; the total round score is not capped.</string>
     <string name="strategy_custom_rules">Exact zero earns %1$d points. Another exact prediction earns %2$d + (%3$d × the prediction). A missed prediction earns 0.</string>
     <string name="strategy_bonus_rules">The majority bonus applies only to an exact prediction strictly greater than half the cards dealt. It adds min(cards dealt, 10) points. Exactly half earns no bonus. The 10-point cap applies only to this bonus, never the total score.</string>
     <string name="strategy_no_bonus">The majority bonus is disabled.</string>
-    <string name="strategy_custom_explanation">Set the reward for an exact zero, the base reward for another exact prediction, and the points added per correctly predicted trick. Missed predictions always earn 0. The optional majority bonus uses the same strict threshold and 10-point bonus cap as Aggressive.</string>
+    <string name="strategy_custom_explanation">Set the reward for an exact zero, the base reward for another exact prediction, and the points added per correctly predicted trick. Missed predictions always earn 0. The optional majority bonus uses the same strict threshold and 10-point bonus cap as Judgement+.</string>
     <string name="strategy_zero_reward">Points for an exact zero</string>
     <string name="strategy_base_reward">Base points for another exact prediction</string>
     <string name="strategy_per_trick">Points per correctly predicted trick</string>
