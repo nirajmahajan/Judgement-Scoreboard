@@ -55,7 +55,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
-      - run: ./gradlew --no-daemon --dependency-verification=strict assembleDebug assembleRelease testDebugUnitTest testReleaseUnitTest createDebugUnitTestCoverageReport lintDebug lintRelease assembleDebugAndroidTest
+      - run: |
+          mkdir -p ci-artifacts
+          ./gradlew --no-daemon --dependency-verification=strict assembleDebug assembleRelease testDebugUnitTest testReleaseUnitTest createDebugUnitTestCoverageReport lintDebug lintRelease assembleDebugAndroidTest 2>&1 | tee ci-artifacts/build.log
+      - name: Report failed test cases
+        if: failure()
+        run: python3 tools/ci/report_test_failures.py ci-artifacts/build.log
       - run: python3 tools/ci/verify_apk_identity.py
       - name: Retain builds and reports
         if: always()
@@ -79,7 +84,12 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ inputs.commit || github.sha }}
-      - run: tools/ci/screenshots.sh verify
+      - run: |
+          mkdir -p ci-artifacts
+          tools/ci/screenshots.sh verify 2>&1 | tee ci-artifacts/screenshots.log
+      - name: Report failed screenshot or unit cases
+        if: failure()
+        run: python3 tools/ci/report_test_failures.py ci-artifacts/screenshots.log
       - name: Retain screenshot comparisons
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -122,7 +132,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
-      - run: tools/ci/run_emulator.sh '${{ matrix.api }}' critical
+      - run: |
+          mkdir -p ci-artifacts
+          tools/ci/run_emulator.sh '${{ matrix.api }}' critical 2>&1 | tee ci-artifacts/device-run.log
+      - name: Report failed device cases
+        if: failure()
+        run: python3 tools/ci/report_test_failures.py ci-artifacts/device-run.log
       - name: Retain device evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
