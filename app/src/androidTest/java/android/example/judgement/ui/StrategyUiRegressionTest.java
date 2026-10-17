@@ -334,8 +334,8 @@ public final class StrategyUiRegressionTest {
         Snapshot snapshot = repository.snapshot();
         String heading = "SETTINGS".equals(target) ? context.getString(R.string.setup_settings)
                 : snapshot.round == null ? context.getString(R.string.game_complete)
-                : context.getResources().getQuantityString(R.plurals.round_heading,
-                        snapshot.round.cards,snapshot.round.number,snapshot.round.cards);
+                : context.getResources().getQuantityString(R.plurals.deal_heading,
+                        snapshot.round.cards,snapshot.round.cards);
         showHeader();
         try { await(() -> screen().equals(target) && text(R.id.screen_title).equals(heading)); }
         catch(AssertionError timeout) {

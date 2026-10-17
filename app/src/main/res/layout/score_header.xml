@@ -1,8 +1,14 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
     <TextView android:id="@+id/screen_title" android:layout_width="match_parent"
         android:layout_height="wrap_content" android:paddingHorizontal="4dp"
         android:paddingTop="12dp" android:textAppearance="?attr/textAppearanceHeadlineMedium" />
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/home_cards" android:layout_width="match_parent" android:layout_height="220dp"
+        android:layout_marginTop="12dp" android:layout_marginBottom="12dp"
+        android:background="@android:color/white" android:src="@drawable/home_cards"
+        android:scaleType="fitCenter" android:importantForAccessibility="no" android:visibility="gone"
+        app:shapeAppearanceOverlay="@style/ShapeAppearance.Score.HomePhoto" />
     <TextView android:id="@+id/screen_description" android:layout_width="match_parent"
         android:layout_height="wrap_content" android:paddingHorizontal="4dp"
         android:paddingVertical="8dp" android:textAppearance="?attr/textAppearanceBodyLarge" />

@@ -77,7 +77,15 @@ public class RepositoryRegressionTest {
         for (Records.RoundPlayer row : before.roundPlayers) repository.submitBid(before.round.id, row.playerId, 0);
         repository.recordBids(before.round.id);
         for (Records.RoundPlayer row : before.roundPlayers) repository.setOutcome(before.round.id, row.playerId, Outcome.LOST);
-        rejects(() -> repository.completeRound(before.round.id));
+        try {
+            repository.completeRound(before.round.id);
+            fail("Impossible results must be rejected");
+        } catch (IllegalArgumentException error) {
+            assertTrue(error.getMessage().contains("predicted 0"));
+            assertTrue(error.getMessage().contains("3 cards"));
+            for (Records.RoundPlayer row : before.roundPlayers) assertTrue(error.getMessage().contains(row.nameSnapshot));
+            assertFalse(error.getMessage().toLowerCase(java.util.Locale.ROOT).contains("trick"));
+        }
         Snapshot after = repository.snapshot();
         assertEquals(before.round.id, after.round.id);
         assertEquals(before.round.dealerId, after.round.dealerId);

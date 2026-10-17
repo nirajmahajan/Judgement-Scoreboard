@@ -287,6 +287,7 @@ public final class MainActivity extends AppCompatActivity {
         @Override public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) { bind.accept(holder.itemView); }
     }
     private void bindHeader(View view) {
+        view.findViewById(R.id.home_cards).setVisibility("HOME".equals(model.screen()) ? View.VISIBLE : View.GONE);
         View strategy = view.findViewById(R.id.setup_strategy);
         boolean choosingPlayers = "PLAYERS".equals(model.screen()) && state.draft != null;
         strategy.setVisibility(choosingPlayers ? View.VISIBLE : View.GONE);
@@ -642,7 +643,7 @@ public final class MainActivity extends AppCompatActivity {
         }
         Records.Round round = state.round;
         String trump = "CUSTOM".equals(state.game.trumpMode) ? "" : getString(R.string.trump_format, getString(new int[]{R.string.spades, R.string.diamonds, R.string.clubs, R.string.hearts}[(round.number - 1) % 4]));
-        header(roundHeading(round.number, round.cards), (trump.isEmpty() ? "" : trump + "\n")
+        header(getResources().getQuantityString(R.plurals.deal_heading, round.cards, round.cards), (trump.isEmpty() ? "" : trump + "\n")
                 + getString(R.string.scoring_selected, StrategyEditor.label(this, ScoringStrategy.decode(round.scoringConfig))));
         if ("BIDDING".equals(round.phase)) bidding(round); else results(round);
 

@@ -1,6 +1,8 @@
 package android.example.judgement.domain;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -162,6 +164,68 @@ public final class GameRules {
             possibleTotals = nextTotals;
         }
         return possibleTotals[cards];
+    }
+
+    /** Null means the selections are possible; otherwise explains the conflicting results. */
+    public static String outcomeConflict(int cards, int[] predictions, Outcome[] outcomes,
+            String[] names) {
+        if (names == null || predictions == null || names.length != predictions.length) {
+            throw new IllegalArgumentException("Every result needs a player name.");
+        }
+        if (areOutcomesFeasible(cards, predictions, outcomes)) return null;
+        int wonTotal = 0;
+        List<String> winners = new ArrayList<>(), losers = new ArrayList<>();
+        List<String> zeroPredictionLosers = new ArrayList<>();
+        int onlyLoser = -1;
+        for (int index = 0; index < predictions.length; index++) {
+            if (outcomes[index] == null) return "Choose Won or Lost for every player.";
+            if (outcomes[index] == Outcome.WON) {
+                wonTotal += predictions[index];
+                winners.add(names[index]);
+            } else {
+                losers.add(names[index]);
+                onlyLoser = index;
+                if (predictions[index] == 0) zeroPredictionLosers.add(names[index]);
+            }
+        }
+        String wonSummary = winners.isEmpty() ? "No players are marked Won. "
+                : "Players marked Won (" + String.join(", ", winners) + ") predicted "
+                        + wonTotal + " in total. ";
+        if (wonTotal > cards) {
+            return wonSummary + "Only " + cards + " can be won in this deal, so that total is too high.";
+        }
+        int remaining = cards - wonTotal;
+        if (remaining == 0 && !zeroPredictionLosers.isEmpty()) {
+            return wonSummary + "That accounts for the whole deal. "
+                    + String.join(", ", zeroPredictionLosers)
+                    + " predicted 0 and cannot collect any cards, so they must be marked Won.";
+        }
+        if (zeroPredictionLosers.size() > remaining) {
+            return wonSummary + "Only " + cardCount(remaining)
+                    + (remaining == 1 ? " remains" : " remain") + " to be collected, but "
+                    + String.join(", ", zeroPredictionLosers)
+                    + " predicted 0 and are marked Lost. Each must collect at least 1 card; they need at least "
+                    + cardCount(zeroPredictionLosers.size()) + " between them.";
+        }
+        if (losers.isEmpty()) {
+            return wonSummary + "This is a " + cards + "-card deal, leaving "
+                    + cardCount(remaining) + " unaccounted for. At least one player must be marked Lost.";
+        }
+        if (losers.size() == 1) {
+            return wonSummary + names[onlyLoser] + " must collect the remaining "
+                    + cardCount(remaining) + ". That matches their prediction of "
+                    + predictions[onlyLoser] + ", so they must be marked Won.";
+        }
+        // With no zero predictions, every Lost player can collect zero. The only remaining
+        // impossible total for two or more such players is one when all predicted one.
+        return wonSummary + "There is 1 card left to be collected. "
+                + String.join(", ", losers)
+                + " are all marked Lost with predictions of 1, but whoever collects that card "
+                + "would match their prediction and must be marked Won.";
+    }
+
+    private static String cardCount(int count) {
+        return count + (count == 1 ? " card" : " cards");
     }
 
     public static long score(int bid, Outcome outcome) {

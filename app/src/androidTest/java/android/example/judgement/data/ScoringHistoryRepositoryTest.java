@@ -210,7 +210,14 @@ public class ScoringHistoryRepositoryTest {
         Snapshot.RoundHistory history = repository.snapshot().history.get(0);
         long first = history.players.get(0).playerId, second = history.players.get(1).playerId;
         rejects(() -> repository.editRound(history.round.id, 0, Arrays.asList(new RoundPlayerEdit(first, 1, Outcome.WON), new RoundPlayerEdit(second, 0, Outcome.WON))));
-        rejects(() -> repository.editRound(history.round.id, 0, Arrays.asList(new RoundPlayerEdit(first, 0, Outcome.WON), new RoundPlayerEdit(second, 0, Outcome.WON))));
+        try {
+            repository.editRound(history.round.id, 0, Arrays.asList(new RoundPlayerEdit(first, 0, Outcome.WON), new RoundPlayerEdit(second, 0, Outcome.WON)));
+            fail("Impossible historical results must be rejected");
+        } catch (IllegalArgumentException error) {
+            assertTrue(error.getMessage().contains("predicted 0 in total"));
+            assertTrue(error.getMessage().contains("1 card unaccounted for"));
+            assertFalse(error.getMessage().toLowerCase(java.util.Locale.ROOT).contains("trick"));
+        }
         rejects(() -> repository.editRound(history.round.id, 0, Arrays.asList(new RoundPlayerEdit(first, 0, Outcome.LOST), new RoundPlayerEdit(first, 0, Outcome.WON))));
         rejects(() -> repository.editRound(history.round.id, 0, Arrays.asList(new RoundPlayerEdit(first, -1, Outcome.LOST), new RoundPlayerEdit(second, 0, Outcome.WON))));
         rejects(() -> repository.editRound(history.round.id, 0, Arrays.asList(new RoundPlayerEdit(first, 0, null), new RoundPlayerEdit(second, 0, Outcome.WON))));

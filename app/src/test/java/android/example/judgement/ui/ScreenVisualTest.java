@@ -99,6 +99,7 @@ public class ScreenVisualTest {
         assertTrue("Home Help stays compact", help.getWidth() < activity.getResources().getDisplayMetrics().widthPixels / 2);
         assertTrue("Home Help stays at the bottom", help.getBottom() >= activity.findViewById(R.id.score_root).getHeight() - dp(16));
         assertEquals(0, contentAdapter((RecyclerView) activity.findViewById(R.id.screen_list)).getItemCount());
+        assertFullyVisible(activity.findViewById(R.id.home_cards));
         capture("home_light_320");
     }
 
@@ -120,6 +121,17 @@ public class ScreenVisualTest {
         assertEquals("PLAYERS", model.screen());
         assertEquals(draft, model.state.getValue().draft.id);
         assertEquals(6, model.state.getValue().draftPlayers.size());
+    }
+
+    @Test public void launcherShowsFannedPlayingCards() throws Exception {
+        launch(false, false, false);
+        android.widget.FrameLayout preview = new android.widget.FrameLayout(activity);
+        android.widget.ImageView icon = new android.widget.ImageView(activity);
+        icon.setImageDrawable(androidx.appcompat.content.res.AppCompatResources.getDrawable(activity, R.mipmap.ic_launcher));
+        preview.addView(icon, new android.widget.FrameLayout.LayoutParams(dp(128), dp(128), android.view.Gravity.CENTER));
+        activity.setContentView(preview); layout();
+        assertTrue(icon.getDrawable() instanceof android.graphics.drawable.AdaptiveIconDrawable);
+        capture("launcher_cards_128", icon);
     }
 
     @Test public void setupEllipsizesLongNamesWhileRetainingFullTextAndControls() throws Exception {
@@ -373,6 +385,32 @@ public class ScreenVisualTest {
         }
         assertFullyVisible(activity.findViewById(R.id.primary_action));
         capture("results_compact_320");
+    }
+
+    @Test public void impossibleResultsExplainWhichPlayerMustBeMarkedWon() throws Exception {
+        seedEnglishSetup(false);
+        databaseWorker.submit(() -> {
+            try (ScoreRepository repository = new ScoreRepository(context)) {
+                repository.startGame(repository.snapshot().draft.id);
+                Snapshot snapshot = repository.snapshot();
+                for (int index = 0; index < snapshot.roundPlayers.size(); index++) repository.submitBid(
+                        snapshot.round.id, snapshot.roundPlayers.get(index).playerId, index == 0 || index == 2 ? 1 : 0);
+                repository.recordBids(snapshot.round.id);
+                for (int index = 0; index < snapshot.roundPlayers.size(); index++) repository.setOutcome(
+                        snapshot.round.id, snapshot.roundPlayers.get(index).playerId, index == 1 || index == 2 ? Outcome.LOST : Outcome.WON);
+            }
+        }).get(10, TimeUnit.SECONDS);
+        launch(false, false, false); open("GAME", "ROUND");
+        assertEquals("Deal 1 card", ((TextView) activity.findViewById(R.id.screen_title)).getText().toString());
+        activity.findViewById(R.id.primary_action).performClick();
+        await(() -> model.error.getValue() != null); layout();
+        String error = model.error.getValue();
+        assertTrue(error.contains("Benjamin Alexander")); assertTrue(error.contains("Won"));
+        assertTrue(error.contains("0")); assertTrue(error.contains("1")); assertFalse(error.toLowerCase(java.util.Locale.ROOT).contains("trick"));
+        assertTrue(model.state.getValue().history.isEmpty());
+        assertEquals("RESULTS", model.state.getValue().round.phase);
+        assertFullyVisible(activity.findViewById(R.id.inline_error));
+        capture("results_impossible_reason_320");
     }
 
     @Test public void requiredSetupPromptsKeepSixNamesTogether() throws Exception {

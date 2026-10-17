@@ -100,7 +100,7 @@ public class CriticalUiRegressionTest {
         clickFooter(R.id.primary_action);
         awaitState(s -> s.history.size() == 1);
         onView(withId(R.id.screen_list)).perform(RecyclerViewActions.scrollToPosition(0));
-        awaitView(withText("Round 2 · 2 cards"));
+        awaitView(withText("Deal 2 cards"));
         assertEquals(10, inspector.snapshot().total(inspector.snapshot().players.get(7).id));
     }
 

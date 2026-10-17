@@ -297,6 +297,7 @@ public final class ScoreRepository implements AutoCloseable {
             List<Records.RoundPlayer> rows = dao.roundPlayers(roundId);
             int[] bids = new int[rows.size()];
             Outcome[] outcomes = new Outcome[rows.size()];
+            String[] names = new String[rows.size()];
             ScoringStrategy strategy = ScoringStrategy.decode(round.scoringConfig);
             Map<Long, Long> totals = totals(round.gameId);
             for (int index = 0; index < rows.size(); index++) {
@@ -304,11 +305,11 @@ public final class ScoreRepository implements AutoCloseable {
                 if (row.bid == null || row.outcome == null) fail("Choose Won or Lost for every player.");
                 bids[index] = row.bid;
                 outcomes[index] = Outcome.valueOf(row.outcome);
+                names[index] = row.nameSnapshot;
                 GameRules.addScore(totals.get(row.playerId), strategy.points(round.cards, row.bid, outcomes[index]));
             }
-            if (!GameRules.areOutcomesFeasible(round.cards, bids, outcomes)) {
-                fail("These results are impossible for " + round.cards + " tricks. Check the Won/Lost choices.");
-            }
+            String conflict = GameRules.outcomeConflict(round.cards, bids, outcomes, names);
+            if (conflict != null) fail(conflict);
             Records.Game game = requireGame(round.gameId);
             List<Records.GamePlayer> players = activePlayers(game.id);
             long nextDealer = GameRules.nextDealer(ids(players), round.dealerId);
@@ -376,6 +377,7 @@ public final class ScoreRepository implements AutoCloseable {
         Map<Long, Long> deltas = new LinkedHashMap<>();
         int[] correctedBids = new int[before.size()];
         Outcome[] correctedOutcomes = new Outcome[before.size()];
+        String[] names = new String[before.size()];
         boolean changed = false;
         for (int index = 0; index < before.size(); index++) {
             Records.RoundPlayer original = before.get(index);
@@ -388,6 +390,7 @@ public final class ScoreRepository implements AutoCloseable {
             row.bidPosition = original.bidPosition; row.nameSnapshot = original.nameSnapshot;
             row.bid = edit.bid; row.outcome = edit.outcome.name(); after.add(row);
             correctedBids[index] = edit.bid; correctedOutcomes[index] = edit.outcome;
+            names[index] = original.nameSnapshot;
             RoundEditPreview.PlayerChange change = new RoundEditPreview.PlayerChange(row.playerId,
                     row.nameSnapshot, original.bid, edit.bid, Outcome.valueOf(original.outcome), edit.outcome,
                     strategy.points(round.cards, original.bid, Outcome.valueOf(original.outcome)),
@@ -396,9 +399,8 @@ public final class ScoreRepository implements AutoCloseable {
             changed |= original.bid != edit.bid || !original.outcome.equals(row.outcome);
         }
         GameRules.validateBidsComplete(round.cards, roundIds(after), round.dealerId, bids(after));
-        if (!GameRules.areOutcomesFeasible(round.cards, correctedBids, correctedOutcomes)) {
-            fail("These results are impossible for " + round.cards + " tricks. Check the predictions and Won/Lost choices.");
-        }
+        String conflict = GameRules.outcomeConflict(round.cards, correctedBids, correctedOutcomes, names);
+        if (conflict != null) fail(conflict);
         return new ValidatedEdit(round, before, after, new RoundEditPreview(round.id, expectedRevision,
                 changes, totals(round.gameId, round.id, after), deltas, changed));
     }

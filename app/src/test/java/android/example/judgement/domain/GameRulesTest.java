@@ -143,6 +143,8 @@ public class GameRulesTest {
         int checked = 0;
         int forbiddenBidCases = 0;
         for (int count = 2; count <= 4; count++) {
+            String[] names = new String[count];
+            for (int player = 0; player < count; player++) names[player] = "Player " + player;
             for (int cards = 1; cards <= 5; cards++) {
                 for (int code = 0; code < integerPower(cards + 1, count); code++) {
                     int[] bids = decode(code, cards + 1, count);
@@ -156,6 +158,20 @@ public class GameRulesTest {
                         boolean actual = GameRules.areOutcomesFeasible(cards, bids, outcomes);
                         assertEquals("players=" + count + " cards=" + cards + " bids="
                                 + code + " outcomes=" + mask, expected, actual);
+                        String conflict = GameRules.outcomeConflict(cards, bids, outcomes, names);
+                        assertEquals("Only impossible allocations need an explanation", expected, conflict == null);
+                        if (conflict != null) {
+                            assertFalse(conflict.contains("trick"));
+                            assertTrue(conflict.contains("Player "));
+                            if (conflict.contains("There is 1 card left")) {
+                                int won = 0;
+                                for (int player = 0; player < count; player++) {
+                                    if (outcomes[player] == Outcome.WON) won += bids[player];
+                                    else assertEquals("Every Lost player in this explanation predicted one", 1, bids[player]);
+                                }
+                                assertEquals("The explanation's remaining amount is exact", 1, cards - won);
+                            }
+                        }
                         checked++;
                         if (bidTotal == cards) {
                             forbiddenBidCases++;
@@ -190,6 +206,50 @@ public class GameRulesTest {
                 new Outcome[] {Outcome.WON, Outcome.LOST, Outcome.LOST}));
         assertFalse(GameRules.areOutcomesFeasible(1, new int[] {1, 0},
                 new Outcome[] {Outcome.WON, null}));
+    }
+
+    @Test
+    public void resultConflictsExplainTheActualTotalsAndNamedPlayers() {
+        String[] names = {"Alice", "Ben", "Cara"};
+        String over = GameRules.outcomeConflict(3, new int[] {2, 2, 0},
+                new Outcome[] {Outcome.WON, Outcome.WON, Outcome.LOST}, names);
+        assertTrue(over.contains("Won (Alice, Ben) predicted 4 in total"));
+        assertTrue(over.contains("Only 3 can be won"));
+
+        String zeroMustWin = GameRules.outcomeConflict(3, new int[] {3, 0, 0},
+                new Outcome[] {Outcome.WON, Outcome.LOST, Outcome.LOST}, names);
+        assertTrue(zeroMustWin.contains("accounts for the whole deal"));
+        assertTrue(zeroMustWin.contains("Ben, Cara predicted 0"));
+        assertTrue(zeroMustWin.contains("must be marked Won"));
+
+        String zeroNeedMore = GameRules.outcomeConflict(2, new int[] {1, 0, 0},
+                new Outcome[] {Outcome.WON, Outcome.LOST, Outcome.LOST}, names);
+        assertTrue(zeroNeedMore.contains("Only 1 card remains"));
+        assertTrue(zeroNeedMore.contains("Ben, Cara predicted 0"));
+        assertTrue(zeroNeedMore.contains("at least 2 cards between them"));
+
+        String allZeroLost = GameRules.outcomeConflict(1, new int[] {0, 0, 0},
+                new Outcome[] {Outcome.LOST, Outcome.LOST, Outcome.LOST}, names);
+        assertTrue(allZeroLost.contains("Alice, Ben, Cara predicted 0"));
+        assertTrue(allZeroLost.contains("at least 3 cards between them"));
+
+        String loneLost = GameRules.outcomeConflict(3, new int[] {1, 2, 0},
+                new Outcome[] {Outcome.WON, Outcome.LOST, Outcome.WON}, names);
+        assertTrue(loneLost.contains("Ben must collect the remaining 2 cards"));
+        assertTrue(loneLost.contains("matches their prediction of 2"));
+
+        String unaccounted = GameRules.outcomeConflict(3, new int[] {1, 1, 0},
+                new Outcome[] {Outcome.WON, Outcome.WON, Outcome.WON}, names);
+        assertTrue(unaccounted.contains("predicted 2 in total"));
+        assertTrue(unaccounted.contains("1 card unaccounted for"));
+
+        String oneLeft = GameRules.outcomeConflict(1, new int[] {1, 1, 0},
+                new Outcome[] {Outcome.LOST, Outcome.LOST, Outcome.WON}, names);
+        assertTrue(oneLeft.contains("There is 1 card left"));
+        assertTrue(oneLeft.contains("Alice, Ben are all marked Lost with predictions of 1"));
+
+        assertNull(GameRules.outcomeConflict(3, new int[] {1, 0, 0},
+                new Outcome[] {Outcome.WON, Outcome.LOST, Outcome.LOST}, names));
     }
 
     @Test
