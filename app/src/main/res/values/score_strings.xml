@@ -6,12 +6,12 @@
     <string name="saved_players">Saved players</string><string name="help">Help</string><string name="completed_results">Completed results</string>
     <string name="back">Back</string><string name="home">Home</string><string name="cancel">Cancel</string><string name="save">Save</string>
     <string name="setup_players">1 · Players</string><string name="setup_settings">2 · Game settings</string>
-    <string name="setup_description">Add 2–52 players in seating order. Use Move up and Move down to set the seats.</string>
+    <string name="setup_description">Add 2–52 players in seating order. Drag a handle or use Move up and Move down.</string>
     <string name="add_player">Add player</string><string name="quick_add">Quick-add saved players</string><string name="next_settings">Game settings</string>
     <string name="save_future">Save for future games</string>
     <string name="rename">Rename</string><string name="remove">Remove</string><string name="move_up">Move up</string><string name="move_down">Move down</string>
     <string name="seat_format">Seat %1$d</string><string name="seat_dealer_format">Seat %1$d · Dealer</string>
-    <string name="move_announcement">%1$s moved to seat %2$d</string>
+    <string name="move_announcement">%1$s moved to seat %2$d</string><string name="drag_player">Drag to reorder %1$s</string>
     <string name="choose_dealer">Choose dealer</string><string name="dealer_format">Dealer: %1$s</string>
     <string name="ascending">Ascending · 1 card to maximum</string><string name="descending">Descending · maximum cards to 1</string>
     <string name="fixed_trump">Fixed trump · Spades, Diamonds, Clubs, Hearts</string><string name="custom_trump">Custom · Trump chosen at table</string>
@@ -42,7 +42,7 @@
     <string name="help_title">How to play</string>
     <string name="help_body">1. Add at least two players in seating order, then choose the dealer, deal direction and trump mode.\n\n2. Each player bids how many tricks they expect to take. Bidding starts after the dealer, who bids last. Total bids must differ from the number of cards dealt. The latest bid can be edited until the next player bids.\n\n3. After play, select Won for an exact bid and Lost for a missed bid. The app rejects combinations that cannot share all the tricks.\n\n4. A successful bid scores 10 + the bid. A successful bid of three earns 13 points. A missed bid scores zero.\n\n5. The dealer advances one seat after each round. Fixed trump cycles through Spades, Diamonds, Clubs and Hearts by round number. In Custom mode, trump is chosen at the table.\n\nUse Game options for player changes, dealer changes or score corrections. Structural changes after bidding starts require restarting the current round. Leaving the app preserves your game. Resume from Home.\n\nSaved players are an optional library. Saving or removing a profile does not change an existing game.</string>
     <string name="loading">Opening your scorecard…</string>
-    <string name="use_saved_player">Use saved player</string><string name="removed_player_score">%1$s · Removed from table</string><string name="original_null">NULL (original value)</string><string name="original_empty_name">Empty name (original value)</string>
+    <string name="drag_handle">Drag handle</string><string name="use_saved_player">Use saved player</string><string name="removed_player_score">%1$s · Removed from table</string><string name="original_null">NULL (original value)</string><string name="original_empty_name">Empty name (original value)</string>
     <plurals name="score_points"><item quantity="one">%1$d point</item><item quantity="other">%1$d points</item></plurals>
     <plurals name="round_heading"><item quantity="one">Round %1$d · %2$d card</item><item quantity="other">Round %1$d · %2$d cards</item></plurals>
     <plurals name="adjustment_detail"><item quantity="one">%1$d → %2$d point</item><item quantity="other">%1$d → %2$d points</item></plurals>
