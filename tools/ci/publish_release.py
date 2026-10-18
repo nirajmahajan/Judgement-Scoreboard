@@ -47,6 +47,7 @@ if new_key:
     body = f"""Judgement Scoreboard {tag}
 
 - Compact blue interface, saved players, drag ordering, and fast 0/1/2/3 predictions.
+- Dealer prediction hints show the forbidden value; prediction entry reveals hidden players while preserving the viewport for visible players.
 - Responsive text and controls for smaller screens, display zoom, and large fonts.
 - Aggressive zero predictions earn 10 below the round player count and 7 from equality; history shows newest events first.
 - Scoring strategies, durable game state, editable round history, and cumulative score graph.

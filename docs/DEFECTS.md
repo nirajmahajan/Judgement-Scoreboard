@@ -103,3 +103,8 @@ created by chatgpt-codex
 - Successful zero predictions earn 10 when fewer cards are dealt than participants in that round; the Aggressive 7-point reward begins at equality. All totals, history, edits, and statistics use each recorded round roster.
 - History cards show newest event time first, including score corrections among completed rounds.
 - Regression: scoring boundary matrix, repository completion/edit/reopen coverage, recorded-roster statistics, and mixed-event history ordering.
+
+### Prediction entry guidance and visibility
+- Dealer input shows a muted Not X hint for the legal prediction that would make total predictions equal the cards dealt; the hint never becomes a recorded value.
+- Advancing predictions preserves the viewport when the current row is fully visible. Hidden rows move to the bottom of the viewport, including after the keyboard reduces available space.
+- Regression: dealer hint recalculation/recycling, visible-row scroll stability, hidden-row bottom alignment, keyboard resize, and normal/200% text screenshots.

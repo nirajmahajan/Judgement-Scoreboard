@@ -325,6 +325,61 @@ public class ScreenVisualTest {
         roundPreview("FIXED", true, "round_aggressive_320");
     }
 
+    @Test public void dealerPredictionHintFitsInsideTheEmptyNumberInput() throws Exception {
+        dealerPredictionHint("dealer_prediction_hint_320");
+    }
+
+    @Test public void dealerPredictionHintAtTwoHundredPercentFontStaysComplete() throws Exception {
+        RuntimeEnvironment.setFontScale(2f);
+        dealerPredictionHint("dealer_prediction_hint_font_200_320");
+    }
+
+    private void dealerPredictionHint(String imageName) throws Exception {
+        databaseWorker.submit(() -> {
+            try (ScoreRepository repository = new ScoreRepository(context)) {
+                List<PlayerSpec> players = Arrays.asList(new PlayerSpec("Alice"), new PlayerSpec("Ben"),
+                        new PlayerSpec("Charlie"), new PlayerSpec("Dana"), new PlayerSpec("Emma"));
+                repository.startGame(repository.saveDraft(new DraftSpec(0, players, "DESCENDING", "CUSTOM", null)));
+                Snapshot round = repository.snapshot();
+                for (int index = 0; index < round.roundPlayers.size() - 1; index++)
+                    repository.submitBid(round.round.id, round.roundPlayers.get(index).playerId, 0);
+            }
+        }).get(10, TimeUnit.SECONDS);
+        launch(false, false, false); open("GAME", "ROUND");
+        Snapshot snapshot = model.state.getValue();
+        assertEquals(10, snapshot.round.cards);
+        assertEquals(snapshot.round.dealerId, snapshot.roundPlayers.get(4).playerId);
+        RecyclerView list = activity.findViewById(R.id.screen_list);
+        RecyclerView.ViewHolder dealer = list.findViewHolderForAdapterPosition(4 + contentOffset(list));
+        assertNotNull("The current dealer remains visible", dealer);
+        TextView input = dealer.itemView.findViewById(R.id.bid_input);
+        assertEquals(View.VISIBLE, input.getVisibility());
+        assertEquals("Not 10", input.getHint().toString());
+        assertEquals("The hint never becomes a prediction", "", input.getText().toString());
+        assertFullyVisible(input);
+        int hintColor = com.google.android.material.color.MaterialColors.getColor(input,
+                com.google.android.material.R.attr.colorOnSurfaceVariant);
+        assertEquals("The hint uses the muted grey text role", hintColor, input.getCurrentHintTextColor());
+        assertTrue("The hint is visually distinct from an entered prediction",
+                input.getCurrentHintTextColor() != input.getCurrentTextColor());
+        int width = input.getWidth() - input.getCompoundPaddingLeft() - input.getCompoundPaddingRight();
+        CharSequence hint = input.getHint();
+        android.text.TextPaint paint = new android.text.TextPaint(input.getPaint());
+        assertTrue("The complete dealer restriction fits the numeric field",
+                Layout.getDesiredWidth(hint, paint) <= width + 1);
+        Layout hintLayout = android.text.StaticLayout.Builder.obtain(hint, 0, hint.length(), paint, width)
+                .setIncludePad(false).build();
+        assertEquals("The dealer restriction stays on one line", 1, hintLayout.getLineCount());
+        assertTrue("Enlarged hint text fits vertically", hintLayout.getHeight()
+                <= input.getHeight() - input.getCompoundPaddingTop() - input.getCompoundPaddingBottom());
+        Rect nameBounds = new Rect(), inputBounds = new Rect();
+        dealer.itemView.findViewById(R.id.row_name).getGlobalVisibleRect(nameBounds);
+        input.getGlobalVisibleRect(inputBounds);
+        assertFalse("The dealer name and prediction input never overlap", Rect.intersects(nameBounds, inputBounds));
+        assertFullyVisible(dealer.itemView.findViewById(R.id.dealer_tag));
+        capture(imageName, activity.getWindow().getDecorView());
+    }
+
     private void roundPreview(String trumpMode, boolean plus, String imageName) throws Exception {
         List<String> names = Arrays.asList("Alice", "Benjamin Alexander", "Charlie", "David", "Emma");
         databaseWorker.submit(() -> {

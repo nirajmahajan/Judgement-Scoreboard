@@ -57,6 +57,8 @@ public final class MainActivity extends AppCompatActivity {
     private LinearLayout fixedActions;
     private View addSavedPlayer, homeHelp;
     private boolean biddingColumns;
+    private boolean predictionRevealPending;
+    private long autoScrollingPrediction = -1;
     private RosterAdapter roster;
     private StrategyEditor strategyEditor;
     private RoundEditorAdapter roundEditor;
@@ -111,6 +113,14 @@ public final class MainActivity extends AppCompatActivity {
         });
         list = findViewById(R.id.screen_list);
         list.setLayoutManager(new LinearLayoutManager(this));
+        list.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+            if (bottom - top != oldBottom - oldTop) requestPredictionVisibility();
+        });
+        list.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override public void onScrollStateChanged(RecyclerView view, int state) {
+                if (state == RecyclerView.SCROLL_STATE_IDLE) autoScrollingPrediction = -1;
+            }
+        });
         headingText = getString(R.string.loading);
         headerAdapter = new ChromeAdapter(R.layout.score_header, this::bindHeader);
         footerAdapter = new ChromeAdapter(R.layout.score_footer, this::bindFooter);
@@ -302,6 +312,41 @@ public final class MainActivity extends AppCompatActivity {
             list.stopScroll();
             ((LinearLayoutManager) list.getLayoutManager()).scrollToPositionWithOffset(0, 0);
         } else if (scroll != null && !revealScoringError) list.getLayoutManager().onRestoreInstanceState(scroll);
+        if (biddingColumns) requestPredictionVisibility();
+        else if (autoScrollingPrediction != -1) list.stopScroll();
+    }
+    private void requestPredictionVisibility() {
+        if (predictionRevealPending) return;
+        predictionRevealPending = true;
+        androidx.core.view.OneShotPreDrawListener.add(list, () -> {
+            predictionRevealPending = false;
+            revealCurrentPrediction();
+        });
+    }
+    private void revealCurrentPrediction() {
+        if (state == null || state.round == null || model == null || contentAdapter != bids
+                || !"GAME".equals(model.screen()) || !"ROUND".equals(model.tab())
+                || !"BIDDING".equals(state.round.phase) || list.getHeight() == 0) return;
+        int current = 0;
+        while (current < state.roundPlayers.size() && state.roundPlayers.get(current).bid != null) current++;
+        if (current > 0 && model.editingBid(state.round.id, state.roundPlayers.get(current - 1).playerId)) current--;
+        if (current == state.roundPlayers.size()) return;
+        long playerId = state.roundPlayers.get(current).playerId;
+        if (autoScrollingPrediction != -1 && autoScrollingPrediction != playerId) list.stopScroll();
+        LinearLayoutManager layout = (LinearLayoutManager) list.getLayoutManager();
+        int position = headerAdapter.getItemCount() + current;
+        View row = layout.findViewByPosition(position);
+        if (row != null && layout.getDecoratedTop(row) >= 0 && layout.getDecoratedBottom(row) <= list.getHeight()) return;
+        if (autoScrollingPrediction == playerId && list.getScrollState() == RecyclerView.SCROLL_STATE_SETTLING) return;
+        autoScrollingPrediction = playerId;
+        androidx.recyclerview.widget.LinearSmoothScroller reveal = new androidx.recyclerview.widget.LinearSmoothScroller(this) {
+            @Override protected int getVerticalSnapPreference() { return SNAP_TO_END; }
+            @Override public int calculateDyToMakeVisible(View view, int snapPreference) {
+                RecyclerView.LayoutParams params = (RecyclerView.LayoutParams) view.getLayoutParams();
+                return list.getHeight() - getLayoutManager().getDecoratedBottom(view) - params.bottomMargin;
+            }
+        };
+        reveal.setTargetPosition(position); layout.startSmoothScroll(reveal);
     }
     private void header(String heading, String subtitle) {
         headingText = heading; descriptionText = subtitle;
@@ -780,7 +825,7 @@ public final class MainActivity extends AppCompatActivity {
             else if (firstMissing == state.roundPlayers.size()) firstMissing = i;
         }
         if (bids == null) bids = new BidAdapter(model, this::render);
-        bids.submit(round.id, round.dealerId, state.roundPlayers, firstMissing); setContent(bids);
+        bids.submit(round.id, round.dealerId, round.cards, state.roundPlayers, firstMissing); setContent(bids);
         fixedActions.removeAllViews(); fixedActions.setVisibility(View.VISIBLE);
         Records.RoundPlayer current = firstMissing < state.roundPlayers.size() ? state.roundPlayers.get(firstMissing) : null;
         int[] ids = {R.id.quick_bid_0, R.id.quick_bid_1, R.id.quick_bid_2, R.id.quick_bid_3};

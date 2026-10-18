@@ -24,12 +24,13 @@ final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
     private final Runnable refresh;
     private final List<Records.RoundPlayer> players = new ArrayList<>();
     private long roundId, dealerId;
-    private int current;
+    private int current, cards;
     BidAdapter(ScoreViewModel model, Runnable refresh) {
         this.model = model; this.refresh = refresh; setHasStableIds(true);
     }
-    void submit(long roundId, long dealerId, List<Records.RoundPlayer> players, int current) {
-        this.dealerId = dealerId; this.roundId = roundId; this.players.clear(); this.players.addAll(players); this.current = current;
+    void submit(long roundId, long dealerId, int cards, List<Records.RoundPlayer> players, int current) {
+        this.dealerId = dealerId; this.roundId = roundId; this.cards = cards;
+        this.players.clear(); this.players.addAll(players); this.current = current;
         notifyDataSetChanged();
     }
     @Override public long getItemId(int position) { return players.get(position).playerId; }
@@ -55,7 +56,16 @@ final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
         holder.input.setVisibility(editing ? View.VISIBLE : View.GONE);
         String input = model.bidInput(owner, player.playerId, player.bid);
         if (!holder.input.getText().toString().equals(input)) holder.input.setText(input);
-        holder.input.setContentDescription(player.nameSnapshot + ", " + holder.itemView.getContext().getString(R.string.table_bid));
+        Integer forbidden = dealer ? forbiddenPrediction() : null;
+        String hint = forbidden == null ? null : holder.itemView.getContext().getString(R.string.dealer_prediction_hint, forbidden);
+        android.text.SpannableString styledHint = hint == null ? null : new android.text.SpannableString(hint);
+        if (styledHint != null) styledHint.setSpan(new android.text.style.AbsoluteSizeSpan(hintSize(holder.input.getContext())),
+                0, styledHint.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        holder.input.setHint(styledHint);
+        holder.input.setHintTextColor(com.google.android.material.color.MaterialColors.getColor(holder.input,
+                com.google.android.material.R.attr.colorOnSurfaceVariant));
+        holder.input.setContentDescription(player.nameSnapshot + ", " + holder.itemView.getContext().getString(R.string.table_bid)
+                + (hint == null ? "" : ", " + hint));
         holder.watcher = new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -80,11 +90,27 @@ final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
             else { model.editBid(owner, player.playerId); refresh.run(); }
         });
     }
+    private Integer forbiddenPrediction() {
+        int total = 0;
+        for (Records.RoundPlayer player : players) if (player.playerId != dealerId) {
+            if (player.bid == null) return null;
+            total += player.bid;
+        }
+        int forbidden = cards - total;
+        return forbidden >= 0 && forbidden <= cards ? forbidden : null;
+    }
+    private static int hintSize(android.content.Context context) {
+        return Math.round(android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP,
+                12, context.getResources().getDisplayMetrics()));
+    }
     static int inputWidth(android.content.Context context) {
         TextView sample = new TextView(context);
         sample.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyLarge);
+        float numberWidth = sample.getPaint().measureText("52");
+        sample.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, hintSize(context));
+        float hintWidth = sample.getPaint().measureText(context.getString(R.string.dealer_prediction_hint, 52));
         return Math.max(Math.round(48 * context.getResources().getDisplayMetrics().density),
-                (int) Math.ceil(sample.getPaint().measureText("52"))
+                (int) Math.ceil(Math.max(numberWidth, hintWidth))
                         + Math.round(8 * context.getResources().getDisplayMetrics().density));
     }
     static final class Holder extends RecyclerView.ViewHolder {
