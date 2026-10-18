@@ -124,6 +124,86 @@ public final class PredictionInteractionUiTest {
                 new java.io.File(context.getExternalFilesDir(null), "dealer-any-two-cards.png")));
     }
 
+    @Test public void previousPredictionEditHasOneEditorAndQuickActionsUpdateOnlyThatPlayer() {
+        start(4, 1); launchGame(); assertSingleEditor(1);
+        onView(withContentDescription(context.getString(R.string.edit_bid) + ", " + name(0))).perform(click());
+        assertSingleEditor(0);
+        onView(withId(R.id.quick_bid_2)).perform(click()); awaitBid(0, 2);
+        assertNull("Editing must not submit the next player's prediction",repository.snapshot().roundPlayers.get(1).bid);
+        assertSingleEditor(1);
+        onView(withContentDescription(context.getString(R.string.edit_bid) + ", " + name(0))).perform(click());
+        onView(predictionInput(0)).perform(replaceText("3"),closeSoftKeyboard());
+        scenario.recreate(); awaitGame(); assertSingleEditor(0);
+        onView(predictionInput(0)).check((view,missing) -> {
+            assertNull(missing); assertEquals("3",((EditText)view).getText().toString());
+        });
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+        assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(
+                new java.io.File(context.getExternalFilesDir(null),"editing-previous-prediction.png")));
+        onView(withContentDescription(context.getString(R.string.enter_bid) + ", " + name(0))).perform(click());
+        awaitBid(0,3); assertSingleEditor(1);
+        assertNull("Typed edits preserve the next player's pending entry",repository.snapshot().roundPlayers.get(1).bid);
+        scenario.onActivity(activity -> assertTrue(activity.findViewById(R.id.quick_bid_0)
+                .getContentDescription().toString().endsWith(", "+name(1))));
+    }
+
+    @Test public void dealerPredictionEditKeepsForbiddenValueAndBoundsAfterAllPredictions() {
+        start(4,6,6,0,0); launchGame();
+        onView(withContentDescription(context.getString(R.string.edit_bid) + ", " + name(3))).perform(click());
+        assertSingleEditor(3);
+        scenario.onActivity(activity -> {
+            assertEquals("Not 1",input(list(activity),3).getHint().toString());
+            assertFalse(activity.findViewById(R.id.quick_bid_1).isEnabled());
+            assertTrue(activity.findViewById(R.id.quick_bid_0).isEnabled());
+            assertTrue(activity.findViewById(R.id.quick_bid_2).isEnabled());
+        });
+        onView(predictionInput(3)).perform(replaceText("1"),closeSoftKeyboard());
+        onView(withContentDescription(context.getString(R.string.enter_bid) + ", " + name(3))).perform(click());
+        await(() -> inspect(activity -> model(activity).error.getValue()!=null),"forbidden dealer edit rejected");
+        assertEquals(Integer.valueOf(0),repository.snapshot().roundPlayers.get(3).bid);
+        assertSingleEditor(3);
+        scenario.recreate(); awaitGame(); assertSingleEditor(3);
+        scenario.onActivity(activity -> {
+            assertEquals("Not 1",input(list(activity),3).getHint().toString());
+            assertEquals("1",input(list(activity),3).getText().toString());
+            assertFalse(activity.findViewById(R.id.quick_bid_1).isEnabled());
+        });
+        onView(predictionInput(3)).perform(replaceText("14"),closeSoftKeyboard());
+        onView(withContentDescription(context.getString(R.string.enter_bid) + ", " + name(3))).perform(click());
+        await(() -> inspect(activity -> "Enter a prediction from 0 to 13.".equals(model(activity).error.getValue())),
+                "out-of-range dealer edit rejected");
+        assertEquals(Integer.valueOf(0),repository.snapshot().roundPlayers.get(3).bid);
+        assertSingleEditor(3);
+        onView(withId(R.id.quick_bid_2)).perform(click()); awaitBid(3,2);
+        await(() -> inspect(activity -> {
+            for(int i=0;i<4;i++) if(input(list(activity),i).isShown()) return false;
+            return activity.findViewById(R.id.primary_action)!=null;
+        }),"successful dealer edit returns to Record predictions");
+        for(int i=0;i<3;i++) assertEquals(Integer.valueOf(new int[]{6,6,0}[i]),repository.snapshot().roundPlayers.get(i).bid);
+    }
+
+    private void assertSingleEditor(int expectedIndex) {
+        await(() -> inspect(activity -> {
+            int inputs=0,confirmations=0;
+            String confirmPrefix=context.getString(R.string.enter_bid)+", ";
+            for(int i=0;i<4;i++) {
+                View row=row(list(activity),i); if(row==null)return false;
+                EditText input=row.findViewById(R.id.bid_input);
+                if(input.isShown()) {
+                    if(i!=expectedIndex)return false;
+                    inputs++;
+                }
+                View confirm=row.findViewById(R.id.bid_confirm);
+                if(confirm.isShown()&&confirm.getContentDescription()!=null
+                        &&confirm.getContentDescription().toString().startsWith(confirmPrefix)) {
+                    if(i!=expectedIndex)return false;
+                    confirmations++;
+                }
+            }
+            return inputs==1&&confirmations==1;
+        }),"exactly one prediction input and confirmation for player "+expectedIndex);
+    }
+
     @Test public void advancingToAnAlreadyVisiblePredictionKeepsTheExactScrollOffset() {
         start(24); launchGame();
         await(() -> inspect(activity -> fullyVisible(list(activity), 1)), "both first players visible");

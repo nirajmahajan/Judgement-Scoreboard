@@ -125,3 +125,8 @@ created by chatgpt-codex
 ### Dealer prediction without a restriction
 - Once every other player has predicted, the dealer input says Any if their total already exceeds the cards dealt. Otherwise it shows Not X. Both strategies retain identical dealer validation.
 - Native regressions cover the photographed two-card, six-player case, bounds, edits between Any and Not X, and recreation.
+
+### D43: Previous prediction editing activated two rows and misrouted quick actions
+- Editing the latest recorded prediction left the next player editable and sent quick buttons to that pending player. A shared ViewModel selection now drives the sole input, confirmation, quick buttons, and reveal target. Dealer quick-edit validation excludes the dealer’s previously recorded value.
+- Native regressions cover one active editor, quick/typed edits, pending-player preservation, rotation, completed dealer edits, forbidden values, and bounds. The existing tests exercised typed edits but omitted active-control counts and quick actions during editing.
+- A separate positive Correct score test opens the real row action and verifies one adjustment survives recreation and database reopening.

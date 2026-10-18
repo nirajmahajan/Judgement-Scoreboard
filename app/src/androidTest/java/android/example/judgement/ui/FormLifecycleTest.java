@@ -29,10 +29,12 @@ import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.action.ViewActions.replaceText;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
 import static androidx.test.espresso.matcher.ViewMatchers.isChecked;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static androidx.test.espresso.matcher.ViewMatchers.withContentDescription;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -92,6 +94,46 @@ public class FormLifecycleTest {
         onView(withId(R.id.edit_value)).check(matches(withText(invalid)));
         onView(withText(R.string.score_invalid)).check(matches(isDisplayed()));
         assertEquals(0L, repository.snapshot().total(snapshot.players.get(0).id));
+    }
+
+    @Test public void correctScoreActionSavesOnceAndSurvivesRecreationAndDatabaseReopen() {
+        Snapshot initial=seed(true); long player=initial.players.get(0).id;
+        launch("PICK_SCORE");
+        onView(withId(R.id.screen_list)).perform(RecyclerViewActions.scrollToPosition(1));
+        onView(withContentDescription(context.getString(R.string.correct_score)+", Ada")).perform(click());
+        awaitForm();
+        assertEquals(player,currentForm().playerId);
+        onView(withId(R.id.edit_value)).perform(replaceText("42"));
+        onView(withText(R.string.save)).perform(click());
+        await(() -> currentForm()==null&&repository.snapshot().total(player)==42L);
+        Snapshot saved=repository.snapshot();
+        assertEquals(1,saved.adjustments.size());
+        assertEquals(player,saved.adjustments.get(0).playerId);
+        assertEquals(0L,saved.adjustments.get(0).previousTotal);
+        assertEquals(42L,saved.adjustments.get(0).delta);
+        scenario.recreate();
+        await(() -> {
+            AtomicReference<Snapshot> state=new AtomicReference<>();
+            scenario.onActivity(activity -> state.set(new ViewModelProvider(activity).get(ScoreViewModel.class).state.getValue()));
+            return state.get()!=null&&state.get().total(player)==42L;
+        });
+        assertEquals(null,currentForm());
+        onView(withId(R.id.edit_value)).check(doesNotExist());
+        assertEquals(1,repository.snapshot().adjustments.size());
+        RepositoryTestCleanup.close(scenario,repository); scenario=null; repository=null;
+        repository=new ScoreRepository(context); launch("PICK_SCORE");
+        assertEquals(initial.game.id,repository.snapshot().game.id);
+        assertEquals(42L,repository.snapshot().total(player));
+        assertEquals(1,repository.snapshot().adjustments.size());
+        onView(withId(R.id.edit_value)).check(doesNotExist());
+        onView(withId(R.id.screen_list)).perform(RecyclerViewActions.scrollToPosition(1));
+        onView(withContentDescription(context.getString(R.string.correct_score)+", Ada")).perform(click());
+        awaitForm();
+        assertEquals(42L,currentForm().expectedScore);
+        onView(withId(R.id.edit_value)).check(matches(withText("42")));
+        onView(withText(R.string.cancel)).perform(click());
+        await(() -> currentForm()==null);
+        assertEquals("Reopening and cancelling cannot duplicate the score change",1,repository.snapshot().adjustments.size());
     }
 
     @Test public void restoredBidFormRejectsItsOriginalRoundAfterRestart() {

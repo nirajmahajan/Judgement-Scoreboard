@@ -344,9 +344,7 @@ public final class MainActivity extends AppCompatActivity {
         if (state == null || state.round == null || model == null || contentAdapter != bids
                 || !"GAME".equals(model.screen()) || !"ROUND".equals(model.tab())
                 || !"BIDDING".equals(state.round.phase) || list.getHeight() == 0) return;
-        int current = 0;
-        while (current < state.roundPlayers.size() && state.roundPlayers.get(current).bid != null) current++;
-        if (current > 0 && model.editingBid(state.round.id, state.roundPlayers.get(current - 1).playerId)) current--;
+        int current = model.predictionEntryIndex(state.round.id, state.roundPlayers);
         if (current == state.roundPlayers.size()) return;
         long playerId = state.roundPlayers.get(current).playerId;
         if (autoScrollingPrediction != -1 && autoScrollingPrediction != playerId) list.stopScroll();
@@ -859,16 +857,13 @@ public final class MainActivity extends AppCompatActivity {
     }
     private void bidding(Records.Round round) {
         tableDetailLabel = R.string.table_bid; biddingColumns = true;
-        int firstMissing = state.roundPlayers.size(), submittedTotal = 0;
-        for (int i = 0; i < state.roundPlayers.size(); i++) {
-            Integer bid = state.roundPlayers.get(i).bid;
-            if (bid != null) submittedTotal += bid;
-            else if (firstMissing == state.roundPlayers.size()) firstMissing = i;
-        }
+        int entryIndex = model.predictionEntryIndex(round.id, state.roundPlayers), submittedTotal = 0;
+        for (Records.RoundPlayer player : state.roundPlayers) if (player.bid != null) submittedTotal += player.bid;
         if (bids == null) bids = new BidAdapter(model, this::render);
-        bids.submit(round.id, round.dealerId, round.cards, state.roundPlayers, firstMissing, TrumpCaller.playerId(state.game.trumpMode, state.roundPlayers)); setContent(bids);
+        bids.submit(round.id, round.dealerId, round.cards, state.roundPlayers, entryIndex, TrumpCaller.playerId(state.game.trumpMode, state.roundPlayers)); setContent(bids);
         fixedActions.removeAllViews(); fixedActions.setVisibility(View.VISIBLE);
-        Records.RoundPlayer current = firstMissing < state.roundPlayers.size() ? state.roundPlayers.get(firstMissing) : null;
+        Records.RoundPlayer current = entryIndex < state.roundPlayers.size() ? state.roundPlayers.get(entryIndex) : null;
+        int otherPredictions = submittedTotal - (current == null || current.bid == null ? 0 : current.bid);
         int[] ids = {R.id.quick_bid_0, R.id.quick_bid_1, R.id.quick_bid_2, R.id.quick_bid_3};
         for (int value = 0; current != null && value <= 3; value++) {
             final int bid = value;
@@ -878,7 +873,7 @@ public final class MainActivity extends AppCompatActivity {
             button.setMinHeight(dp(48));
             button.setContentDescription(getString(R.string.quick_bid, value) + (current == null ? "" : ", " + current.nameSnapshot));
             button.setEnabled(current != null && value <= round.cards
-                    && (current.playerId != round.dealerId || submittedTotal + value != round.cards));
+                    && (current.playerId != round.dealerId || otherPredictions + value != round.cards));
             if (current != null) button.setOnClickListener(view -> model.submitInlineBid(round.id, current.playerId, Integer.toString(bid)));
             LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(0, dp(56), 1);
             if (value < 3) layout.setMarginEnd(dp(6));

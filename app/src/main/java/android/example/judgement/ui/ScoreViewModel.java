@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Bundle;
 import android.example.judgement.data.PlayerSpec;
+import android.example.judgement.data.Records;
 import android.example.judgement.data.ScoreRepository;
 import android.example.judgement.data.Snapshot;
 import android.example.judgement.data.RoundEditPreview;
@@ -124,6 +125,11 @@ public final class ScoreViewModel extends AndroidViewModel {
     boolean editingBid(long roundId, long playerId) {
         Bundle inputs = bidInputs(roundId);
         return inputs.containsKey("editing") && inputs.getLong("editing") == playerId;
+    }
+    int predictionEntryIndex(long roundId, List<Records.RoundPlayer> players) {
+        int next = 0;
+        while (next < players.size() && players.get(next).bid != null) next++;
+        return next > 0 && editingBid(roundId, players.get(next - 1).playerId) ? next - 1 : next;
     }
     void editBid(long roundId, long playerId) {
         Bundle inputs = new Bundle(bidInputs(roundId));

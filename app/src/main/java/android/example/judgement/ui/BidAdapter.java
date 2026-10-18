@@ -26,14 +26,14 @@ final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
     private final List<Records.RoundPlayer> players = new ArrayList<>();
     private long roundId, dealerId;
     private Long trumpCallerId;
-    private int current, cards;
+    private int entryIndex, cards;
     BidAdapter(ScoreViewModel model, Runnable refresh) {
         this.model = model; this.refresh = refresh; setHasStableIds(true);
     }
-    void submit(long roundId, long dealerId, int cards, List<Records.RoundPlayer> players, int current, Long trumpCallerId) {
+    void submit(long roundId, long dealerId, int cards, List<Records.RoundPlayer> players, int entryIndex, Long trumpCallerId) {
         this.dealerId = dealerId; this.roundId = roundId; this.cards = cards;
         this.trumpCallerId = trumpCallerId;
-        this.players.clear(); this.players.addAll(players); this.current = current;
+        this.players.clear(); this.players.addAll(players); this.entryIndex = entryIndex;
         notifyDataSetChanged();
     }
     @Override public long getItemId(int position) { return players.get(position).playerId; }
@@ -44,8 +44,9 @@ final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
     @Override public void onBindViewHolder(@NonNull Holder holder, int position) {
         Records.RoundPlayer player = players.get(position);
         final long owner = roundId;
-        boolean latest = position == current - 1;
-        boolean editing = position == current || (latest && model.editingBid(owner, player.playerId));
+        boolean latest = player.bid != null
+                && (position + 1 == players.size() || players.get(position + 1).bid == null);
+        boolean editing = position == entryIndex;
         holder.name.setText(player.nameSnapshot);
         boolean dealer = player.playerId == dealerId;
         boolean trumpCaller = Objects.equals(trumpCallerId, player.playerId);
@@ -55,7 +56,7 @@ final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
                 + (dealer ? ", " + holder.itemView.getContext().getString(R.string.dealer_tag) : "")
                 + (trumpCaller ? ", " + holder.itemView.getContext().getString(R.string.trump_tag) : ""));
         holder.name.setTooltipText(player.nameSnapshot);
-        holder.name.setTypeface(null, position == current ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+        holder.name.setTypeface(null, position == entryIndex ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
         holder.detail.setText(player.bid == null ? "—" : player.bid.toString());
         holder.detail.setVisibility(editing ? View.GONE : View.VISIBLE);
         if (holder.watcher != null) holder.input.removeTextChangedListener(holder.watcher);

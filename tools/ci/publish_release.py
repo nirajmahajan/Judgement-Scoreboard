@@ -49,6 +49,7 @@ if new_key:
 - Compact blue interface, saved players, drag ordering, and fast 0/1/2/3 predictions.
 - Dealer “Not X” hints are verified in both Default and Aggressive, including prediction edits, recreation, and rejection of forbidden values. The dealer sees “Any” when other predictions already exceed the cards dealt.
 - Prediction entry reveals hidden players while preserving the viewport for visible players.
+- Editing a prediction uses one field and confirmation; quick 0/1/2/3 buttons update the edited player and preserve the next pending prediction. Dealer edits retain correct bounds and forbidden values.
 - Back returns other screens to the current Round, then returns Round to Home without clearing the game. Unsaved player and round edits retain discard confirmation.
 - Responsive text and controls for smaller screens, display zoom, and large fonts.
 - Aggressive successful zero predictions earn 10 for 1–3 cards and 7 from 4 cards; the prediction screen shows the 7-point note.
