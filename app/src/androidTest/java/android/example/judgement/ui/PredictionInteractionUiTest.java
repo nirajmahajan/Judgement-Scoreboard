@@ -148,7 +148,7 @@ public final class PredictionInteractionUiTest {
     }
 
     @Test public void dealerPredictionEditKeepsForbiddenValueAndBoundsAfterAllPredictions() {
-        start(4,6,6,0,0); launchGame();
+        start(4,6,6,0,2); launchGame();
         onView(withContentDescription(context.getString(R.string.edit_bid) + ", " + name(3))).perform(click());
         assertSingleEditor(3);
         scenario.onActivity(activity -> {
@@ -160,7 +160,7 @@ public final class PredictionInteractionUiTest {
         onView(predictionInput(3)).perform(replaceText("1"),closeSoftKeyboard());
         onView(withContentDescription(context.getString(R.string.enter_bid) + ", " + name(3))).perform(click());
         await(() -> inspect(activity -> model(activity).error.getValue()!=null),"forbidden dealer edit rejected");
-        assertEquals(Integer.valueOf(0),repository.snapshot().roundPlayers.get(3).bid);
+        assertEquals(Integer.valueOf(2),repository.snapshot().roundPlayers.get(3).bid);
         assertSingleEditor(3);
         scenario.recreate(); awaitGame(); assertSingleEditor(3);
         scenario.onActivity(activity -> {
@@ -172,9 +172,9 @@ public final class PredictionInteractionUiTest {
         onView(withContentDescription(context.getString(R.string.enter_bid) + ", " + name(3))).perform(click());
         await(() -> inspect(activity -> "Enter a prediction from 0 to 13.".equals(model(activity).error.getValue())),
                 "out-of-range dealer edit rejected");
-        assertEquals(Integer.valueOf(0),repository.snapshot().roundPlayers.get(3).bid);
+        assertEquals(Integer.valueOf(2),repository.snapshot().roundPlayers.get(3).bid);
         assertSingleEditor(3);
-        onView(withId(R.id.quick_bid_2)).perform(click()); awaitBid(3,2);
+        onView(withId(R.id.quick_bid_0)).perform(click()); awaitBid(3,0);
         await(() -> inspect(activity -> {
             for(int i=0;i<4;i++) if(input(list(activity),i).isShown()) return false;
             return activity.findViewById(R.id.primary_action)!=null;
