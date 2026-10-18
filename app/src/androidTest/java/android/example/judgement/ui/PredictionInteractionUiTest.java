@@ -63,7 +63,7 @@ public final class PredictionInteractionUiTest {
         assertHint(3, "Not 1");
         assertHint(2, "");
         editLatest(2, 2); // Fourteen predicted hands exceeds this thirteen-card deal.
-        assertHint(3, "");
+        assertHint(3, "Any");
         editLatest(2, 1); // All thirteen hands are predicted: dealer cannot choose zero.
         assertHint(3, "Not 0");
         scenario.recreate(); awaitGame();
@@ -84,7 +84,7 @@ public final class PredictionInteractionUiTest {
         assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(
                 new java.io.File(context.getExternalFilesDir(null), "aggressive-dealer-not-one.png")));
         editLatest(2, 2); // The other players already predict fourteen of thirteen hands.
-        assertHint(3, "");
+        assertHint(3, "Any");
         for (int id : new int[]{R.id.quick_bid_0,R.id.quick_bid_1,R.id.quick_bid_2,R.id.quick_bid_3})
             assertTrue(inspect(activity -> activity.findViewById(id).isEnabled()));
         editLatest(2, 1); // Exactly thirteen hands are predicted; the dealer cannot choose zero.
@@ -96,6 +96,32 @@ public final class PredictionInteractionUiTest {
         assertNull(repository.snapshot().roundPlayers.get(3).bid);
         onView(predictionInput(3)).perform(replaceText(""), closeSoftKeyboard());
         assertHint(3, "Not 0");
+    }
+
+    @Test public void twoCardDealerShowsAnyWhenOtherPredictionsAlreadyExceedTheDeal() {
+        List<PlayerSpec> players = new ArrayList<>();
+        for (String name : new String[]{"Rajesh","Jayshree","Aai","Niraj","Swati","Raju"}) players.add(new PlayerSpec(name));
+        long draft = repository.saveDraft(new DraftSpec(0, players, "ASCENDING", "CUSTOM", null, ScoringStrategy.aggressive()));
+        repository.chooseDraftDealer(draft,repository.snapshot().draftPlayers.get(4).id);
+        repository.startGame(draft); completeZeroRound();
+        Snapshot state = repository.snapshot();
+        assertEquals(2, state.round.cards);
+        assertEquals("Raju",state.roundPlayers.get(5).nameSnapshot);
+        int[] predictions={0,2,1,0,1};
+        for (int i=0;i<predictions.length;i++) repository.submitBid(state.round.id,state.roundPlayers.get(i).playerId,predictions[i]);
+        launchGame();
+        scenario.onActivity(activity -> {
+            EditText dealer=input(list(activity),5);
+            assertNotNull(dealer); assertEquals("Any",dealer.getHint().toString());
+            assertEquals("",dealer.getText().toString());
+            for(int id:new int[]{R.id.quick_bid_0,R.id.quick_bid_1,R.id.quick_bid_2}) assertTrue(activity.findViewById(id).isEnabled());
+            assertFalse(activity.findViewById(R.id.quick_bid_3).isEnabled());
+        });
+        scenario.recreate(); awaitGame();
+        scenario.onActivity(activity -> assertEquals("Any",input(list(activity),5).getHint().toString()));
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+        assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(
+                new java.io.File(context.getExternalFilesDir(null), "dealer-any-two-cards.png")));
     }
 
     @Test public void advancingToAnAlreadyVisiblePredictionKeepsTheExactScrollOffset() {

@@ -174,6 +174,11 @@ public final class ScoreViewModel extends AndroidViewModel {
     }
     String tab() { String value = saved.get("tab"); return value == null ? "ROUND" : value; }
     void tab(String value) { saved.set("tab", value); }
+    void returnToRound() {
+        tab("ROUND"); screen("GAME");
+        saved.set("strategyEditor", null);
+        saved.set("roundEditor", null); roundPreview.setValue(null);
+    }
     LiveData<Bundle> formState() { return saved.getLiveData("form"); }
     FormRequest form() { return FormRequest.fromBundle(saved.get("form")); }
     void beginForm(FormRequest request) { saved.set("form", request.toBundle()); }

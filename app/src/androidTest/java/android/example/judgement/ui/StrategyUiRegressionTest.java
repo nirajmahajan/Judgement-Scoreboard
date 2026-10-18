@@ -271,6 +271,81 @@ public final class StrategyUiRegressionTest {
         assertRosterUnchanged(original);
     }
 
+    @Test public void gameTabsBackAndHomeResumeKeepTheCurrentRoundAndPrediction() {
+        seed(true,ScoringStrategy.defaults()); launch("GAME");
+        clickId(R.id.quick_bid_0);
+        await(() -> uiSnapshot().roundPlayers.get(0).bid!=null);
+        Snapshot original=repository.snapshot();
+        clickId(R.id.tab_scoreboard); await(() -> tab().equals("SCOREBOARD"));
+        Espresso.pressBack(); assertRound();
+        UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()); device.waitForIdle();
+        assertTrue(device.takeScreenshot(new java.io.File(context.getExternalFilesDir(null),"back-to-round.png")));
+        clickId(R.id.tab_history); await(() -> tab().equals("HISTORY"));
+        toolbarBack(); assertRound();
+        Espresso.pressBack(); await(() -> screen().equals("HOME"));
+        device.waitForIdle();
+        assertTrue(device.takeScreenshot(new java.io.File(context.getExternalFilesDir(null),"back-from-round-home.png")));
+        clickId(R.id.resume_game); assertRound();
+        assertEquals(original.game.id,repository.snapshot().game.id);
+        assertEquals(original.round.id,repository.snapshot().round.id);
+        assertEquals(Integer.valueOf(0),repository.snapshot().roundPlayers.get(0).bid);
+        option(R.string.new_game); await(() -> screen().equals("PLAYERS"));
+        assertNotNull(repository.snapshot().draft);
+        Espresso.pressBack(); assertRound();
+        assertEquals(original.round.id,repository.snapshot().round.id);
+        assertNotNull("Leaving new setup preserves the draft",repository.snapshot().draft);
+    }
+
+    @Test public void gameOptionAndNestedStrategyBackReturnToRoundAndClearStrategyPreview() {
+        seed(true,ScoringStrategy.defaults()); launch("GAME");
+        int[] options={R.string.help,R.string.change_dealer,R.string.correct_score,R.string.how_scoring_works};
+        String[] destinations={"HELP","PICK_DEALER","PICK_SCORE","SCORING_HELP"};
+        for(int i=0;i<options.length;i++) {
+            clickId(R.id.tab_history); await(() -> tab().equals("HISTORY"));
+            option(options[i]); final String expected=destinations[i]; await(() -> screen().equals(expected));
+            Espresso.pressBack(); assertRound();
+        }
+        option(R.string.change_scoring); choosePreset(R.id.strategy_aggressive);
+        await(() -> current()!=null&&hasAppearance(true));
+        Espresso.pressBack(); assertRound();
+        assertNull("Back clears the strategy request",current());
+        await(() -> hasAppearance(false));
+        option(R.string.change_scoring); choosePreset(R.id.strategy_aggressive);
+        await(() -> current()!=null&&hasAppearance(true));
+        clickId(R.id.strategy_help); await(() -> screen().equals("SCORING_HELP"));
+        toolbarBack(); assertRound();
+        assertNull("Back from nested help also clears its strategy request",current());
+        await(() -> hasAppearance(false));
+        assertEquals(ScoringStrategy.defaults().encode(),repository.snapshot().round.scoringConfig);
+        assertNull(repository.snapshot().game.pendingScoringConfig);
+    }
+
+    @Test public void roundEditBackKeepsStagedInputOnCancelAndReturnsToRoundAfterDiscard() {
+        seed(true,ScoringStrategy.defaults()); completeRound(); launch("GAME");
+        Snapshot original=repository.snapshot();
+        clickId(R.id.tab_history); clickText(R.string.history_inspect_round);
+        await(() -> screen().equals("ROUND_DETAILS"));
+        clickId(R.id.edit_historical_round); await(() -> screen().equals("ROUND_EDIT"));
+        scenario.onActivity(activity -> {
+            ScoreViewModel model=new ViewModelProvider(activity).get(ScoreViewModel.class);
+            RoundEditRequest request=model.roundEditor();
+            model.editRoundInput(request.editBid(request.players.get(0).playerId,"1"));
+        });
+        toolbarBack();
+        onView(withText(R.string.discard_title)).check(androidx.test.espresso.assertion.ViewAssertions.matches(
+                androidx.test.espresso.matcher.ViewMatchers.isDisplayed()));
+        onView(withText(R.string.cancel)).perform(click());
+        assertEquals("ROUND_EDIT",screen());
+        scenario.onActivity(activity -> assertEquals("1",new ViewModelProvider(activity)
+                .get(ScoreViewModel.class).roundEditor().players.get(0).bidText));
+        Espresso.pressBack(); onView(withText(R.string.discard)).perform(click());
+        assertRound();
+        scenario.onActivity(activity -> assertNull(new ViewModelProvider(activity).get(ScoreViewModel.class).roundEditor()));
+        assertEquals(original.round.id,repository.snapshot().round.id);
+        assertEquals(original.history.get(0).players.get(0).bid,repository.snapshot().history.get(0).players.get(0).bid);
+        assertTrue(repository.snapshot().roundEdits.isEmpty());
+    }
+
     @Test public void changedNameDealerOrSeatingStillRequiresDiscardConfirmation() {
         seed(true,ScoringStrategy.defaults()); launch("GAME");
         Snapshot original=repository.snapshot();
@@ -313,10 +388,13 @@ public final class StrategyUiRegressionTest {
         assertDealerChecked(original,selected);
         assertEquals(original.players.get(1).id,stagedPlayers().get(0).id);
         assertRosterUnchanged(original);
-        Espresso.pressBack(); await(() -> screen().equals("MANAGE")); assertRosterUnchanged(original);
-        clickId(R.id.primary_action); await(() -> screen().equals("CONFIRM_ROSTER_DEALER"));
-        assertDealerChecked(original,previousDealer);
-        chooseDealer(original,selected); clickId(R.id.primary_action);
+        toolbarBack();
+        onView(withText(R.string.discard_title)).check(androidx.test.espresso.assertion.ViewAssertions.matches(
+                androidx.test.espresso.matcher.ViewMatchers.isDisplayed()));
+        onView(withText(R.string.cancel)).perform(click());
+        assertEquals("CONFIRM_ROSTER_DEALER",screen()); assertRosterUnchanged(original);
+        assertEquals(original.players.get(1).id,stagedPlayers().get(0).id);
+        assertDealerChecked(original,selected); clickId(R.id.primary_action);
         await(() -> screen().equals("GAME") && repository.snapshot().round.dealerId==selected);
         Snapshot applied=repository.snapshot();
         assertEquals(original.players.get(1).id,applied.players.get(0).id);
@@ -606,6 +684,14 @@ public final class StrategyUiRegressionTest {
     private String screen() {
         AtomicReference<String> value=new AtomicReference<>();
         scenario.onActivity(activity -> value.set(new ViewModelProvider(activity).get(ScoreViewModel.class).screen()));return value.get();
+    }
+    private String tab() {
+        AtomicReference<String> value=new AtomicReference<>();
+        scenario.onActivity(activity -> value.set(new ViewModelProvider(activity).get(ScoreViewModel.class).tab()));return value.get();
+    }
+    private void assertRound() { await(() -> screen().equals("GAME")&&tab().equals("ROUND")); }
+    private void toolbarBack() {
+        onView(androidx.test.espresso.matcher.ViewMatchers.withContentDescription(R.string.back)).perform(click());
     }
     private boolean hasAppearance(boolean aggressive) {
         AtomicReference<Boolean> value=new AtomicReference<>(false);

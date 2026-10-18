@@ -62,8 +62,10 @@ final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
         holder.input.setVisibility(editing ? View.VISIBLE : View.GONE);
         String input = model.bidInput(owner, player.playerId, player.bid);
         if (!holder.input.getText().toString().equals(input)) holder.input.setText(input);
-        Integer forbidden = dealer ? forbiddenPrediction() : null;
-        String hint = forbidden == null ? null : holder.itemView.getContext().getString(R.string.dealer_prediction_hint, forbidden);
+        Integer remaining = dealer ? remainingHands() : null;
+        String hint = remaining == null ? null : remaining < 0
+                ? holder.itemView.getContext().getString(R.string.dealer_prediction_any)
+                : holder.itemView.getContext().getString(R.string.dealer_prediction_hint, remaining);
         android.text.SpannableString styledHint = hint == null ? null : new android.text.SpannableString(hint);
         if (styledHint != null) styledHint.setSpan(new android.text.style.AbsoluteSizeSpan(hintSize(holder.input.getContext())),
                 0, styledHint.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -96,14 +98,13 @@ final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
             else { model.editBid(owner, player.playerId); refresh.run(); }
         });
     }
-    private Integer forbiddenPrediction() {
+    private Integer remainingHands() {
         int total = 0;
         for (Records.RoundPlayer player : players) if (player.playerId != dealerId) {
             if (player.bid == null) return null;
             total += player.bid;
         }
-        int forbidden = cards - total;
-        return forbidden >= 0 && forbidden <= cards ? forbidden : null;
+        return cards - total;
     }
     private static int hintSize(android.content.Context context) {
         return Math.round(android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP,

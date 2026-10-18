@@ -117,3 +117,11 @@ created by chatgpt-codex
 ### Strategy selection layout
 - Heading and single-select strategy buttons stay above the scrollable explanation and compact bulleted examples. Saved strategies remain selectable and editable; the add-players dropdown and custom-only editor remain available.
 - Focused native checks exercise selection/theme preview, cancellation, heading/button order, fixed controls, and custom editing.
+
+### Consistent game Back navigation
+- While a game exists, Back from other screens selects Round; Back from Round returns Home. Home still exits normally, and setup without an existing game keeps its wizard navigation.
+- Cancelling a strategy or historical editor clears its editing request; unsaved player and historical round edits retain discard confirmation. The game and any saved setup remain persisted.
+
+### Dealer prediction without a restriction
+- Once every other player has predicted, the dealer input says Any if their total already exceeds the cards dealt. Otherwise it shows Not X. Both strategies retain identical dealer validation.
+- Native regressions cover the photographed two-card, six-player case, bounds, edits between Any and Not X, and recreation.

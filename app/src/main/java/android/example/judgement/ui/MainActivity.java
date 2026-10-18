@@ -211,6 +211,20 @@ public final class MainActivity extends AppCompatActivity {
     private void open(String screen) { rememberLastPlayed(); model.screen(screen); }
     private void back() {
         String screen = model.screen();
+        if (state != null && state.game != null && !"HOME".equals(screen)) {
+            if ("GAME".equals(screen) && "ROUND".equals(model.tab())) {
+                open("HOME");
+            } else {
+                boolean rosterScreen = "MANAGE".equals(screen) || "RESTORE".equals(screen)
+                        || "PICK_DEALER".equals(screen) || "CONFIRM_ROSTER_DEALER".equals(screen)
+                        || ("MANAGE".equals(pickerReturn) && ("QUICK_ADD".equals(screen)
+                            || "SAVED".equals(screen) || "SAVED_MANAGE".equals(screen)));
+                if ("ROUND_EDIT".equals(screen) || (rosterScreen && hasRosterChanges()))
+                    confirm(R.string.discard_title, R.string.discard_message, R.string.discard, model::returnToRound);
+                else model.returnToRound();
+            }
+            return;
+        }
         if ("SCORING".equals(screen)) {
             StrategyRequest request = model.strategyRequest();
             if (request != null) model.finishStrategy(request.token); else open("HOME");
