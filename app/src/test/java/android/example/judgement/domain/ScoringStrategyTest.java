@@ -62,21 +62,23 @@ public class ScoringStrategyTest {
             for (int bid = 0; bid <= cards; bid++) {
                 assertEquals(0L, ScoringStrategy.aggressive().points(cards, bid, Outcome.LOST, 2));
             }
-            assertEquals(cards < 2 ? 10L : 7L,
+            assertEquals(cards < 4 ? 10L : 7L,
                     ScoringStrategy.aggressive().points(cards, 0, Outcome.WON, 2));
         }
     }
 
     @Test
-    public void aggressiveZeroPenaltyStartsWhenCardsEqualRecordedRoundPlayers() {
+    public void aggressiveZeroPenaltyStartsAtFourCardsRegardlessOfPlayerCount() {
         ScoringStrategy scoring = ScoringStrategy.aggressive();
-        assertEquals(10L, scoring.points(5, 0, Outcome.WON, 6));
-        assertEquals(7L, scoring.points(6, 0, Outcome.WON, 6));
-        assertEquals(7L, scoring.points(7, 0, Outcome.WON, 6));
+        assertEquals(10L, scoring.points(1, 0, Outcome.WON, 6));
+        assertEquals(10L, scoring.points(2, 0, Outcome.WON, 6));
+        assertEquals(10L, scoring.points(3, 0, Outcome.WON, 2));
+        assertEquals(7L, scoring.points(4, 0, Outcome.WON, 6));
+        assertEquals(7L, scoring.points(5, 0, Outcome.WON, 6));
         for (int players = 1; players <= GameRules.MAX_PLAYERS; players++) {
             for (int cards = 1; cards <= GameRules.DECK_SIZE; cards++) {
                 assertEquals("cards=" + cards + " players=" + players,
-                        cards < players ? 10L : 7L,
+                        cards < 4 ? 10L : 7L,
                         scoring.points(cards, 0, Outcome.WON, players));
                 assertEquals(0L, scoring.points(cards, 0, Outcome.LOST, players));
             }
@@ -85,7 +87,7 @@ public class ScoringStrategyTest {
 
     @Test
     public void zeroThresholdDoesNotChangeDefaultCustomOrOtherAggressiveRewards() {
-        for (int cards : new int[] {5, 6, 7}) {
+        for (int cards : new int[] {1, 2, 3, 4, 5}) {
             assertEquals(10L, ScoringStrategy.defaults().points(cards, 0, Outcome.WON, 6));
             assertEquals(31L, ScoringStrategy.custom(31L, 4L, 3L, true)
                     .points(cards, 0, Outcome.WON, 6));
@@ -160,8 +162,8 @@ public class ScoringStrategyTest {
         assertEquals("v1|DEFAULT|10|10|1|0", ScoringStrategy.defaults().encode());
         assertEquals("v1|AGGRESSIVE|7|10|1|1", ScoringStrategy.aggressive().encode());
         ScoringStrategy existingAggressive = ScoringStrategy.decode("v1|AGGRESSIVE|7|10|1|1");
-        assertEquals(10L, existingAggressive.points(5, 0, Outcome.WON, 6));
-        assertEquals(7L, existingAggressive.points(6, 0, Outcome.WON, 6));
+        assertEquals(10L, existingAggressive.points(3, 0, Outcome.WON, 2));
+        assertEquals(7L, existingAggressive.points(4, 0, Outcome.WON, 6));
         for (ScoringStrategy scoring : new ScoringStrategy[] {
                 ScoringStrategy.defaults(), ScoringStrategy.aggressive(),
                 ScoringStrategy.custom(10L, 10L, 1L, false),

@@ -7,7 +7,7 @@
     <string name="strategy_aggressive">Aggressive</string>
     <string name="strategy_custom">Custom</string>
     <string name="strategy_default_rules">Won means the hands you won matched your prediction. Earn 10 + predicted hands, including zero. Lost earns 0.\n\nPredict 0 and win 0 → 10 points. Predict 3 and win 3 → 13 points.</string>
-    <string name="strategy_aggressive_rules">Won with zero hands earns 10 points when fewer cards are dealt than players in the round; otherwise 7 points. Any other Won earns 10 + predicted hands. Lost earns 0.\n\nFor a matched prediction above half the hands in the round, add the round’s hand count, up to 10 bonus points. Exactly half earns no bonus. Only the bonus is capped at 10; the total round score is not capped.</string>
+    <string name="strategy_aggressive_rules">Won with zero hands earns 10 points when dealing 1–3 cards, or 7 points from 4 cards onward. Any other Won earns 10 + predicted hands. Lost earns 0.\n\nFor a matched prediction above half the hands in the round, add the round’s hand count, up to 10 bonus points. Exactly half earns no bonus. Only the bonus is capped at 10; the total round score is not capped.</string>
     <string name="strategy_custom_rules">Won with zero hands earns %1$d points. Any other Won earns %2$d + (%3$d × predicted hands). Lost earns 0.</string>
     <string name="strategy_bonus_rules">A matched prediction above half the hands in the round earns a majority bonus: the round’s hand count, up to 10 points. Exactly half earns no bonus. Only the bonus is capped at 10.</string>
     <string name="strategy_no_bonus">The majority bonus is disabled.</string>
@@ -51,4 +51,6 @@
     <string name="modify_named_strategy">Modify %1$s</string>
     <string name="delete_strategy">Delete strategy</string>
     <string name="delete_strategy_message">Remove %1$s from saved strategies? Existing games and completed rounds keep their scoring rules.</string>
+    <string name="trump_tag">Trump</string>
+    <string name="zero_prediction_penalty_note">Correct prediction of 0 will only win 7 points</string>
 </resources>

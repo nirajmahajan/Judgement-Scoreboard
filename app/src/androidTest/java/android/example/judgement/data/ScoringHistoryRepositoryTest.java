@@ -205,19 +205,19 @@ public class ScoringHistoryRepositoryTest {
         assertEquals(10, report.player(first).total); assertEquals(2, report.player(second).total);
     }
 
-    @Test public void aggressiveZeroThresholdUsesRecordedRoundRosterDuringCompletionAndHistoricalEdits() throws Exception {
+    @Test public void aggressiveZeroThresholdIsFourCardsDuringCompletionAndHistoricalEdits() throws Exception {
         start(3, ScoringStrategy.aggressive());
-        completeZeroRound(); completeZeroRound(); completeZeroRound();
+        completeZeroRound(); completeZeroRound(); completeZeroRound(); completeZeroRound();
         Snapshot completed = repository.snapshot();
-        Snapshot.RoundHistory below = completed.history.get(1), equal = completed.history.get(2);
-        assertEquals(2, below.round.cards); assertEquals(3, equal.round.cards);
+        Snapshot.RoundHistory below = completed.history.get(2), threshold = completed.history.get(3);
+        assertEquals(3, below.round.cards); assertEquals(4, threshold.round.cards);
         GameStatistics initial = GameStatistics.from(completed);
-        assertEquals(10, initial.rounds.get(1).players.get(1).points);
-        assertEquals(7, initial.rounds.get(2).players.get(1).points);
-        assertEquals(0, initial.rounds.get(1).players.get(0).points);
+        assertEquals(10, initial.rounds.get(2).players.get(1).points);
+        assertEquals(7, initial.rounds.get(3).players.get(1).points);
         assertEquals(0, initial.rounds.get(2).players.get(0).points);
+        assertEquals(0, initial.rounds.get(3).players.get(0).points);
 
-        // Removing a player cannot retroactively turn a two-card round into a penalized round.
+        // Removing a player cannot penalize a successful zero in a three-card deal.
         List<PlayerSpec> twoPlayers = Arrays.asList(
                 new PlayerSpec(completed.players.get(0).id, completed.players.get(0).name),
                 new PlayerSpec(completed.players.get(1).id, completed.players.get(1).name));
@@ -226,21 +226,21 @@ public class ScoringHistoryRepositoryTest {
         assertEquals(10, belowPreview.players.get(0).afterPoints);
         repository.editRound(below.round.id, 0, swapFirstTwo(below));
 
-        // Adding players cannot remove the original equality penalty from a three-card round.
-        List<PlayerSpec> fourPlayers = new ArrayList<>(twoPlayers);
-        fourPlayers.add(new PlayerSpec("Fourth")); fourPlayers.add(new PlayerSpec("Fifth"));
-        repository.applyRoster(repository.snapshot().round.id, fourPlayers, completed.players.get(0).id, true);
-        RoundEditPreview equalPreview = repository.previewRoundEdit(equal.round.id, 0, swapFirstTwo(equal));
-        assertEquals(7, equalPreview.players.get(0).afterPoints);
-        repository.editRound(equal.round.id, 0, swapFirstTwo(equal));
+        // Adding players cannot remove the seven-point reward in a four-card deal.
+        List<PlayerSpec> sixPlayers = new ArrayList<>(twoPlayers);
+        for (int index = 0; index < 4; index++) sixPlayers.add(new PlayerSpec("Added " + index));
+        repository.applyRoster(repository.snapshot().round.id, sixPlayers, completed.players.get(0).id, true);
+        RoundEditPreview thresholdPreview = repository.previewRoundEdit(threshold.round.id, 0, swapFirstTwo(threshold));
+        assertEquals(7, thresholdPreview.players.get(0).afterPoints);
+        repository.editRound(threshold.round.id, 0, swapFirstTwo(threshold));
         reopen();
         Snapshot corrected = repository.snapshot();
-        assertEquals(4, corrected.players.size());
-        assertEquals(3, corrected.history.get(1).players.size());
+        assertEquals(6, corrected.players.size());
         assertEquals(3, corrected.history.get(2).players.size());
+        assertEquals(3, corrected.history.get(3).players.size());
         GameStatistics after = GameStatistics.from(corrected);
-        assertEquals(10, after.rounds.get(1).players.get(0).points);
-        assertEquals(7, after.rounds.get(2).players.get(0).points);
+        assertEquals(10, after.rounds.get(2).players.get(0).points);
+        assertEquals(7, after.rounds.get(3).players.get(0).points);
         assertEquals(2, corrected.roundEdits.size());
         for (Records.RoundEdit audit : corrected.roundEdits) {
             long expected = audit.roundId == below.round.id ? 10 : 7;

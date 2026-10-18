@@ -13,6 +13,12 @@
         <TextView android:id="@id/row_name" android:layout_width="0dp" android:layout_weight="1"
             android:layout_height="wrap_content" android:minHeight="48dp" android:gravity="center_vertical"
             android:singleLine="true" android:ellipsize="end" android:textAppearance="?attr/textAppearanceBodyLarge" />
+        <TextView android:id="@+id/round_trump_tag" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:layout_marginHorizontal="4dp"
+            android:paddingHorizontal="4dp" android:paddingVertical="2dp"
+            android:text="@string/trump_tag" android:textSize="11sp" android:textStyle="bold"
+            android:textColor="?attr/colorOnPrimaryContainer" android:background="@drawable/dealer_tag_background"
+            android:importantForAccessibility="no" android:visibility="gone" />
         <FrameLayout android:layout_width="48dp" android:layout_height="wrap_content" android:minHeight="48dp">
             <TextView android:id="@id/row_detail" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp"
                 android:gravity="center" android:textAppearance="?attr/textAppearanceBodyLarge" />

@@ -17,6 +17,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /** Compact bidding table; drafts live in the ViewModel and commands carry stable IDs. */
 final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
@@ -24,12 +25,14 @@ final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
     private final Runnable refresh;
     private final List<Records.RoundPlayer> players = new ArrayList<>();
     private long roundId, dealerId;
+    private Long trumpCallerId;
     private int current, cards;
     BidAdapter(ScoreViewModel model, Runnable refresh) {
         this.model = model; this.refresh = refresh; setHasStableIds(true);
     }
-    void submit(long roundId, long dealerId, int cards, List<Records.RoundPlayer> players, int current) {
+    void submit(long roundId, long dealerId, int cards, List<Records.RoundPlayer> players, int current, Long trumpCallerId) {
         this.dealerId = dealerId; this.roundId = roundId; this.cards = cards;
+        this.trumpCallerId = trumpCallerId;
         this.players.clear(); this.players.addAll(players); this.current = current;
         notifyDataSetChanged();
     }
@@ -45,9 +48,12 @@ final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
         boolean editing = position == current || (latest && model.editingBid(owner, player.playerId));
         holder.name.setText(player.nameSnapshot);
         boolean dealer = player.playerId == dealerId;
+        boolean trumpCaller = Objects.equals(trumpCallerId, player.playerId);
         holder.itemView.findViewById(R.id.dealer_tag).setVisibility(dealer ? View.VISIBLE : View.GONE);
-        holder.name.setContentDescription(dealer ? player.nameSnapshot + ", "
-                + holder.itemView.getContext().getString(R.string.dealer_tag) : player.nameSnapshot);
+        holder.itemView.findViewById(R.id.round_trump_tag).setVisibility(trumpCaller ? View.VISIBLE : View.GONE);
+        holder.name.setContentDescription(player.nameSnapshot
+                + (dealer ? ", " + holder.itemView.getContext().getString(R.string.dealer_tag) : "")
+                + (trumpCaller ? ", " + holder.itemView.getContext().getString(R.string.trump_tag) : ""));
         holder.name.setTooltipText(player.nameSnapshot);
         holder.name.setTypeface(null, position == current ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
         holder.detail.setText(player.bid == null ? "—" : player.bid.toString());

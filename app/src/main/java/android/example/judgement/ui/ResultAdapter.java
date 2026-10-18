@@ -20,10 +20,12 @@ final class ResultAdapter extends RecyclerView.Adapter<ResultAdapter.Holder> {
     private final ScoreViewModel model;
     private final List<Records.RoundPlayer> players = new ArrayList<>();
     private long roundId, dealerId;
+    private Long trumpCallerId;
 
     ResultAdapter(ScoreViewModel model) { this.model = model; setHasStableIds(true); }
-    void submit(long roundId, long dealerId, List<Records.RoundPlayer> players) {
+    void submit(long roundId, long dealerId, List<Records.RoundPlayer> players, Long trumpCallerId) {
         List<Records.RoundPlayer> previous = new ArrayList<>(this.players);
+        Long previousTrumpCallerId = this.trumpCallerId;
         boolean sameRound = this.roundId == roundId && this.dealerId == dealerId;
         DiffUtil.DiffResult changes = DiffUtil.calculateDiff(new DiffUtil.Callback() {
             @Override public int getOldListSize() { return previous.size(); }
@@ -34,11 +36,13 @@ final class ResultAdapter extends RecyclerView.Adapter<ResultAdapter.Holder> {
             @Override public boolean areContentsTheSame(int before, int after) {
                 Records.RoundPlayer old = previous.get(before), current = players.get(after);
                 return old.nameSnapshot.equals(current.nameSnapshot) && Objects.equals(old.bid, current.bid)
-                        && Objects.equals(old.outcome, current.outcome);
+                        && Objects.equals(old.outcome, current.outcome)
+                        && Objects.equals(previousTrumpCallerId, old.playerId) == Objects.equals(trumpCallerId, current.playerId);
             }
             @Override public Object getChangePayload(int before, int after) { return Boolean.TRUE; }
         });
         this.roundId = roundId; this.dealerId = dealerId;
+        this.trumpCallerId = trumpCallerId;
         this.players.clear(); this.players.addAll(players);
         changes.dispatchUpdatesTo(this);
     }
@@ -52,8 +56,12 @@ final class ResultAdapter extends RecyclerView.Adapter<ResultAdapter.Holder> {
         long owner = roundId;
         holder.name.setText(player.nameSnapshot); holder.name.setTooltipText(player.nameSnapshot);
         boolean dealer = player.playerId == dealerId;
+        boolean trumpCaller = Objects.equals(trumpCallerId, player.playerId);
         holder.tag.setVisibility(dealer ? View.VISIBLE : View.GONE);
-        holder.name.setContentDescription(player.nameSnapshot + (dealer ? ", " + holder.itemView.getContext().getString(R.string.dealer_tag) : ""));
+        holder.trumpTag.setVisibility(trumpCaller ? View.VISIBLE : View.GONE);
+        holder.name.setContentDescription(player.nameSnapshot
+                + (dealer ? ", " + holder.itemView.getContext().getString(R.string.dealer_tag) : "")
+                + (trumpCaller ? ", " + holder.itemView.getContext().getString(R.string.trump_tag) : ""));
         holder.prediction.setText(holder.itemView.getContext().getString(R.string.result_prediction, player.bid));
         holder.choices.setOnCheckedChangeListener(null);
         holder.choices.check(player.outcome == null ? -1 : "WON".equals(player.outcome) ? R.id.result_won : R.id.result_lost);
@@ -73,11 +81,12 @@ final class ResultAdapter extends RecyclerView.Adapter<ResultAdapter.Holder> {
     }
     static final class Holder extends RecyclerView.ViewHolder {
         final TextView name, prediction;
-        final View tag;
+        final View tag, trumpTag;
         final RadioGroup choices;
         Holder(View view) {
             super(view); name = view.findViewById(R.id.row_name); prediction = view.findViewById(R.id.row_detail);
-            tag = view.findViewById(R.id.dealer_tag); choices = view.findViewById(R.id.result_choices);
+            tag = view.findViewById(R.id.dealer_tag); trumpTag = view.findViewById(R.id.round_trump_tag);
+            choices = view.findViewById(R.id.result_choices);
         }
     }
 }

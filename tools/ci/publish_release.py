@@ -49,7 +49,8 @@ if new_key:
 - Compact blue interface, saved players, drag ordering, and fast 0/1/2/3 predictions.
 - Dealer prediction hints show the forbidden value; prediction entry reveals hidden players while preserving the viewport for visible players.
 - Responsive text and controls for smaller screens, display zoom, and large fonts.
-- Aggressive zero predictions earn 10 below the round player count and 7 from equality; history shows newest events first.
+- Aggressive successful zero predictions earn 10 for 1–3 cards and 7 from 4 cards; the prediction screen shows the 7-point note.
+- Custom trumps mark the first player with the highest prediction; history shows newest events first.
 - Scoring strategies, durable game state, editable round history, and cumulative score graph.
 - Repaired scoring, results validation, lifecycle behavior, and large-score/graph layouts.
 - Launcher app name: **Judgement Scoreboard**.

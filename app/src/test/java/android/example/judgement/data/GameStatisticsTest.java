@@ -33,7 +33,7 @@ public class GameStatisticsTest {
         assertEquals(Integer.valueOf(4), alpha.highestSuccessfulBid);
         assertEquals(3, alpha.longestExactStreak);
         assertEquals(1, alpha.zeroBids);
-        assertEquals(26L, report.player(22L).total);
+        assertEquals(29L, report.player(22L).total);
         assertEquals(12L, report.player(33L).total);
         assertFalse(report.player(33L).active);
         assertEquals(0, report.player(44L).playedRounds);
@@ -47,6 +47,8 @@ public class GameStatisticsTest {
         assertEquals("Original complete Alpha name", report.rounds.get(0).player(11L).name);
         assertEquals(10L, report.rounds.get(0).player(11L).points);
         assertEquals(15L, report.rounds.get(2).player(11L).points);
+        assertEquals(10L, report.rounds.get(2).player(22L).points);
+        assertEquals(7L, report.rounds.get(3).player(22L).points);
         assertEquals(28L, report.rounds.get(4).player(11L).points);
         assertEquals(2L, report.rounds.get(4).player(22L).points);
     }
@@ -156,11 +158,11 @@ public class GameStatisticsTest {
         List<Long> ids=new ArrayList<>();for(GameStatistics.PlayerStatistics player:report.players) ids.add(player.playerId);return ids;
     }
 
-    @Test public void aggressiveZeroScoresUseEachRoundsParticipantsRatherThanTheCurrentRoster() {
+    @Test public void aggressiveZeroScoresUseFourCardThresholdRegardlessOfHistoricalOrCurrentRoster() {
         Fixture fixture=twoPlayers(); fixture.addPlayer(33,"Played both rounds",2,true);
         fixture.addPlayer(44,"Joined later",3,true);
-        fixture.round(101,1,2,ScoringStrategy.aggressive(),result(11,0,true),result(22,0,false),result(33,0,true));
-        fixture.round(102,2,3,ScoringStrategy.aggressive(),result(11,0,true),result(22,0,false),result(33,0,true));
+        fixture.round(101,1,3,ScoringStrategy.aggressive(),result(11,0,true),result(22,0,false),result(33,0,true));
+        fixture.round(102,2,4,ScoringStrategy.aggressive(),result(11,0,true),result(22,0,false),result(33,0,true));
         GameStatistics report=GameStatistics.from(fixture.snapshot("COMPLETE"));
         assertEquals(10,report.rounds.get(0).player(11).points);
         assertEquals(7,report.rounds.get(1).player(11).points);

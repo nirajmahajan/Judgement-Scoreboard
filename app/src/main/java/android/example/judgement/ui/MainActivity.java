@@ -7,6 +7,7 @@ import android.example.judgement.data.Records;
 import android.example.judgement.data.Snapshot;
 import android.example.judgement.data.GameStatistics;
 import android.example.judgement.data.RoundEditPreview;
+import android.example.judgement.data.TrumpCaller;
 import android.example.judgement.domain.GameRules;
 import android.example.judgement.domain.Names;
 import android.example.judgement.domain.Outcome;
@@ -157,7 +158,7 @@ public final class MainActivity extends AppCompatActivity {
             Snapshot previous = state;
             state = snapshot;
             if (canUpdateResultSelections(previous))
-                outcomes.submit(state.round.id, state.round.dealerId, state.roundPlayers);
+                outcomes.submit(state.round.id, state.round.dealerId, state.roundPlayers, TrumpCaller.playerId(state.game.trumpMode, state.roundPlayers));
             else render();
             restoreForm(model.form());
         });
@@ -381,6 +382,13 @@ public final class MainActivity extends AppCompatActivity {
         if (choosingPlayers) SetupStrategyHeader.bind(strategy, model, state.draft.id,
                 ScoringStrategy.decode(state.draft.scoringConfig));
         TextView heading = view.findViewById(R.id.screen_title); heading.setText(headingText); ViewCompat.setAccessibilityHeading(heading, true);
+        TextView scoringNote = view.findViewById(R.id.round_scoring_note);
+        boolean showZeroNote = "GAME".equals(model.screen()) && "ROUND".equals(model.tab())
+                && state.round != null && "BIDDING".equals(state.round.phase)
+                && ScoringStrategy.decode(state.round.scoringConfig).preset == ScoringStrategy.Preset.AGGRESSIVE
+                && ScoringStrategy.decode(state.round.scoringConfig).points(state.round.cards, 0, Outcome.WON, state.roundPlayers.size()) == 7;
+        scoringNote.setText(R.string.zero_prediction_penalty_note);
+        scoringNote.setVisibility(showZeroNote ? View.VISIBLE : View.GONE);
         TextView description = view.findViewById(R.id.screen_description); description.setText(descriptionText); description.setVisibility(descriptionText.isEmpty() ? View.GONE : View.VISIBLE);
         TextView error = view.findViewById(R.id.inline_error); error.setText(errorText); error.setVisibility(errorText == null ? View.GONE : View.VISIBLE);
         LinearLayout columns = view.findViewById(R.id.table_columns);
@@ -825,7 +833,7 @@ public final class MainActivity extends AppCompatActivity {
             else if (firstMissing == state.roundPlayers.size()) firstMissing = i;
         }
         if (bids == null) bids = new BidAdapter(model, this::render);
-        bids.submit(round.id, round.dealerId, round.cards, state.roundPlayers, firstMissing); setContent(bids);
+        bids.submit(round.id, round.dealerId, round.cards, state.roundPlayers, firstMissing, TrumpCaller.playerId(state.game.trumpMode, state.roundPlayers)); setContent(bids);
         fixedActions.removeAllViews(); fixedActions.setVisibility(View.VISIBLE);
         Records.RoundPlayer current = firstMissing < state.roundPlayers.size() ? state.roundPlayers.get(firstMissing) : null;
         int[] ids = {R.id.quick_bid_0, R.id.quick_bid_1, R.id.quick_bid_2, R.id.quick_bid_3};
@@ -858,7 +866,7 @@ public final class MainActivity extends AppCompatActivity {
     private void results(Records.Round round) {
         tableDetailLabel = R.string.table_result;
         if (outcomes == null) outcomes = new ResultAdapter(model);
-        outcomes.submit(round.id, round.dealerId, state.roundPlayers); setContent(outcomes);
+        outcomes.submit(round.id, round.dealerId, state.roundPlayers, TrumpCaller.playerId(state.game.trumpMode, state.roundPlayers)); setContent(outcomes);
         fixedActions.removeAllViews(); fixedActions.setVisibility(View.VISIBLE);
         MaterialButton finish = new MaterialButton(this);
         finish.setId(R.id.primary_action); finish.setText(R.string.finish_round);

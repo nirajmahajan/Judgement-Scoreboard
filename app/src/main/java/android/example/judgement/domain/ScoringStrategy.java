@@ -83,7 +83,7 @@ public final class ScoringStrategy {
         return display;
     }
 
-    /** Scores against the participants recorded for this round, including historical players. */
+    /** Aggressive successful zero predictions earn 10 for deals of 1–3 cards, then 7. */
     public long points(int cards, int bid, Outcome outcome, int participantCount) {
         GameRules.validateBid(cards, bid);
         if (participantCount < 1 || participantCount > GameRules.MAX_PLAYERS) {
@@ -96,7 +96,7 @@ public final class ScoringStrategy {
             return 0L;
         }
         if (bid == 0) {
-            return preset == Preset.AGGRESSIVE && cards < participantCount
+            return preset == Preset.AGGRESSIVE && cards < 4
                     ? DEFAULT.zeroReward : zeroReward;
         }
         return checkedExactPoints(cards, bid);
