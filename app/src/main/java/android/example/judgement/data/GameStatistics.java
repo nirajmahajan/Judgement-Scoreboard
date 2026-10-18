@@ -27,20 +27,13 @@ public final class GameStatistics {
     public final boolean hasUnequalParticipation;
 
     private GameStatistics(List<PlayerStatistics> players, List<RoundStatistics> rounds,
-            List<TimelineEvent> timeline, List<Award> awards) {
+            List<TimelineEvent> timeline, List<Award> awards, boolean unequalParticipation) {
         this.players = immutable(players);
         this.rounds = immutable(rounds);
         this.timeline = immutable(timeline);
         this.awards = immutable(awards);
         this.completedRounds = rounds.size();
-        boolean unequal = false;
-        for (PlayerStatistics player : players) {
-            if (player.playedRounds < completedRounds) {
-                unequal = true;
-                break;
-            }
-        }
-        this.hasUnequalParticipation = unequal;
+        this.hasUnequalParticipation = unequalParticipation;
     }
 
     public static GameStatistics from(Snapshot snapshot) {
@@ -129,20 +122,22 @@ public final class GameStatistics {
             }
             player.total = finalTotal.longValue();
         }
-        // TimSort preserves the initial active/seat/ID order when totals tie.
-        standing.sort(Comparator.comparingLong((PlayerAccumulator player) -> player.total)
-                .reversed());
+        boolean unequalParticipation=false;
+        for(PlayerAccumulator player:standing) if(player.played<rounds.size()) { unequalParticipation=true; break; }
+        boolean byAverage=snapshot.game!=null && "COMPLETE".equals(snapshot.game.status) && unequalParticipation;
+        Comparator<PlayerAccumulator> ranking=byAverage
+                ? Comparator.comparing(PlayerAccumulator::pointsPerRound,Comparator.nullsLast(Comparator.reverseOrder()))
+                : Comparator.comparingLong((PlayerAccumulator player)->player.total).reversed();
+        // Stable ties keep active players in seat order, followed by former participants.
+        standing.sort(ranking);
         List<PlayerStatistics> players = new ArrayList<>();
         int rank = 0;
-        Long previousTotal = null;
+        PlayerAccumulator previous=null;
         for (PlayerAccumulator player : standing) {
-            if (previousTotal == null || previousTotal != player.total) {
-                rank++;
-            }
-            players.add(new PlayerStatistics(player, rank));
-            previousTotal = player.total;
+            if(previous==null || ranking.compare(previous,player)!=0) rank++;
+            players.add(new PlayerStatistics(player, rank)); previous=player;
         }
-        return new GameStatistics(players, rounds, timeline, awards(rounds.size(), standing));
+        return new GameStatistics(players, rounds, timeline, awards(rounds.size(), standing),unequalParticipation);
     }
 
     public PlayerStatistics player(long playerId) {
@@ -180,9 +175,7 @@ public final class GameStatistics {
             this.total = player.total;
             this.rank = rank;
             this.playedRounds = player.played;
-            this.pointsPerRound = player.played == 0 ? null
-                    : BigDecimal.valueOf(player.total).divide(BigDecimal.valueOf(player.played),
-                            2, RoundingMode.HALF_UP);
+            this.pointsPerRound = player.pointsPerRound();
             this.exactPredictions = player.exact;
             this.zeroBids = player.zeros;
             this.exactPercentage = player.played == 0 ? null
@@ -360,6 +353,10 @@ public final class GameStatistics {
             name = player.name;
             active = player.active;
             seat = player.seat;
+        }
+
+        BigDecimal pointsPerRound() {
+            return played==0 ? null : BigDecimal.valueOf(total).divide(BigDecimal.valueOf(played),2,RoundingMode.HALF_UP);
         }
 
         void record(Performance performance, long roundId, int roundNumber) {

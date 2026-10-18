@@ -165,8 +165,25 @@ public final class RosterProgressionUiTest {
         Map<Long, Integer> played = participation(finished, 6, ben, 5);
         played.put(grace, 4); played.put(hannah, 0);
         launchGame(); verifyFinalRows(finished, played, true);
+        assertAverageRanking();
         scenario.recreate(); await(() -> screen().equals("GAME") && uiSnapshot() != null && uiSnapshot().round == null);
-        verifyFinalRows(finished, played, true);
+        verifyFinalRows(finished, played, true); assertAverageRanking();
+    }
+    private void assertAverageRanking() {
+        String[] expected={"1 · Grace","2 · Alice","2 · Charlie","2 · Dana","2 · Emma","2 · Frank","3 · Ben","4 · Hannah"};
+        onView(withId(R.id.screen_list)).perform(new ViewAction() {
+            public Matcher<View> getConstraints(){return isAssignableFrom(RecyclerView.class);}
+            public String getDescription(){return "verify average order and dense ranks independently of total score";}
+            public void perform(UiController controller,View view){
+                RecyclerView list=(RecyclerView)view;int row=0;
+                for(int i=0;i<list.getAdapter().getItemCount();i++) {
+                    list.scrollToPosition(i);controller.loopMainThreadUntilIdle();
+                    TextView name=list.findViewHolderForAdapterPosition(i).itemView.findViewById(R.id.row_name);
+                    if(name!=null)assertEquals(expected[row++],name.getText().toString());
+                }
+                assertEquals(expected.length,row);
+            }
+        });
     }
 
     private void verifyFinalRows(Snapshot snapshot, Map<Long, Integer> played, boolean metrics) {

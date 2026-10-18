@@ -805,23 +805,17 @@ public final class MainActivity extends AppCompatActivity {
     private void scoreboard() { header(getString(R.string.scoreboard_tab), ""); scoreboardRows(); }
     private void scoreboardRows() {
         tableDetailLabel = R.string.table_score;
-        GameStatistics report = "COMPLETE".equals(state.game.status) ? GameStatistics.from(state) : null;
-        participationColumns = report != null && report.hasUnequalParticipation;
+        boolean completed="COMPLETE".equals(state.game.status);
+        GameStatistics report=GameStatistics.from(state);
+        participationColumns = completed && report.hasUnequalParticipation;
         stackedParticipationColumns = participationColumns && getResources().getConfiguration().fontScale>=1.5f
                 && getResources().getConfiguration().screenWidthDp<360;
-        List<Records.GamePlayer> players = new ArrayList<>(state.players);
-        players.addAll(state.inactivePlayers);
-        players.sort(Comparator.<Records.GamePlayer>comparingLong(player -> state.total(player.id)).reversed().thenComparing(player -> !player.active).thenComparingInt(player -> player.seat).thenComparingLong(player -> player.id));
         List<ScoreAdapter.Row> rows = new ArrayList<>();
-        int rank = 0; Long previous = null;
-        for (Records.GamePlayer player : players) {
-            long total = state.total(player.id); if (previous == null || previous != total) rank++;
-            previous = total;
-            ScoreAdapter.Row row = new ScoreAdapter.Row(player.id, getString(R.string.ranking_format, rank, player.name), player.active ? points(total) : getString(R.string.removed_player_score, points(total))).compactName().score(total).legend(report != null);
-            if (participationColumns) {
-                GameStatistics.PlayerStatistics stats = report.player(player.id);
-                row.participation(stats.playedRounds,stats.pointsPerRound,stackedParticipationColumns);
-            }
+        for(GameStatistics.PlayerStatistics player:report.players) {
+            ScoreAdapter.Row row = new ScoreAdapter.Row(player.playerId,getString(R.string.ranking_format,player.rank,player.name),
+                    player.active ? points(player.total) : getString(R.string.removed_player_score,points(player.total)))
+                    .compactName().score(player.total).legend(completed);
+            if(participationColumns) row.participation(player.playedRounds,player.pointsPerRound,stackedParticipationColumns);
             rows.add(row);
         }
         adapter.submit(rows);

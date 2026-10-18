@@ -79,6 +79,10 @@ Final rows add Rounds and Pts/round only when someone missed completed rounds. T
 
 `RosterProgressionUiTest`, `RepositoryRegressionTest`, `GameRulesTest`, `GameStatisticsTest`, `ScoreGraphViewTest`, and the normal/200%-font participation screenshot cases cover the changes, cancellation, dealer cycle, stale callbacks, durable state, graph gaps, and injected transaction failures. The final header uses a wider round-count column; large-font Rds retains the full Rounds played accessibility label. On narrow screens at200%font size, metrics move below each name so participants remain identifiable.
 
+## Final participation ranking correction
+
+When the final table displays Pts/round, its order and dense ranks use the displayed points-per-round metric descending. Equal averages retain stable seat order and share a rank; participants with no completed rounds sort last. The owning statistics model computes these standings once and the UI renders them directly. Active-game and uniform-participation tables retain total-point standings. Focused model cases and the final native table regression cover conflicting totals, ties, zero-round entrants, and recreation.
+
 ## Accepted legacy limitation
 
 A malformed v1 database with mixed-case reserved table names such as `Game_Players` can fail recovery. The owner chose fresh installation over further migration edge-case work. The implemented and tested original 4/6/7-column recovery paths remain available.

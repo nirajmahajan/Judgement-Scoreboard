@@ -122,6 +122,40 @@ public class GameStatisticsTest {
         assertEquals(BigInteger.TEN, report.timeline.get(1).cumulative.get(33L));
     }
 
+    @Test public void completedUnequalGamesRankByShownAverageWithZeroRoundPlayersLast() {
+        Fixture fixture=twoPlayers();
+        fixture.addPlayer(33L,"Zero points but played",2,true);
+        fixture.addPlayer(44L,"No rounds",3,true);
+        fixture.round(101,1,1,ScoringStrategy.defaults(),result(11,0,true),result(33,0,false));
+        fixture.round(102,2,2,ScoringStrategy.defaults(),result(11,0,true),result(22,1,true));
+        fixture.round(103,3,3,ScoringStrategy.defaults(),result(11,0,true),result(22,1,true));
+        fixture.adjust(1,44,100,350);
+        GameStatistics finished=GameStatistics.from(fixture.snapshot("COMPLETE"));
+        assertTrue(finished.hasUnequalParticipation);
+        assertEquals(java.util.Arrays.asList(22L,11L,33L,44L),ids(finished));
+        assertEquals(new BigDecimal("11.00"),finished.player(22).pointsPerRound);
+        assertEquals(1,finished.player(22).rank); assertEquals(2,finished.player(11).rank);
+        assertEquals(3,finished.player(33).rank); assertEquals(4,finished.player(44).rank);
+        GameStatistics live=GameStatistics.from(fixture.snapshot("ACTIVE"));
+        assertEquals(java.util.Arrays.asList(44L,11L,22L,33L),ids(live));
+    }
+
+    @Test public void equalAveragesShareDenseRanksRegardlessOfTotalAndKeepSeatOrder() {
+        Fixture fixture=new Fixture();
+        fixture.addPlayer(11,"Two rounds",1,true);fixture.addPlayer(22,"One round",0,true);
+        fixture.addPlayer(33,"Former three rounds",0,false);fixture.addPlayer(44,"No rounds",2,true);
+        fixture.round(101,1,1,ScoringStrategy.defaults(),result(11,0,true),result(33,0,true));
+        fixture.round(102,2,2,ScoringStrategy.defaults(),result(11,0,true),result(33,0,true));
+        fixture.round(103,3,3,ScoringStrategy.defaults(),result(22,0,true),result(33,0,true));
+        GameStatistics report=GameStatistics.from(fixture.snapshot("COMPLETE"));
+        assertEquals(java.util.Arrays.asList(22L,11L,33L,44L),ids(report));
+        for(long id:new long[]{11,22,33}) assertEquals(1,report.player(id).rank);
+        assertEquals(2,report.player(44).rank);
+    }
+    private static List<Long> ids(GameStatistics report) {
+        List<Long> ids=new ArrayList<>();for(GameStatistics.PlayerStatistics player:report.players) ids.add(player.playerId);return ids;
+    }
+
     @Test
     public void uniformAndEmptyParticipationDoNotRequestExtraFinalMetrics() {
         Fixture fixture = twoPlayers();
@@ -397,10 +431,12 @@ public class GameStatisticsTest {
             adjustments.add(adjustment);
         }
 
-        Snapshot snapshot() {
+        Snapshot snapshot() { return snapshot("DRAFT"); }
+        Snapshot snapshot(String status) {
+            Records.Game game=new Records.Game(); game.status=status;
             List<Snapshot.RoundHistory> reverse = new ArrayList<>(history);
             Collections.reverse(reverse);
-            return new Snapshot(null, Collections.emptyList(), new Records.Game(), players, inactive,
+            return new Snapshot(null, Collections.emptyList(), game, players, inactive,
                     Collections.emptyMap(), null, Collections.emptyList(), reverse, adjustments,
                     Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
         }

@@ -6,14 +6,21 @@ on:
       version:
         description: Version to prepare (must match the app version)
         required: true
-        default: '2.0.4'
+        default: '2.0.6'
         type: string
+      update_existing_release:
+        description: Replace assets on the existing published release without moving its tag (main only)
+        required: true
+        default: false
+        type: boolean
   push:
+    branches: ['main']
+    paths: ['release-assets/v2.0.6/Judgement-Scoreboard-v2.0.6.apk']
     tags: ['v[0-9]*']
 permissions:
   contents: write
 concurrency:
-  group: create-release-${{ github.event_name == 'push' && github.ref_name || inputs.version }}
+  group: create-release-${{ github.event_name == 'push' && github.ref_type == 'tag' && github.ref_name || format('v{0}', github.event_name == 'push' && '2.0.6' || inputs.version) }}
   cancel-in-progress: false
 jobs:
   release:
@@ -22,7 +29,8 @@ jobs:
     timeout-minutes: 20
     env:
       ANDROID_HOME: /home/runner/android-sdk-pinned
-      RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || format('v{0}', inputs.version) }}
+      RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_type == 'tag' && github.ref_name || format('v{0}', github.event_name == 'push' && '2.0.6' || inputs.version) }}
+      UPDATE_EXISTING_RELEASE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' && inputs.update_existing_release }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -52,6 +60,10 @@ jobs:
             python3 tools/ci/verify_signed_release.py
             echo 'signed=true' >> "$GITHUB_OUTPUT"
           else
+            if test "$UPDATE_EXISTING_RELEASE" = true; then
+              echo '::error::Refreshing an existing release requires its verified signed APK.'
+              exit 1
+            fi
             python3 tools/ci/prepare_release.py
             echo 'signed=false' >> "$GITHUB_OUTPUT"
           fi

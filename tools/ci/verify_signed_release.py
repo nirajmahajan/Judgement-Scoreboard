@@ -28,13 +28,27 @@ def compare_payloads(signed, unsigned):
         raise ValueError("Signed APK payload differs from the release built from this commit: " + ", ".join(changed))
 
 
+def updating_existing_release():
+    if os.environ.get("UPDATE_EXISTING_RELEASE", "false") != "true":
+        return False
+    if (os.environ.get("GITHUB_ACTOR") != "nirajmahajan"
+            or os.environ.get("GITHUB_REPOSITORY") != "nirajmahajan/Judgement-Scoreboard"
+            or os.environ.get("GITHUB_REF") != "refs/heads/main"
+            or os.environ.get("GITHUB_EVENT_NAME") not in {"push", "workflow_dispatch"}):
+        raise ValueError("Existing release refresh requires the repository owner on main")
+    return True
+
+
 def verify():
     tag, commit = os.environ["RELEASE_TAG"], os.environ["GITHUB_SHA"]
     if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", tag):
         raise ValueError("Invalid release version")
+    refresh = updating_existing_release()
     tagged = subprocess.check_output(["git", "rev-parse", f"refs/tags/{tag}^{{commit}}"], text=True).strip()
-    if tagged != commit:
+    if tagged != commit and not refresh:
         raise ValueError("Release tag does not point to this exact commit")
+    if refresh and subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip() != commit:
+        raise ValueError("Release refresh must build the exact workflow commit")
     source = Path(f"release-assets/{tag}/Judgement-Scoreboard-{tag}.apk")
     unsigned = Path("app/build/outputs/apk/release/app-release-unsigned.apk")
     compare_payloads(source, unsigned)
@@ -61,6 +75,7 @@ def verify():
     (output / "SHA256SUMS").write_text(f"{digest}  judgement-scoreboard.apk\n")
     (output / "verification.json").write_text(json.dumps({
         "commit": commit, "version": tag, "apkSha256": digest,
+        "originalTagCommit": tagged, "refreshExistingRelease": refresh,
         "applicationLabel": "Judgement Scoreboard",
         "signingCertificateSha256": expected, "payloadMatchesCommitBuild": True,
         "excludedBuildMetadata": ["META-INF/version-control-info.textproto"],
