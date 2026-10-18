@@ -72,6 +72,32 @@ public final class PredictionInteractionUiTest {
         assertNull("A hint never submits a prediction", repository.snapshot().roundPlayers.get(3).bid);
     }
 
+    @Test public void aggressiveDealerHintShowsLegalRestrictionAndRejectsThatPrediction() {
+        startWithStrategy(4, ScoringStrategy.aggressive(), 6, 6, 0); launchGame();
+        assertHint(3, "Not 1");
+        onView(predictionInput(3)).check(androidx.test.espresso.assertion.ViewAssertions.matches(isDisplayed()));
+        assertFalse(inspect(activity -> activity.findViewById(R.id.quick_bid_1).isEnabled()));
+        onView(predictionInput(3)).perform(click(), closeSoftKeyboard());
+        assertHint(3, "Not 1");
+        scenario.recreate(); awaitGame(); assertHint(3, "Not 1");
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+        assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(
+                new java.io.File(context.getExternalFilesDir(null), "aggressive-dealer-not-one.png")));
+        editLatest(2, 2); // The other players already predict fourteen of thirteen hands.
+        assertHint(3, "");
+        for (int id : new int[]{R.id.quick_bid_0,R.id.quick_bid_1,R.id.quick_bid_2,R.id.quick_bid_3})
+            assertTrue(inspect(activity -> activity.findViewById(id).isEnabled()));
+        editLatest(2, 1); // Exactly thirteen hands are predicted; the dealer cannot choose zero.
+        assertHint(3, "Not 0");
+        assertFalse(inspect(activity -> activity.findViewById(R.id.quick_bid_0).isEnabled()));
+        onView(predictionInput(3)).perform(replaceText("0"), closeSoftKeyboard());
+        onView(withContentDescription(context.getString(R.string.enter_bid) + ", " + name(3))).perform(click());
+        await(() -> inspect(activity -> model(activity).error.getValue() != null), "forbidden dealer prediction rejected");
+        assertNull(repository.snapshot().roundPlayers.get(3).bid);
+        onView(predictionInput(3)).perform(replaceText(""), closeSoftKeyboard());
+        assertHint(3, "Not 0");
+    }
+
     @Test public void advancingToAnAlreadyVisiblePredictionKeepsTheExactScrollOffset() {
         start(24); launchGame();
         await(() -> inspect(activity -> fullyVisible(list(activity), 1)), "both first players visible");
@@ -220,9 +246,12 @@ public final class PredictionInteractionUiTest {
     }
 
     private void start(int count, int... predictions) {
+        startWithStrategy(count, ScoringStrategy.defaults(), predictions);
+    }
+    private void startWithStrategy(int count, ScoringStrategy strategy, int... predictions) {
         List<PlayerSpec> players = new ArrayList<>();
         for (int i = 0; i < count; i++) players.add(new PlayerSpec(name(i)));
-        long draft = repository.saveDraft(new DraftSpec(0, players, "DESCENDING", "CUSTOM", null));
+        long draft = repository.saveDraft(new DraftSpec(0, players, "DESCENDING", "CUSTOM", null, strategy));
         repository.startGame(draft);
         Snapshot initial = repository.snapshot();
         for (int i = 0; i < predictions.length; i++)
