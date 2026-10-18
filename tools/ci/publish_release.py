@@ -47,7 +47,8 @@ if new_key:
     body = f"""Judgement Scoreboard {tag}
 
 - Compact blue interface, saved players, drag ordering, and fast 0/1/2/3 predictions.
-- Dealer prediction hints show the forbidden value; prediction entry reveals hidden players while preserving the viewport for visible players.
+- Dealer “Not X” hints are verified in both Default and Aggressive, including prediction edits, recreation, and rejection of forbidden values. No hint is shown when other predictions already exceed the cards dealt.
+- Prediction entry reveals hidden players while preserving the viewport for visible players.
 - Responsive text and controls for smaller screens, display zoom, and large fonts.
 - Aggressive successful zero predictions earn 10 for 1–3 cards and 7 from 4 cards; the prediction screen shows the 7-point note.
 - Custom trumps mark the first player with the highest prediction; history shows newest events first.
