@@ -378,6 +378,104 @@ public class ScreenVisualTest {
         capture("scoreboard_navigation_font_200_320");
     }
 
+    @Test @Config(qualifiers = "w320dp-h640dp-notnight-mdpi")
+    public void zoomedSetupDealerAndSavedPlayersKeepLabelsAndControlsInsideBounds() throws Exception {
+        RuntimeEnvironment.setFontScale(2f);
+        seedEnglishSetup(false);
+        databaseWorker.submit(() -> {
+            try (ScoreRepository repository = new ScoreRepository(context)) {
+                repository.addSavedPlayer("Alexandra Catherine Montgomery");
+                repository.addSavedPlayer("Benjamin Alexander");
+            }
+        }).get(10, TimeUnit.SECONDS);
+        launch(false, false, false);
+        assertFixedControlsReachable();
+        assertScaledTextFits((TextView) activity.findViewById(R.id.home_help));
+        open("PLAYERS", "ROUND");
+        ViewGroup columns = activity.findViewById(R.id.table_columns);
+        assertEquals(4, columns.getChildCount());
+        for (int index : new int[]{0, 2, 3}) {
+            View icon = columns.getChildAt(index);
+            assertTrue("Compact action headers use labelled icons", !(icon instanceof TextView)
+                    || ((TextView) icon).getText().length() == 0);
+            assertTrue("Action header retains its accessible label", icon.getContentDescription() != null
+                    && icon.getContentDescription().length() > 0);
+            assertFullyVisible(icon);
+        }
+        assertScaledTextFits((TextView) columns.getChildAt(1));
+        for (int index = 0; index < model.state.getValue().draftPlayers.size(); index++) {
+            scrollTo(index);
+            RecyclerView list = activity.findViewById(R.id.screen_list);
+            View row = list.findViewHolderForAdapterPosition(index + contentOffset(list)).itemView;
+            assertCompactRosterName(row.findViewById(R.id.row_name));
+            assertRosterTarget(row.findViewById(R.id.row_drag_handle));
+            assertRosterTarget(row.findViewById(R.id.roster_rename));
+            assertRosterTarget(row.findViewById(R.id.roster_remove));
+        }
+        assertFixedControlsReachable();
+        capture("zoomed_setup_320");
+        open("SETUP_DEALER", "ROUND");
+        assertFixedActionLabelsFit();
+        assertScaledTextFits((TextView) activity.findViewById(R.id.screen_title));
+        capture("zoomed_dealer_320");
+        open("SAVED", "ROUND");
+        assertFixedActionLabelsFit();
+        assertScaledTextFits((TextView) activity.findViewById(R.id.screen_title));
+        RecyclerView list = activity.findViewById(R.id.screen_list);
+        View saved = list.findViewHolderForAdapterPosition(contentOffset(list)).itemView;
+        assertFullyVisible(saved.findViewById(R.id.saved_player_checkbox));
+        assertFullyVisible(saved.findViewById(R.id.delete_saved_player));
+        capture("zoomed_saved_players_320");
+    }
+
+    @Test @Config(qualifiers = "w320dp-h640dp-notnight-mdpi")
+    public void zoomedPredictionsAndResultsKeepTwoDigitsAndFullLabelsVisible() throws Exception {
+        RuntimeEnvironment.setFontScale(2f);
+        databaseWorker.submit(() -> {
+            try (ScoreRepository repository = new ScoreRepository(context)) {
+                repository.startGame(repository.saveDraft(new DraftSpec(0,
+                        Arrays.asList(new PlayerSpec("Alexandra Catherine"), new PlayerSpec("Benjamin Alexander")),
+                        "DESCENDING", "CUSTOM", null)));
+            }
+        }).get(10, TimeUnit.SECONDS);
+        launch(false, false, false); open("GAME", "ROUND");
+        assertEquals(26, model.state.getValue().round.cards);
+        android.widget.EditText input = activity.findViewById(R.id.bid_input);
+        input.setText("26"); layout();
+        assertEquals("26", input.getText().toString());
+        assertEquals("Two-digit predictions do not scroll horizontally", 0, input.getScrollX());
+        assertScaledTextFits(input);
+        ViewGroup predictionHeader = activity.findViewById(R.id.table_columns);
+        for (int index = 0; index < predictionHeader.getChildCount(); index++)
+            if (predictionHeader.getChildAt(index) instanceof TextView)
+                assertScaledTextFits((TextView) predictionHeader.getChildAt(index));
+        assertFixedActionLabelsFit();
+        capture("zoomed_prediction_320");
+        databaseWorker.submit(() -> {
+            Snapshot snapshot = model.repository.snapshot();
+            model.repository.submitBid(snapshot.round.id, snapshot.roundPlayers.get(0).playerId, 26);
+            model.repository.submitBid(snapshot.round.id, snapshot.roundPlayers.get(1).playerId, 1);
+        }).get(10, TimeUnit.SECONDS);
+        open("GAME", "ROUND");
+        assertFixedActionLabelsFit();
+        databaseWorker.submit(() -> model.repository.recordBids(model.repository.snapshot().round.id))
+                .get(10, TimeUnit.SECONDS);
+        open("GAME", "ROUND");
+        RecyclerView list = activity.findViewById(R.id.screen_list);
+        for (int index = 0; index < 2; index++) {
+            scrollTo(index);
+            View row = list.findViewHolderForAdapterPosition(index + contentOffset(list)).itemView;
+            for (int id : new int[]{R.id.result_won, R.id.result_lost}) {
+                TextView choice = row.findViewById(id);
+                assertEquals("Result labels stay on a single line", 1, choice.getLayout().getLineCount());
+                assertScaledTextFits(choice);
+            }
+            assertScaledTextFits(row.findViewById(R.id.row_detail));
+        }
+        assertFixedActionLabelsFit();
+        capture("zoomed_results_320");
+    }
+
     @Test public void playersStrategySectionKeepsSixPlayersAndStartTogether() throws Exception {
         seedEnglishSetup(false); launch(false, false, false); open("PLAYERS", "ROUND");
         TextView choices = activity.findViewById(R.id.setup_strategy_choices);
@@ -731,6 +829,31 @@ public class ScreenVisualTest {
     }
     @Test public void finalParticipationColumnsStayReachableAtLargeFonts() throws Exception {
         participationFinalResults(2f,"final_participation_font200_320");
+    }
+    @Test @Config(qualifiers = "w360dp-h640dp-notnight-mdpi")
+    public void zoomedFinalParticipationStacksOnWiderPhonesToo() throws Exception {
+        participationFinalResults(2f,"zoomed_final_participation_360");
+        assertNavigationText((ViewGroup) activity.findViewById(R.id.table_columns));
+        com.google.android.material.appbar.MaterialToolbar toolbar = activity.findViewById(R.id.toolbar);
+        TextView title = null;
+        for (int index = 0; index < toolbar.getChildCount(); index++) {
+            View child = toolbar.getChildAt(index);
+            if (child instanceof TextView && toolbar.getTitle().equals(((TextView) child).getText()))
+                title = (TextView) child;
+        }
+        assertNotNull("The actual toolbar title remains present", title);
+        assertEquals(activity.getString(R.string.toolbar_title), title.getText().toString());
+        assertEquals("Toolbar title adapts to available width", TextView.AUTO_SIZE_TEXT_TYPE_UNIFORM,
+                androidx.core.widget.TextViewCompat.getAutoSizeTextType(title));
+        assertScaledTextFits(title);
+        android.view.MenuItem replay = toolbar.getMenu().findItem(R.id.play_again);
+        assertNotNull(replay); assertNotNull("Play again uses a compact icon at large fonts", replay.getIcon());
+        assertEquals(activity.getString(R.string.play_again), replay.getContentDescription().toString());
+        View replayButton = activity.findViewById(R.id.play_again);
+        assertNotNull("Play again stays in the visible toolbar", replayButton);
+        assertFullyVisible(replayButton);
+        assertTrue("Play again remains actionable", replayButton.isEnabled() && replayButton.isClickable());
+        assertEquals(activity.getString(R.string.play_again), replayButton.getContentDescription().toString());
     }
     private void participationFinalResults(float fontScale,String image) throws Exception {
         RuntimeEnvironment.setFontScale(fontScale);
@@ -1103,7 +1226,7 @@ public class ScreenVisualTest {
         }
         View tableBody = row.findViewById(R.id.compact_score_body);
         if (tableBody != null) {
-            assertEquals("Compact table rows have a 48dp body", dp(48), tableBody.getHeight());
+            assertTrue("Compact table rows retain at least a 48dp body", tableBody.getHeight() >= dp(48));
             assertSingleLineNameData(name);
             if (detail.getVisibility() == View.VISIBLE) {
                 Rect detailBounds = new Rect(); detail.getDrawingRect(detailBounds);
@@ -1170,8 +1293,38 @@ public class ScreenVisualTest {
 
     private void assertCompactRosterName(TextView name) {
         assertSingleLineNameData(name);
-        assertEquals("Roster row content stays 48dp for every name", dp(48), ((View) name.getParent()).getHeight());
-        assertEquals("Name stays inside its fixed row", dp(48), name.getHeight());
+        assertTrue("Roster rows retain at least 48dp for scaled text", ((View) name.getParent()).getHeight() >= dp(48));
+        assertEquals("Name stays inside its row", ((View) name.getParent()).getHeight(), name.getHeight());
+    }
+
+    private void assertFixedActionLabelsFit() {
+        ViewGroup actions = activity.findViewById(R.id.fixed_actions);
+        assertEquals(View.VISIBLE, actions.getVisibility());
+        assertTrue(actions.getChildCount() > 0);
+        for (int index = 0; index < actions.getChildCount(); index++) {
+            TextView button = (TextView) actions.getChildAt(index);
+            assertFullyVisible(button);
+            assertScaledTextFits(button);
+        }
+    }
+
+    private void assertScaledTextFits(TextView view) {
+        assertFullyVisible(view);
+        assertCompleteText(view);
+        Layout text = view.getLayout();
+        int width = view.getWidth() - view.getCompoundPaddingLeft() - view.getCompoundPaddingRight();
+        CharSequence displayed = text.getText();
+        for (int line = 0; line < text.getLineCount(); line++) {
+            assertTrue("Text fits horizontally: " + view.getText(), text.getLineWidth(line) <= width + 1);
+            int start = text.getLineStart(line), end = text.getLineEnd(line);
+            String value = displayed.subSequence(start, end).toString().trim();
+            if (value.isEmpty()) continue;
+            Rect glyphs = new Rect(); view.getPaint().getTextBounds(value, 0, value.length(), glyphs);
+            int baseline = view.getBaseline() + text.getLineBaseline(line) - text.getLineBaseline(0);
+            assertTrue("Top of painted glyphs stays inside the control: " + value, baseline + glyphs.top >= 0);
+            assertTrue("Bottom of painted glyphs stays inside the control: " + value,
+                    baseline + glyphs.bottom <= view.getHeight());
+        }
     }
 
     private void assertSingleLineNameData(TextView name) {

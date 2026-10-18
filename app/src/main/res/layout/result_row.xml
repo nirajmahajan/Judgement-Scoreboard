@@ -18,7 +18,7 @@
             <TextView android:id="@id/row_detail" android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:textAppearance="?attr/textAppearanceBodySmall" android:textColor="?attr/colorOnSurfaceVariant" />
         </LinearLayout>
-        <RadioGroup android:id="@+id/result_choices" android:layout_width="88dp" android:layout_height="wrap_content"
+        <RadioGroup android:id="@+id/result_choices" android:layout_width="wrap_content" android:minWidth="88dp" android:layout_height="wrap_content"
             android:orientation="vertical">
             <com.google.android.material.radiobutton.MaterialRadioButton android:id="@+id/result_won"
                 android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="32dp"

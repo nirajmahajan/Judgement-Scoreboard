@@ -92,3 +92,9 @@ A malformed v1 database with mixed-case reserved table names such as `Game_Playe
 The owner approved a new signing key and fresh installation instead of the original key. Releases v2.0.0 onward reuse that new certificate; v2.0.3 updates those releases in place. The original app must be uninstalled first. The release workflow verifies the production package, version, signature and runtime payload against its source build. Debug installs retain a separate identity.
 
 created by chatgpt-codex
+
+### Display zoom and enlarged text
+- Replaced cramped roster action labels with accessible icon headers; kept names and touch controls compact.
+- Allowed text rows, prediction inputs, result choices, strategy selectors, and fixed actions to measure their full text rather than clip inside fixed dimensions.
+- Adapted final standings on enlarged-text phones and used a labelled Play again icon to preserve toolbar space.
+- Regression: `ScreenVisualTest.zoomed*` checks 320dp/360dp layouts at 200% text, including glyph bounds, two-digit input, result labels, and reachable actions.

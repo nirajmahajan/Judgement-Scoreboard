@@ -6,7 +6,7 @@
     <string name="manage_saved_players">Manage saved players</string>
     <string name="dealer_tag">Dealer</string>
     <string name="round_tab">Round</string><string name="scoreboard_tab">Scoreboard</string><string name="history_tab">History</string>
-    <string name="table_player">Player</string><string name="table_bid">Prediction</string>
+    <string name="table_player">Player</string><string name="table_bid">Prediction</string><string name="table_prediction_short">Pred.</string>
     <string name="table_move">Move</string><string name="table_edit">Edit</string><string name="table_delete">Delete</string>
     <string name="table_result">Result</string><string name="table_score">Score</string>
     <string name="table_bidding">Predicting</string><string name="table_result_value">%1$d · %2$s</string>

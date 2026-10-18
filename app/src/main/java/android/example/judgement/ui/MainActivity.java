@@ -260,6 +260,12 @@ public final class MainActivity extends AppCompatActivity {
         navigation.setVisibility(game ? View.VISIBLE : View.GONE);
         toolbar.getMenu().clear();
         toolbar.setTitle(R.string.toolbar_title);
+        for (int i = 0; i < toolbar.getChildCount(); i++) {
+            View child = toolbar.getChildAt(i);
+            if (child instanceof TextView && toolbar.getTitle().equals(((TextView) child).getText()))
+                androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                        (TextView) child, 12, 20, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+        }
         if (game) {
             options();
             int tab = "HISTORY".equals(model.tab()) ? R.id.tab_history : "SCOREBOARD".equals(model.tab()) ? R.id.tab_scoreboard : R.id.tab_round;
@@ -347,22 +353,23 @@ public final class MainActivity extends AppCompatActivity {
             return;
         }
         if (rosterColumns) {
-            TextView move = columnLabel(R.string.table_move, false);
-            move.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+            View move = columnIcon(R.string.table_move, R.drawable.ic_roster_drag);
             columns.addView(move, new LinearLayout.LayoutParams(dp(48), -2));
         }
         if (rosterColumns || tableDetailLabel != 0) {
             columns.addView(columnLabel(R.string.table_player, false), new LinearLayout.LayoutParams(0, -2, 1));
             if (rosterColumns) {
-                TextView edit = columnLabel(R.string.table_edit, false);
-                TextView delete = columnLabel(R.string.table_delete, false);
-                edit.setTextAlignment(View.TEXT_ALIGNMENT_CENTER); delete.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+                View edit = columnIcon(R.string.table_edit, R.drawable.ic_roster_edit);
+                View delete = columnIcon(R.string.table_delete, R.drawable.ic_roster_remove);
                 columns.addView(edit, new LinearLayout.LayoutParams(dp(48), -2));
                 columns.addView(delete, new LinearLayout.LayoutParams(dp(48), -2));
             } else if (biddingColumns) {
                 TextView bid = columnLabel(tableDetailLabel, false);
                 bid.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
-                columns.addView(bid, new LinearLayout.LayoutParams(dp(80), -2));
+                int predictionWidth = BidAdapter.inputWidth(this) + dp(32);
+                if (bid.getPaint().measureText(bid.getText().toString()) > predictionWidth) bid.setText(R.string.table_prediction_short);
+                bid.setContentDescription(getString(tableDetailLabel)); bid.setTooltipText(getString(tableDetailLabel));
+                columns.addView(bid, new LinearLayout.LayoutParams(predictionWidth, -2));
             } else if (participationColumns) {
                 addParticipationLabels(columns);
             } else columns.addView(columnLabel(tableDetailLabel, true), new LinearLayout.LayoutParams(dp(88), -2));
@@ -380,6 +387,14 @@ public final class MainActivity extends AppCompatActivity {
         rounds.setContentDescription(getString(R.string.rounds_played_label)); rounds.setTooltipText(getString(R.string.rounds_played_label));
         columns.addView(rounds,new LinearLayout.LayoutParams(roundsWidth,-2));
         columns.addView(columnLabel(R.string.table_points_per_round,true),new LinearLayout.LayoutParams(getResources().getDimensionPixelSize(stackedParticipationColumns ? R.dimen.final_large_number_width : R.dimen.final_average_width),-2));
+    }
+    private View columnIcon(int label, int drawable) {
+        androidx.appcompat.widget.AppCompatImageView icon = new androidx.appcompat.widget.AppCompatImageView(this);
+        icon.setImageResource(drawable); icon.setColorFilter(getColor(R.color.score_table_on_header));
+        icon.setPadding(dp(15), dp(4), dp(15), dp(4)); icon.setMinimumHeight(dp(32));
+        icon.setContentDescription(getString(label)); icon.setTooltipText(getString(label));
+        ViewCompat.setAccessibilityHeading(icon, true);
+        return icon;
     }
     private TextView columnLabel(int label, boolean endAligned) {
         TextView text = new TextView(this);
@@ -718,7 +733,7 @@ public final class MainActivity extends AppCompatActivity {
             else if (required) model.chooseSetupDealer(draftId, signature, confirmed);
             else model.run(() -> model.repository.chooseDraftDealer(draftId, confirmed), "SETTINGS");
         });
-        fixedActions.addView(confirm, new LinearLayout.LayoutParams(-1, dp(56)));
+        addFixedAction(confirm);
     }
     private String playerName(List<Records.GamePlayer> players, Long id) {
         if (id != null) for (Records.GamePlayer player : players) if (player.id == id) return player.name;
@@ -734,6 +749,11 @@ public final class MainActivity extends AppCompatActivity {
             replayLabel.setSpan(new android.text.style.ForegroundColorSpan(getColor(R.color.score_table_on_header)),
                     0, replayLabel.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             replay.setTitle(replayLabel);
+            if (getResources().getConfiguration().fontScale > 1.2f || getResources().getConfiguration().screenWidthDp < 320) {
+                replay.setIcon(R.drawable.ic_score_replay);
+                replay.setContentDescription(getString(R.string.play_again));
+                replay.setTooltipText(getString(R.string.play_again));
+            }
             replay.setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_ALWAYS);
             replay.setOnMenuItemClickListener(item -> {
                 model.run(() -> model.repository.playAgain(gameId), "PLAYERS"); return true;
@@ -782,7 +802,7 @@ public final class MainActivity extends AppCompatActivity {
             MaterialButton record = new MaterialButton(this);
             record.setId(R.id.primary_action); record.setText(R.string.record_bids);
             record.setOnClickListener(view -> model.run(() -> model.repository.recordBids(round.id)));
-            fixedActions.addView(record, new LinearLayout.LayoutParams(-1, dp(56)));
+            addFixedAction(record);
         }
     }
     private void bidDialog(Records.Round round, Records.RoundPlayer player) {
@@ -798,7 +818,12 @@ public final class MainActivity extends AppCompatActivity {
         MaterialButton finish = new MaterialButton(this);
         finish.setId(R.id.primary_action); finish.setText(R.string.finish_round);
         finish.setOnClickListener(view -> model.run(() -> model.repository.completeRound(round.id)));
-        fixedActions.addView(finish, new LinearLayout.LayoutParams(-1, dp(56)));
+        addFixedAction(finish);
+    }
+    private void addFixedAction(MaterialButton button) {
+        button.setSingleLine(false); button.setMaxLines(10); button.setMinWidth(0); button.setMinimumWidth(0);
+        button.setMinHeight(dp(56));
+        fixedActions.addView(button, new LinearLayout.LayoutParams(-1, -2));
     }
     private String points(long total) { return getResources().getQuantityString(R.plurals.score_points, total == 1 ? 1 : 2, total); }
     private String roundHeading(int number, int cards) { return getResources().getQuantityString(R.plurals.round_heading, cards, number, cards); }
@@ -808,8 +833,8 @@ public final class MainActivity extends AppCompatActivity {
         boolean completed="COMPLETE".equals(state.game.status);
         GameStatistics report=GameStatistics.from(state);
         participationColumns = completed && report.hasUnequalParticipation;
-        stackedParticipationColumns = participationColumns && getResources().getConfiguration().fontScale>=1.5f
-                && getResources().getConfiguration().screenWidthDp<360;
+        stackedParticipationColumns = participationColumns && getResources().getConfiguration().fontScale>=1.3f
+                && getResources().getConfiguration().screenWidthDp<600;
         List<ScoreAdapter.Row> rows = new ArrayList<>();
         for(GameStatistics.PlayerStatistics player:report.players) {
             ScoreAdapter.Row row = new ScoreAdapter.Row(player.playerId,getString(R.string.ranking_format,player.rank,player.name),
@@ -1080,7 +1105,7 @@ public final class MainActivity extends AppCompatActivity {
                 model.run(() -> model.repository.saveDraft(new DraftSpec(0, players, "ASCENDING", "CUSTOM", null)), "PLAYERS");
             }
         });
-        fixedActions.addView(add, new LinearLayout.LayoutParams(-1, dp(56)));
+        addFixedAction(add);
         SavedPlayerPickerAdapter pickerAdapter = new SavedPlayerPickerAdapter((profileId, checked) -> {
             if (checked) selectedProfiles.add(profileId); else selectedProfiles.remove(profileId);
             add.setEnabled(!selectedProfiles.isEmpty() && addable.containsAll(selectedProfiles));

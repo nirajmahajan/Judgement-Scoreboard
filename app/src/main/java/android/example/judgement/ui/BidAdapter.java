@@ -80,6 +80,13 @@ final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
             else { model.editBid(owner, player.playerId); refresh.run(); }
         });
     }
+    static int inputWidth(android.content.Context context) {
+        TextView sample = new TextView(context);
+        sample.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyLarge);
+        return Math.max(Math.round(48 * context.getResources().getDisplayMetrics().density),
+                (int) Math.ceil(sample.getPaint().measureText("52"))
+                        + Math.round(8 * context.getResources().getDisplayMetrics().density));
+    }
     static final class Holder extends RecyclerView.ViewHolder {
         final TextView name, detail;
         final EditText input;
@@ -88,6 +95,10 @@ final class BidAdapter extends RecyclerView.Adapter<BidAdapter.Holder> {
         Holder(View view) {
             super(view); name = view.findViewById(R.id.row_name); detail = view.findViewById(R.id.row_detail);
             input = view.findViewById(R.id.bid_input); confirm = view.findViewById(R.id.bid_confirm);
+            input.setHorizontallyScrolling(false);
+            View numberCell = (View) input.getParent();
+            ViewGroup.LayoutParams numberLayout = numberCell.getLayoutParams();
+            numberLayout.width = inputWidth(view.getContext()); numberCell.setLayoutParams(numberLayout);
             confirm.addOnLayoutChangeListener((button, l, t, r, b, ol, ot, or, ob) -> expandActionTarget());
         }
         void expandActionTarget() {

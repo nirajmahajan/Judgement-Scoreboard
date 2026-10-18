@@ -2,7 +2,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent" android:layout_height="wrap_content"
     android:orientation="vertical">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="48dp"
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:minHeight="48dp" android:gravity="center_vertical" android:orientation="horizontal">
         <com.google.android.material.button.MaterialButton
             android:id="@id/row_drag_handle" style="@style/Widget.Material3.Button.TextButton"
@@ -11,7 +11,7 @@
             app:icon="@drawable/ic_roster_drag" app:iconTint="?attr/colorOnSurfaceVariant"
             app:iconPadding="0dp" app:iconGravity="textStart" />
         <TextView android:id="@id/row_name" android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="match_parent" android:gravity="center_vertical"
+            android:layout_height="wrap_content" android:minHeight="48dp" android:gravity="center_vertical"
             android:singleLine="true" android:maxLines="1" android:ellipsize="end"
             android:textAppearance="?attr/textAppearanceBodyLarge"
             android:breakStrategy="simple" android:hyphenationFrequency="none" />

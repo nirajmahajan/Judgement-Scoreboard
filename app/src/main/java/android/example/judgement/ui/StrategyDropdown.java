@@ -28,6 +28,7 @@ final class StrategyDropdown {
     static void bind(MaterialButton anchor, ScoringStrategy selected,
             List<Records.SavedStrategy> saved, Listener listener) {
         anchor.setText(StrategyEditor.label(anchor.getContext(), selected));
+        anchor.setSingleLine(false); anchor.setMaxLines(10);
         anchor.setIconResource(R.drawable.ic_score_dropdown);
         anchor.setIconGravity(MaterialButton.ICON_GRAVITY_END);
         anchor.setContentDescription(anchor.getContext().getString(R.string.strategy_dropdown_description,
@@ -50,6 +51,7 @@ final class StrategyDropdown {
                 ScoringStrategy.decode(item.scoringConfig), View.generateViewId(), selected, item, listener);
         MaterialButton create = new MaterialButton(anchor.getContext(),null,com.google.android.material.R.attr.materialButtonOutlinedStyle);
         create.setId(R.id.create_custom_strategy); create.setText(R.string.create_custom_strategy); create.setGravity(android.view.Gravity.START|android.view.Gravity.CENTER_VERTICAL);
+        create.setSingleLine(false); create.setMaxLines(10);
         create.setMinHeight(dp(anchor,48)); create.setOnClickListener(view -> { popup.dismiss(); listener.create(); });
         rows.addView(create,new LinearLayout.LayoutParams(-1,-2));
         scroll.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));

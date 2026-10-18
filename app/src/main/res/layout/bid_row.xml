@@ -2,7 +2,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent" android:layout_height="wrap_content"
     android:orientation="vertical">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="48dp"
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp"
         android:paddingHorizontal="8dp" android:gravity="center_vertical" android:orientation="horizontal">
         <TextView android:id="@+id/dealer_tag" android:layout_width="wrap_content"
             android:layout_height="wrap_content" android:layout_marginEnd="6dp"
@@ -11,13 +11,13 @@
             android:textColor="?attr/colorOnPrimaryContainer" android:background="@drawable/dealer_tag_background"
             android:importantForAccessibility="no" android:visibility="gone" />
         <TextView android:id="@id/row_name" android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="match_parent" android:gravity="center_vertical"
+            android:layout_height="wrap_content" android:minHeight="48dp" android:gravity="center_vertical"
             android:singleLine="true" android:ellipsize="end" android:textAppearance="?attr/textAppearanceBodyLarge" />
-        <FrameLayout android:layout_width="48dp" android:layout_height="match_parent">
-            <TextView android:id="@id/row_detail" android:layout_width="match_parent" android:layout_height="match_parent"
+        <FrameLayout android:layout_width="48dp" android:layout_height="wrap_content" android:minHeight="48dp">
+            <TextView android:id="@id/row_detail" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp"
                 android:gravity="center" android:textAppearance="?attr/textAppearanceBodyLarge" />
             <androidx.appcompat.widget.AppCompatEditText android:id="@+id/bid_input"
-                android:layout_width="match_parent" android:layout_height="match_parent"
+                android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp"
                 android:inputType="number" android:singleLine="true" android:gravity="center"
                 android:imeOptions="actionDone" android:maxLength="2"
                 android:paddingHorizontal="4dp"

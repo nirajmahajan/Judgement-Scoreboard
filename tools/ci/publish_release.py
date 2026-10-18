@@ -47,6 +47,7 @@ if new_key:
     body = f"""Judgement Scoreboard {tag}
 
 - Compact blue interface, saved players, drag ordering, and fast 0/1/2/3 predictions.
+- Responsive text and controls for smaller screens, display zoom, and large fonts.
 - Scoring strategies, durable game state, editable round history, and cumulative score graph.
 - Repaired scoring, results validation, lifecycle behavior, and large-score/graph layouts.
 - Launcher app name: **Judgement Scoreboard**.
