@@ -67,7 +67,7 @@ public final class MainActivity extends AppCompatActivity {
     private RecyclerView.Adapter<?> contentAdapter;
     private String headingText = "", descriptionText = "", errorText;
     private int tableDetailLabel;
-    private boolean rosterColumns;
+    private boolean rosterColumns, participationColumns, stackedParticipationColumns;
     private final List<FooterAction> footerActions = new ArrayList<>();
     private String renderedScreen = "";
     private String pickerReturn = "SETTINGS";
@@ -250,7 +250,7 @@ public final class MainActivity extends AppCompatActivity {
             adapter = new ScoreAdapter(); setContent(adapter); renderedScreen = screen;
         }
         footerActions.clear();
-        tableDetailLabel = 0; rosterColumns = false; biddingColumns = false;
+        tableDetailLabel = 0; rosterColumns = false; biddingColumns = false; participationColumns = false; stackedParticipationColumns = false;
         fixedActions.setVisibility(View.GONE);
         homeHelp.setVisibility("HOME".equals(screen) ? View.VISIBLE : View.GONE);
         boolean savedPicker = "SAVED".equals(screen) || "QUICK_ADD".equals(screen);
@@ -337,6 +337,15 @@ public final class MainActivity extends AppCompatActivity {
         columns.setBackgroundColor(getColor(R.color.score_table_header));
         columns.setVisibility(rosterColumns || tableDetailLabel != 0 ? View.VISIBLE : View.GONE);
         columns.setPaddingRelative(rosterColumns ? 0 : dp(8), 0, rosterColumns ? 0 : dp(8), 0);
+        columns.setOrientation(LinearLayout.HORIZONTAL);
+        if (stackedParticipationColumns) {
+            columns.setOrientation(LinearLayout.VERTICAL);
+            columns.addView(columnLabel(R.string.table_player,false),new LinearLayout.LayoutParams(-1,-2));
+            LinearLayout metrics=new LinearLayout(this); metrics.setOrientation(LinearLayout.HORIZONTAL);
+            metrics.addView(new View(this),new LinearLayout.LayoutParams(0,1,1));
+            addParticipationLabels(metrics); columns.addView(metrics,new LinearLayout.LayoutParams(-1,-2));
+            return;
+        }
         if (rosterColumns) {
             TextView move = columnLabel(R.string.table_move, false);
             move.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
@@ -354,8 +363,23 @@ public final class MainActivity extends AppCompatActivity {
                 TextView bid = columnLabel(tableDetailLabel, false);
                 bid.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
                 columns.addView(bid, new LinearLayout.LayoutParams(dp(80), -2));
+            } else if (participationColumns) {
+                addParticipationLabels(columns);
             } else columns.addView(columnLabel(tableDetailLabel, true), new LinearLayout.LayoutParams(dp(88), -2));
         }
+    }
+    private void addParticipationLabels(LinearLayout columns) {
+        TextView score=columnLabel(R.string.table_score,true);
+        int scoreWidth=getResources().getDimensionPixelSize(stackedParticipationColumns ? R.dimen.final_large_number_width : R.dimen.final_score_width);
+        if(score.getPaint().measureText(score.getText().toString())>scoreWidth) score.setText(R.string.table_score_short);
+        score.setContentDescription(getString(R.string.table_score)); score.setTooltipText(getString(R.string.table_score));
+        columns.addView(score,new LinearLayout.LayoutParams(scoreWidth,-2));
+        TextView rounds=columnLabel(R.string.table_rounds,true);
+        int roundsWidth=getResources().getDimensionPixelSize(R.dimen.final_rounds_width);
+        if(rounds.getPaint().measureText(rounds.getText().toString())>roundsWidth) rounds.setText(R.string.table_rounds_short);
+        rounds.setContentDescription(getString(R.string.rounds_played_label)); rounds.setTooltipText(getString(R.string.rounds_played_label));
+        columns.addView(rounds,new LinearLayout.LayoutParams(roundsWidth,-2));
+        columns.addView(columnLabel(R.string.table_points_per_round,true),new LinearLayout.LayoutParams(getResources().getDimensionPixelSize(stackedParticipationColumns ? R.dimen.final_large_number_width : R.dimen.final_average_width),-2));
     }
     private TextView columnLabel(int label, boolean endAligned) {
         TextView text = new TextView(this);
@@ -781,6 +805,10 @@ public final class MainActivity extends AppCompatActivity {
     private void scoreboard() { header(getString(R.string.scoreboard_tab), ""); scoreboardRows(); }
     private void scoreboardRows() {
         tableDetailLabel = R.string.table_score;
+        GameStatistics report = "COMPLETE".equals(state.game.status) ? GameStatistics.from(state) : null;
+        participationColumns = report != null && report.hasUnequalParticipation;
+        stackedParticipationColumns = participationColumns && getResources().getConfiguration().fontScale>=1.5f
+                && getResources().getConfiguration().screenWidthDp<360;
         List<Records.GamePlayer> players = new ArrayList<>(state.players);
         players.addAll(state.inactivePlayers);
         players.sort(Comparator.<Records.GamePlayer>comparingLong(player -> state.total(player.id)).reversed().thenComparing(player -> !player.active).thenComparingInt(player -> player.seat).thenComparingLong(player -> player.id));
@@ -789,7 +817,12 @@ public final class MainActivity extends AppCompatActivity {
         for (Records.GamePlayer player : players) {
             long total = state.total(player.id); if (previous == null || previous != total) rank++;
             previous = total;
-            rows.add(new ScoreAdapter.Row(player.id, getString(R.string.ranking_format, rank, player.name), player.active ? points(total) : getString(R.string.removed_player_score, points(total))).compactName().score(total).legend("COMPLETE".equals(state.game.status)));
+            ScoreAdapter.Row row = new ScoreAdapter.Row(player.id, getString(R.string.ranking_format, rank, player.name), player.active ? points(total) : getString(R.string.removed_player_score, points(total))).compactName().score(total).legend(report != null);
+            if (participationColumns) {
+                GameStatistics.PlayerStatistics stats = report.player(player.id);
+                row.participation(stats.playedRounds,stats.pointsPerRound,stackedParticipationColumns);
+            }
+            rows.add(row);
         }
         adapter.submit(rows);
         if (!"COMPLETE".equals(state.game.status)) { setContent(adapter); return; }
@@ -949,7 +982,9 @@ public final class MainActivity extends AppCompatActivity {
         }
         List<PlayerSpec> players = model.staged();
         Long dealer = model.stagedDealer();
-        try { GameRules.validateCards(state.round.cards, players.size()); }
+        final Integer adjustedCards;
+        try { adjustedCards=GameRules.cardsAfterRosterChange(state.round.cards,players.size(),
+                android.example.judgement.domain.Direction.valueOf(state.game.direction)); }
         catch (IllegalArgumentException exception) { model.error.setValue(exception.getMessage()); return; }
         boolean seatingChanged = hasSeatingChanges(players);
         if (seatingChanged && !model.confirmedRosterDealer()) {
@@ -959,7 +994,16 @@ public final class MainActivity extends AppCompatActivity {
         boolean started = false; for (Records.RoundPlayer player : state.roundPlayers) started |= player.bid != null;
         long roundId = stagedRoundId; long selected = dealer == null ? 0 : dealer;
         Runnable apply = () -> model.run(() -> model.repository.applyRoster(roundId, players, selected, true), "GAME");
-        if (structure && started) confirm(R.string.restart_title, R.string.restart_message, R.string.apply, apply); else apply.run();
+        if (adjustedCards == null) {
+            new MaterialAlertDialogBuilder(this).setTitle(R.string.roster_finish_title)
+                    .setMessage(getString(R.string.roster_finish_message,state.round.cards,GameRules.maximumCards(players.size())))
+                    .setNegativeButton(R.string.cancel,null).setPositiveButton(R.string.finish_game,(dialog,which)->apply.run()).show();
+        } else if (structure && started && adjustedCards != state.round.cards) {
+            new MaterialAlertDialogBuilder(this).setTitle(R.string.restart_title)
+                    .setMessage(getString(R.string.roster_step_down_message,adjustedCards))
+                    .setNegativeButton(R.string.cancel,null).setPositiveButton(R.string.apply,(dialog,which)->apply.run()).show();
+        } else if (structure && started) confirm(R.string.restart_title,R.string.restart_message,R.string.apply,apply);
+        else apply.run();
     }
     private void restorePlayers() {
         header(getString(R.string.restore_players), "");

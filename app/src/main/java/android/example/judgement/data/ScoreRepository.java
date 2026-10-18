@@ -619,7 +619,8 @@ public final class ScoreRepository implements AutoCloseable {
     private void applyRosterInTransaction(long roundId, List<PlayerSpec> specs, long requestedDealer, boolean confirmedRestart) {
         Records.Round round = requireOpenRound(roundId, null);
         validateRoster(specs, true);
-        GameRules.validateCards(round.cards, specs.size());
+        Records.Game game = requireGame(round.gameId);
+        Integer currentCards = GameRules.cardsAfterRosterChange(round.cards, specs.size(), Direction.valueOf(game.direction));
         List<Records.GamePlayer> original = activePlayers(round.gameId);
         Set<Long> uniqueIds = new HashSet<>();
         boolean structural = original.size() != specs.size();
@@ -636,20 +637,27 @@ public final class ScoreRepository implements AutoCloseable {
         if (dealer == 0) dealer = nextSurvivingDealer(original, specs, round.dealerId);
         boolean dealerPresent = false;
         for (PlayerSpec spec : specs) if (spec.id == dealer) dealerPresent = true;
+        if (!dealerPresent && dealer == round.dealerId) {
+            dealer = nextSurvivingDealer(original, specs, round.dealerId);
+            dealerPresent = true;
+        }
         if (!dealerPresent) fail("Choose a dealer from the prospective roster.");
         structural |= dealer != round.dealerId;
         boolean started = !bids(dao.roundPlayers(roundId)).isEmpty() || "RESULTS".equals(round.phase);
         if (structural && started && !confirmedRestart) fail("Confirm restarting the current round before applying player or dealer changes.");
         List<Records.GamePlayer> players = applyPlayers(round.gameId, specs);
-        Records.Game game = requireGame(round.gameId);
         Long persistedDealer = resolveDealer(specs, players, dealer);
-        game.dealerId = persistedDealer; dao.updateGame(game);
-        if (structural) replaceRound(round, persistedDealer, players);
+        game.dealerId = persistedDealer;
+        if (currentCards == null) {
+            round.phase = "ABANDONED"; dao.updateRound(round);
+            game.status = "COMPLETE";
+        } else if (structural) replaceRound(round, currentCards, persistedDealer, players);
         else {
             for (Records.RoundPlayer row : dao.roundPlayers(roundId)) {
                 row.nameSnapshot = requirePlayer(row.playerId).name; dao.updateRoundPlayer(row);
             }
         }
+        dao.updateGame(game);
     }
 
     private List<Records.GamePlayer> applyPlayers(long gameId, List<PlayerSpec> specs) {
@@ -718,8 +726,12 @@ public final class ScoreRepository implements AutoCloseable {
     }
 
     private long replaceRound(Records.Round old, long dealer, List<Records.GamePlayer> players) {
+        return replaceRound(old, old.cards, dealer, players);
+    }
+
+    private long replaceRound(Records.Round old, int cards, long dealer, List<Records.GamePlayer> players) {
         old.phase = "ABANDONED"; dao.updateRound(old);
-        return createRound(old.gameId, old.number, old.cards, dealer, players, old.scoringConfig);
+        return createRound(old.gameId, old.number, cards, dealer, players, old.scoringConfig);
     }
 
     private long createRound(long gameId, int number, int cards, long dealer, List<Records.GamePlayer> players, String scoringConfig) {

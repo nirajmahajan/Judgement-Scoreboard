@@ -197,14 +197,121 @@ public class RepositoryRegressionTest {
         assertEquals("Fresh one", replacement.players.get(0).name);
     }
 
-    @Test public void descendingInfeasibleRosterDoesNotSilentlyChangeCards() {
-        long draft = repository.saveDraft(new DraftSpec(0, Arrays.asList(new PlayerSpec("One"), new PlayerSpec("Two")), "DESCENDING", "FIXED", null));
+    @Test public void descendingRosterImmediatelyStepsDownAndRemovingPlayersNeverRaisesCurrentDeal() {
+        List<PlayerSpec> initial = new ArrayList<>();
+        for (int index = 0; index < 8; index++) initial.add(new PlayerSpec("Player " + index));
+        long draft = repository.saveDraft(new DraftSpec(0, initial, "DESCENDING", "FIXED", null));
         repository.startGame(draft);
         Snapshot before = repository.snapshot();
-        List<PlayerSpec> more = specs(before.players); more.add(new PlayerSpec("Third"));
-        rejects(() -> repository.applyRoster(before.round.id, more, before.round.dealerId, true));
+        repository.submitBid(before.round.id, before.roundPlayers.get(0).playerId, 0);
+        List<PlayerSpec> more = specs(before.players); more.add(new PlayerSpec("Ninth player"));
+        rejects(() -> repository.applyRoster(before.round.id, more, before.round.dealerId, false));
+        assertEquals(6, repository.snapshot().round.cards);
+        assertEquals(8, repository.snapshot().players.size());
+        repository.applyRoster(before.round.id, more, before.round.dealerId, true);
         Snapshot after = repository.snapshot();
-        assertEquals(26, after.round.cards); assertEquals(before.round.id, after.round.id); assertEquals(2, after.players.size());
+        assertEquals(5, after.round.cards); assertNotEquals(before.round.id, after.round.id);
+        assertEquals(before.round.number, after.round.number);
+        assertEquals(before.round.scoringConfig, after.round.scoringConfig);
+        assertEquals(before.round.dealerId, after.round.dealerId);
+        assertEquals(6, after.game.maximumCards); assertEquals(9, after.players.size());
+        for (Records.RoundPlayer row : after.roundPlayers) { assertNull(row.bid); assertNull(row.outcome); }
+        rejects(() -> repository.submitBid(before.round.id, before.roundPlayers.get(0).playerId, 0));
+        rejects(() -> repository.completeRound(before.round.id));
+        reopen();
+        Snapshot persisted = repository.snapshot();
+        assertEquals(after.round.id, persisted.round.id); assertEquals(5, persisted.round.cards);
+        List<PlayerSpec> reduced = specs(persisted.players); reduced.remove(8);
+        repository.applyRoster(persisted.round.id, reduced, persisted.round.dealerId, true);
+        assertEquals(5, repository.snapshot().round.cards);
+        fillBidsAndResults(); repository.completeRound(repository.snapshot().round.id);
+        Snapshot next = repository.snapshot();
+        assertEquals(4, next.round.cards); assertEquals(2, next.round.number);
+        assertEquals(6, next.game.maximumCards);
+        assertEquals(1, next.history.size()); assertEquals(5, next.history.get(0).round.cards);
+    }
+
+    @Test public void ascendingRosterPastNewLimitFinishesWithoutScoringUnfinishedRoundAndSurvivesReopen() {
+        start(8);
+        for (int index = 0; index < 5; index++) {
+            fillBidsAndResults(); repository.completeRound(repository.snapshot().round.id);
+        }
+        Snapshot before = repository.snapshot();
+        assertEquals(6, before.round.cards); assertEquals(5, before.history.size());
+        fillBidsAndResults();
+        List<PlayerSpec> more = specs(before.players); more.add(new PlayerSpec(-100, "Ninth player", null, true));
+        rejects(() -> repository.applyRoster(before.round.id, more, before.round.dealerId, false));
+        assertEquals("ACTIVE", repository.snapshot().game.status);
+        ScoreDatabase faultConnection = ScoreDatabase.open(context, name);
+        SupportSQLiteDatabase sql = faultConnection.getOpenHelper().getWritableDatabase();
+        sql.execSQL("CREATE TRIGGER reject_roster_finish BEFORE UPDATE ON games WHEN NEW.status='COMPLETE' BEGIN SELECT RAISE(ABORT, 'Injected finish failure'); END");
+        try {
+            try { repository.applyRoster(before.round.id, more, before.round.dealerId, true); fail("Expected SQL failure"); }
+            catch (android.database.sqlite.SQLiteException expected) { assertTrue(expected.getMessage().contains("Injected finish")); }
+            Snapshot unchanged = repository.snapshot();
+            assertEquals("ACTIVE", unchanged.game.status); assertEquals(8, unchanged.players.size());
+            assertEquals(before.round.id, unchanged.round.id); assertEquals("RESULTS", unchanged.round.phase);
+            assertEquals(before.totals, unchanged.totals); assertTrue(unchanged.savedPlayers.isEmpty());
+            assertEquals(5, unchanged.history.size());
+        } finally { sql.execSQL("DROP TRIGGER reject_roster_finish"); faultConnection.close(); }
+        repository.applyRoster(before.round.id, more, before.round.dealerId, true);
+        Snapshot finished = repository.snapshot();
+        assertEquals("COMPLETE", finished.game.status); assertNull(finished.round);
+        assertEquals(9, finished.players.size()); assertEquals(6, finished.game.maximumCards);
+        assertEquals(1, finished.savedPlayers.size());
+        assertEquals(5, finished.history.size());
+        for (Records.GamePlayer player : before.players) assertEquals(before.total(player.id), finished.total(player.id));
+        assertEquals(0, finished.total(finished.players.get(8).id));
+        for (int index = 0; index < before.history.size(); index++) {
+            assertEquals(before.history.get(index).round.id, finished.history.get(index).round.id);
+        }
+        rejects(() -> repository.completeRound(before.round.id));
+        rejects(() -> repository.setOutcome(before.round.id, before.roundPlayers.get(0).playerId, Outcome.WON));
+        rejects(() -> repository.applyRoster(before.round.id, more, before.round.dealerId, true));
+        reopen();
+        Snapshot persisted = repository.snapshot();
+        assertEquals("COMPLETE", persisted.game.status); assertNull(persisted.round);
+        assertEquals(finished.totals, persisted.totals); assertEquals(5, persisted.history.size());
+        ScoreDatabase connection = ScoreDatabase.open(context, name);
+        try { assertEquals("ABANDONED", connection.dao().round(before.round.id).phase); }
+        finally { connection.close(); }
+    }
+
+    @Test public void ascendingRemovalKeepsCurrentDealAndExtendsLastDealWithoutChangingStartingMaximum() {
+        start(8);
+        for (int index = 0; index < 5; index++) {
+            fillBidsAndResults(); repository.completeRound(repository.snapshot().round.id);
+        }
+        Snapshot before = repository.snapshot();
+        List<PlayerSpec> reduced = specs(before.players); reduced.remove(0);
+        repository.applyRoster(before.round.id, reduced, 0, true);
+        Snapshot changed = repository.snapshot();
+        assertEquals(6, changed.round.cards); assertEquals(6, changed.game.maximumCards);
+        assertEquals(before.round.number, changed.round.number); assertEquals(7, changed.players.size());
+        fillBidsAndResults(); repository.completeRound(changed.round.id);
+        Snapshot last = repository.snapshot();
+        assertEquals(7, last.round.cards); assertEquals("ACTIVE", last.game.status);
+        fillBidsAndResults(); repository.completeRound(last.round.id);
+        assertEquals("COMPLETE", repository.snapshot().game.status);
+        assertEquals(7, repository.snapshot().history.size());
+    }
+
+    @Test public void removingDealerAdvancesToNextSurvivorAndInsertedSeatJoinsDealerCycle() {
+        start(4);
+        Snapshot before = repository.snapshot();
+        long removedDealer = before.round.dealerId;
+        repository.correctScore(removedDealer, 0, 42);
+        List<PlayerSpec> reordered = specs(before.players); reordered.remove(3);
+        reordered.add(1, new PlayerSpec("Inserted after next dealer"));
+        repository.applyRoster(before.round.id, reordered, removedDealer, true);
+        Snapshot changed = repository.snapshot();
+        long inserted = changed.players.get(1).id;
+        assertEquals(before.players.get(0).id, changed.round.dealerId);
+        assertEquals(removedDealer, changed.inactivePlayers.get(0).id);
+        assertEquals(42, changed.total(removedDealer)); assertEquals(0, changed.total(inserted));
+        assertEquals(inserted, changed.roundPlayers.get(0).playerId);
+        fillBidsAndResults(); repository.completeRound(changed.round.id);
+        assertEquals(inserted, repository.snapshot().round.dealerId);
     }
 
     @Test public void removedParticipantsRetainPointsAndExplicitRestoreUsesSameIdentity() {
@@ -402,16 +509,28 @@ public class RepositoryRegressionTest {
         assertEquals(before.round.id, after.round.id);
     }
 
-    @Test public void infeasibleRosterNeverCreatesItsRequestedSavedProfile() {
+    @Test public void failedDescendingStepDownRollsBackRosterSavedProfileAndOldPredictions() {
         long draft = repository.saveDraft(new DraftSpec(0, Arrays.asList(new PlayerSpec("One"), new PlayerSpec("Two")), "DESCENDING", "FIXED", null));
         repository.startGame(draft);
         Snapshot before = repository.snapshot();
+        repository.submitBid(before.round.id, before.roundPlayers.get(0).playerId, 0);
         List<PlayerSpec> staged = specs(before.players);
-        staged.add(new PlayerSpec(-100, "Cannot fit this hand", null, true));
-        rejects(() -> repository.applyRoster(before.round.id, staged, before.round.dealerId, true));
-        assertTrue(repository.snapshot().savedPlayers.isEmpty());
-        assertEquals(before.round.id, repository.snapshot().round.id);
-        assertEquals(2, repository.snapshot().players.size());
+        staged.add(new PlayerSpec(-100, "Remembered new player", null, true));
+        ScoreDatabase connection = ScoreDatabase.open(context, name);
+        SupportSQLiteDatabase sql = connection.getOpenHelper().getWritableDatabase();
+        sql.execSQL("CREATE TRIGGER reject_replacement BEFORE INSERT ON rounds BEGIN SELECT RAISE(ABORT, 'Injected replacement failure'); END");
+        try {
+            try { repository.applyRoster(before.round.id, staged, before.round.dealerId, true); fail("Expected SQL failure"); }
+            catch (android.database.sqlite.SQLiteException expected) { assertTrue(expected.getMessage().contains("Injected replacement")); }
+            Snapshot unchanged = repository.snapshot();
+            assertTrue(unchanged.savedPlayers.isEmpty()); assertEquals(2, unchanged.players.size());
+            assertEquals(before.round.id, unchanged.round.id); assertEquals(26, unchanged.round.cards);
+            assertEquals(Integer.valueOf(0), unchanged.roundPlayers.get(0).bid);
+            assertEquals("ACTIVE", unchanged.game.status);
+        } finally { sql.execSQL("DROP TRIGGER reject_replacement"); connection.close(); }
+        repository.applyRoster(before.round.id, staged, before.round.dealerId, true);
+        assertEquals(17, repository.snapshot().round.cards);
+        assertEquals(1, repository.snapshot().savedPlayers.size());
     }
 
     @Test public void startingGameExcludesRemovedSetupEntriesButKeepsTheirSavedProfiles() {

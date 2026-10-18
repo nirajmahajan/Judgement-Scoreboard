@@ -295,6 +295,28 @@ public class GameRulesTest {
     }
 
     @Test
+    public void rosterChangesPreserveCurrentDealOrFinishAscendingAndClampDescending() {
+        assertEquals(Integer.valueOf(6), GameRules.cardsAfterRosterChange(6, 7, Direction.ASCENDING));
+        assertNull(GameRules.cardsAfterRosterChange(6, 9, Direction.ASCENDING));
+        assertEquals(Integer.valueOf(5), GameRules.cardsAfterRosterChange(6, 9, Direction.DESCENDING));
+        assertEquals(Integer.valueOf(5), GameRules.cardsAfterRosterChange(5, 8, Direction.DESCENDING));
+        for (int players = 2; players <= 52; players++) {
+            for (int current = 1; current <= 26; current++) {
+                Integer ascending = GameRules.cardsAfterRosterChange(current, players, Direction.ASCENDING);
+                if (current > 52 / players) assertNull(ascending);
+                else assertEquals(Integer.valueOf(current), ascending);
+                assertEquals(Integer.valueOf(Math.min(current, 52 / players)),
+                        GameRules.cardsAfterRosterChange(current, players, Direction.DESCENDING));
+            }
+        }
+        rejects(() -> GameRules.cardsAfterRosterChange(0, 8, Direction.ASCENDING));
+        rejects(() -> GameRules.cardsAfterRosterChange(53, 8, Direction.DESCENDING));
+        rejects(() -> GameRules.cardsAfterRosterChange(6, 1, Direction.ASCENDING));
+        rejects(() -> GameRules.cardsAfterRosterChange(6, 53, Direction.DESCENDING));
+        rejects(() -> GameRules.cardsAfterRosterChange(6, 8, null));
+    }
+
+    @Test
     public void trumpFollowsChronologicalRoundRatherThanCardsOrDirection() {
         Trump[] cycle = {Trump.SPADES, Trump.DIAMONDS, Trump.CLUBS, Trump.HEARTS};
         for (int ordinal = 1; ordinal <= 104; ordinal++) {

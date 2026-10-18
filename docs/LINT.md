@@ -27,3 +27,7 @@ Version advisories, upgrade attributes, English arithmetic templates and bounded
 ## v2.0.5 strategy library
 
 Debug Lint passed with zero errors and 85 warnings. The detector counts are unchanged from the focused UX pass except UnusedResources 53, SetTextI18n 2, and AlwaysShowAction 2. The added always-visible action is the requested red Delete button for persisted custom strategies. Unused historical radio/info resources remain harmless; no baseline or detector suppression was added.
+
+## v2.0.6 roster progression and participation
+
+Debug Lint passed with zero errors and 89 warnings. Relative to v2.0.5, PluralsCandidate is8 and SetTextI18n is3; the additions are English roster-confirmation counts and compact numeric participation cells. Existing detector dispositions remain applicable; no baseline or detector suppression was added.

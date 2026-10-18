@@ -124,6 +124,70 @@ public class ScoreGraphViewTest {
     }
 
     @Test
+    public void cumulativeGraphLeavesGapsForLateArrivalDepartureAndReturn() {
+        Fixture fixture = new Fixture(2);
+        fixture.round(1, ScoringStrategy.defaults(), false);
+        fixture.round(2, ScoringStrategy.defaults(), true);
+        fixture.history.get(1).players.get(1).outcome = Outcome.WON.name();
+        fixture.round(3, ScoringStrategy.defaults(), false);
+        fixture.adjust(5L, 350L);
+        fixture.round(4, ScoringStrategy.defaults(), true);
+        fixture.history.get(3).players.get(1).outcome = Outcome.WON.name();
+        GameStatistics report = GameStatistics.from(fixture.snapshot());
+        ScoreGraphView graph = graph(report, set(2L), ScoreGraphView.Mode.CUMULATIVE,
+                new AtomicReference<>());
+        PlayerSeries drawn = playerSeries(graph, 2L);
+        assertEquals("Absences must break the cumulative line", 0, drawn.segments);
+        assertTrue("Both attended rounds retain visible points", drawn.markers >= 2);
+        assertEquals(BigInteger.valueOf(20L), report.timeline.get(4).cumulative.get(2L));
+        AccessibilityNodeProvider provider = graph.getAccessibilityNodeProvider();
+        String late = provider.createAccessibilityNodeInfo(0).getContentDescription().toString();
+        String away = provider.createAccessibilityNodeInfo(2).getContentDescription().toString();
+        assertTrue(late.contains("did not participate"));
+        assertFalse(late.contains("cumulative 0"));
+        assertTrue(away.contains("did not participate"));
+        assertFalse(away.contains("cumulative 10"));
+        assertFalse(provider.createAccessibilityNodeInfo(3).getContentDescription().toString()
+                .contains("Complete name 2:"));
+        assertTrue(provider.createAccessibilityNodeInfo(4).getContentDescription().toString()
+                .contains("cumulative 20 points"));
+    }
+
+    @Test
+    public void anUnrelatedCorrectionDoesNotBreakAPlayersAttendedRounds() {
+        Fixture fixture = new Fixture(2);
+        fixture.round(1, ScoringStrategy.defaults(), true);
+        fixture.adjust(5L, 150L);
+        fixture.round(2, ScoringStrategy.defaults(), true);
+        ScoreGraphView graph = graph(GameStatistics.from(fixture.snapshot()), set(2L),
+                ScoreGraphView.Mode.CUMULATIVE, new AtomicReference<>());
+        PlayerSeries drawn = playerSeries(graph, 2L);
+        assertEquals(1, drawn.segments);
+        assertEquals("Unrelated correction must not fabricate a third point", 2, drawn.markers);
+    }
+
+    @Test
+    public void correctingAnAbsentPlayersRetainedTotalShowsAnIsolatedPointWithoutClosingTheGap() {
+        Fixture fixture = new Fixture(2);
+        fixture.round(1, ScoringStrategy.defaults(), true);
+        fixture.history.get(0).players.get(1).outcome = Outcome.WON.name();
+        fixture.round(2, ScoringStrategy.defaults(), false);
+        fixture.adjust(2L, 7L, 250L);
+        fixture.round(3, ScoringStrategy.defaults(), true);
+        fixture.history.get(2).players.get(1).outcome = Outcome.WON.name();
+        GameStatistics report = GameStatistics.from(fixture.snapshot());
+        ScoreGraphView graph = graph(report, set(2L), ScoreGraphView.Mode.CUMULATIVE,
+                new AtomicReference<>());
+        PlayerSeries drawn = playerSeries(graph, 2L);
+        assertEquals(0, drawn.segments);
+        assertEquals(3, drawn.markers);
+        assertTrue(graph.getAccessibilityNodeProvider().createAccessibilityNodeInfo(2)
+                .getContentDescription().toString().contains("cumulative 17 points"));
+        assertEquals(BigInteger.valueOf(27L), report.timeline.get(3).cumulative.get(2L));
+        assertEquals(2, report.player(2L).playedRounds);
+    }
+
+    @Test
     public void fullNamesAndRecordedResultsRemainAccessibleWithFortyEightDpTargets() {
         Fixture fixture = new Fixture(52);
         String name = "निरज 🎴 — ";
@@ -324,6 +388,30 @@ public class ScoreGraphViewTest {
         return labels;
     }
 
+    private static PlayerSeries playerSeries(ScoreGraphView graph, long playerId) {
+        PlayerSeries result = new PlayerSeries(Bitmap.createBitmap(graph.getWidth(),
+                graph.getHeight(), Bitmap.Config.ARGB_8888), ScoreGraphView.colorForPlayer(playerId));
+        graph.draw(result);
+        return result;
+    }
+
+    /** Captures actual series drawing, independently of value selection and graph coordinates. */
+    private static final class PlayerSeries extends Canvas {
+        final int color;
+        int segments;
+        int markers;
+        PlayerSeries(Bitmap bitmap, int color) { super(bitmap); this.color = color; }
+        @Override public void drawLine(float startX, float startY, float stopX, float stopY,
+                Paint paint) {
+            if (paint.getColor() == color) segments++;
+            super.drawLine(startX, startY, stopX, stopY, paint);
+        }
+        @Override public void drawPath(android.graphics.Path path, Paint paint) {
+            if (paint.getColor() == color && paint.getStyle() == Paint.Style.FILL) markers++;
+            super.drawPath(path, paint);
+        }
+    }
+
     /** Captures the actual text drawn rather than repeating the tick-selection algorithm. */
     private static final class AxisLabels extends Canvas {
         final List<String> names = new ArrayList<>();
@@ -400,9 +488,13 @@ public class ScoreGraphViewTest {
         }
 
         void adjust(long delta, long at) {
+            adjust(1L, delta, at);
+        }
+
+        void adjust(long playerId, long delta, long at) {
             Records.ScoreAdjustment adjustment = new Records.ScoreAdjustment();
-            adjustment.id = 1L; adjustment.playerId = 1L; adjustment.delta = delta;
-            adjustment.nameSnapshot = players.get(0).name; adjustment.createdAt = at;
+            adjustment.id = 1L; adjustment.playerId = playerId; adjustment.delta = delta;
+            adjustment.nameSnapshot = players.get((int) playerId - 1).name; adjustment.createdAt = at;
             adjustments.add(adjustment);
         }
 

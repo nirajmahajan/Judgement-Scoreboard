@@ -44,6 +44,9 @@ if new_key:
 - Prediction keyboards keep the player list usable; Aggressive text meets the contrast check.
 - Restored forms keep one dialog window and preserve edits during rotation.
 - Clearer scoring validation and consistent rounds, cards, hands, and prediction wording.
+- Named custom scoring strategies persist, with dropdown selection and Modify/Delete controls.
+- Roster changes preserve completed scores, step descending deals down to fit, and finish ascending games beyond the new limit.
+- Final results show rounds played and points per round when participation differs; score graphs show gaps for absent rounds.
 
 Download **judgement-scoreboard.apk** below. Requires Android 8 or later.
 

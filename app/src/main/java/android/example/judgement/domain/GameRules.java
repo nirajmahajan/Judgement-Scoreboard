@@ -38,6 +38,17 @@ public final class GameRules {
         return direction == Direction.ASCENDING ? 1 : maximum;
     }
 
+    /** Ascending games finish past the new limit; descending games step down to fit. */
+    public static Integer cardsAfterRosterChange(int currentCards, int playerCount, Direction direction) {
+        requireDirection(direction);
+        int maximum = maximumCards(playerCount);
+        if (currentCards < 1 || currentCards > DECK_SIZE) {
+            throw new IllegalArgumentException("This deal is outside the game's card range.");
+        }
+        if (direction == Direction.ASCENDING) return currentCards > maximum ? null : currentCards;
+        return Math.min(currentCards, maximum);
+    }
+
     /** For a game whose roster has not changed. Round ordinals start at one. */
     public static int cardsForRound(int playerCount, Direction direction, int roundOrdinal) {
         requireDirection(direction);

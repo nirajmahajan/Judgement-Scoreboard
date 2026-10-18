@@ -1,0 +1,15 @@
+<resources>
+    <string name="table_score_short">Pts</string>
+    <string name="table_rounds">Rounds</string>
+    <string name="table_rounds_short">Rds</string>
+    <string name="rounds_played_label">Rounds played</string>
+    <string name="table_points_per_round">Pts/round</string>
+    <string name="rounds_played_description">%1$d completed rounds played</string>
+    <string name="points_per_round_description">%1$s points per round</string>
+    <string name="no_points_per_round">No completed rounds played</string>
+    <string name="not_played">—</string>
+    <string name="roster_finish_title">Finish game?</string>
+    <string name="roster_finish_message">The current deal is %1$d cards; the new maximum is %2$d. Finish with the scores from completed rounds.</string>
+    <string name="finish_game">Finish game</string>
+    <string name="roster_step_down_message">Deal %1$d cards each. Current predictions and results will be cleared. Completed rounds and scores stay unchanged.</string>
+</resources>

@@ -1,0 +1,6 @@
+<resources>
+    <dimen name="final_score_width">56dp</dimen>
+    <dimen name="final_rounds_width">56dp</dimen>
+    <dimen name="final_average_width">72dp</dimen>
+    <dimen name="final_large_number_width">88dp</dimen>
+</resources>

@@ -3,7 +3,9 @@ package android.example.judgement.data;
 import android.example.judgement.domain.Outcome;
 import android.example.judgement.domain.ScoringStrategy;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -21,6 +23,8 @@ public final class GameStatistics {
     public final List<TimelineEvent> timeline;
     public final List<Award> awards;
     public final int completedRounds;
+    /** True when at least one participant missed a completed round. */
+    public final boolean hasUnequalParticipation;
 
     private GameStatistics(List<PlayerStatistics> players, List<RoundStatistics> rounds,
             List<TimelineEvent> timeline, List<Award> awards) {
@@ -29,6 +33,14 @@ public final class GameStatistics {
         this.timeline = immutable(timeline);
         this.awards = immutable(awards);
         this.completedRounds = rounds.size();
+        boolean unequal = false;
+        for (PlayerStatistics player : players) {
+            if (player.playedRounds < completedRounds) {
+                unequal = true;
+                break;
+            }
+        }
+        this.hasUnequalParticipation = unequal;
     }
 
     public static GameStatistics from(Snapshot snapshot) {
@@ -150,6 +162,8 @@ public final class GameStatistics {
         public final long total;
         public final int rank;
         public final int playedRounds;
+        /** Final total divided by completed rounds actually played; null before participation. */
+        public final BigDecimal pointsPerRound;
         public final int exactPredictions;
         public final int zeroBids;
         /** Null means this participant has not played a completed round. */
@@ -166,6 +180,9 @@ public final class GameStatistics {
             this.total = player.total;
             this.rank = rank;
             this.playedRounds = player.played;
+            this.pointsPerRound = player.played == 0 ? null
+                    : BigDecimal.valueOf(player.total).divide(BigDecimal.valueOf(player.played),
+                            2, RoundingMode.HALF_UP);
             this.exactPredictions = player.exact;
             this.zeroBids = player.zeros;
             this.exactPercentage = player.played == 0 ? null

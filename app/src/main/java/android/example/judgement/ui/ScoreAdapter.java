@@ -33,7 +33,9 @@ final class ScoreAdapter extends RecyclerView.Adapter<ScoreAdapter.Holder> {
         final String name;
         final String detail;
         Long score;
-        boolean compactName, dealer, legend;
+        Integer playedRounds;
+        java.math.BigDecimal pointsPerRound;
+        boolean compactName, dealer, legend, stackedParticipation;
         final List<Action> actions = new ArrayList<>();
         final List<QuickBid> quickBids = new ArrayList<>();
         Row(long id, String name, String detail) { this.id = id; this.name = name; this.detail = detail; }
@@ -44,6 +46,7 @@ final class ScoreAdapter extends RecyclerView.Adapter<ScoreAdapter.Holder> {
         Row compactName() { compactName = true; return this; }
         Row score(long value) { score = value; return this; }
         Row legend(boolean value) { legend = value; return this; }
+        Row participation(int rounds, java.math.BigDecimal average, boolean stacked) { playedRounds=rounds; pointsPerRound=average; stackedParticipation=stacked; return this; }
     }
     private final List<Row> rows = new ArrayList<>();
     ScoreAdapter() { setHasStableIds(true); }
@@ -57,6 +60,8 @@ final class ScoreAdapter extends RecyclerView.Adapter<ScoreAdapter.Holder> {
                 Row old = previous.get(oldIndex), current = next.get(newIndex);
                 // Action callbacks capture the current round and must always be rebound.
                 return old.actions.isEmpty() && current.actions.isEmpty() && old.quickBids.isEmpty() && current.quickBids.isEmpty()
+                        && old.stackedParticipation==current.stackedParticipation && java.util.Objects.equals(old.playedRounds, current.playedRounds)
+                        && java.util.Objects.equals(old.pointsPerRound, current.pointsPerRound)
                         && java.util.Objects.equals(old.score, current.score) && old.legend == current.legend && old.dealer == current.dealer && old.compactName == current.compactName && old.name.equals(current.name) && old.detail.equals(current.detail);
             }
         });
@@ -64,10 +69,10 @@ final class ScoreAdapter extends RecyclerView.Adapter<ScoreAdapter.Holder> {
     }
     @Override public long getItemId(int position) { return rows.get(position).id; }
     @Override public int getItemCount() { return rows.size(); }
-    @Override public int getItemViewType(int position) { return rows.get(position).compactName ? 1 : 0; }
+    @Override public int getItemViewType(int position) { return rows.get(position).playedRounds != null ? (rows.get(position).stackedParticipation ? 3 : 2) : rows.get(position).compactName ? 1 : 0; }
     @NonNull @Override public Holder onCreateViewHolder(@NonNull ViewGroup parent, int type) {
         return new Holder(LayoutInflater.from(parent.getContext()).inflate(
-                type == 1 ? R.layout.compact_score_row : R.layout.score_row, parent, false));
+                type == 3 ? R.layout.participation_score_row_stacked : type == 2 ? R.layout.participation_score_row : type == 1 ? R.layout.compact_score_row : R.layout.score_row, parent, false));
     }
     @Override public void onBindViewHolder(@NonNull Holder holder, int position) {
         Row row = rows.get(position);
@@ -101,6 +106,16 @@ final class ScoreAdapter extends RecyclerView.Adapter<ScoreAdapter.Holder> {
         holder.detail.setEllipsize(row.compactName ? TextUtils.TruncateAt.END : null);
         holder.detail.setTooltipText(row.compactName ? row.detail : null);
         holder.detail.setVisibility(row.detail.isEmpty() ? View.GONE : View.VISIBLE);
+        if (holder.playedRounds != null) {
+            holder.playedRounds.setText(Integer.toString(row.playedRounds));
+            holder.playedRounds.setContentDescription(holder.itemView.getContext().getString(
+                    R.string.rounds_played_description,row.playedRounds));
+            holder.pointsPerRound.setText(row.pointsPerRound == null ? holder.itemView.getContext().getString(R.string.not_played)
+                    : numberText(row.pointsPerRound,holder.pointsPerRound));
+            String averageDescription = row.pointsPerRound == null ? holder.itemView.getContext().getString(R.string.no_points_per_round)
+                    : holder.itemView.getContext().getString(R.string.points_per_round_description,row.pointsPerRound.toPlainString());
+            holder.pointsPerRound.setContentDescription(averageDescription); holder.pointsPerRound.setTooltipText(averageDescription);
+        }
         holder.actions.removeAllViews();
         if (!row.quickBids.isEmpty()) {
             LinearLayout strip = new LinearLayout(holder.itemView.getContext());
@@ -138,10 +153,12 @@ final class ScoreAdapter extends RecyclerView.Adapter<ScoreAdapter.Holder> {
     }
     /** Explicit notation replaces misleading ellipsis; speech and long-press retain the exact total. */
     private static String scoreText(long score, TextView view) {
-        String exact = Long.toString(score);
+        return numberText(java.math.BigDecimal.valueOf(score),view);
+    }
+    private static String numberText(java.math.BigDecimal value, TextView view) {
+        String exact = value.toPlainString();
         int width = view.getLayoutParams().width - view.getCompoundPaddingLeft() - view.getCompoundPaddingRight();
         if (view.getPaint().measureText(exact) <= width) return exact;
-        java.math.BigDecimal value = java.math.BigDecimal.valueOf(score);
         String compact = exact;
         for (int precision = 3; precision >= 1; precision--) {
             compact = value.round(new java.math.MathContext(precision, java.math.RoundingMode.HALF_UP))
@@ -152,8 +169,8 @@ final class ScoreAdapter extends RecyclerView.Adapter<ScoreAdapter.Holder> {
     }
     static int dp(View view, int value) { return Math.round(value * view.getResources().getDisplayMetrics().density); }
     static final class Holder extends RecyclerView.ViewHolder {
-        final TextView name, detail;
+        final TextView name, detail, playedRounds, pointsPerRound;
         final LinearLayout actions;
-        Holder(View view) { super(view); name = view.findViewById(R.id.row_name); detail = view.findViewById(R.id.row_detail); actions = view.findViewById(R.id.row_actions); }
+        Holder(View view) { super(view); name = view.findViewById(R.id.row_name); detail = view.findViewById(R.id.row_detail); actions = view.findViewById(R.id.row_actions); playedRounds=view.findViewById(R.id.row_played_rounds); pointsPerRound=view.findViewById(R.id.row_points_per_round); }
     }
 }

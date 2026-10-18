@@ -1,0 +1,22 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <LinearLayout android:id="@+id/compact_score_body" android:layout_width="match_parent"
+        android:layout_height="48dp" android:orientation="horizontal" android:gravity="center_vertical"
+        android:paddingHorizontal="8dp">
+        <TextView android:id="@id/row_name" android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="match_parent" android:gravity="center_vertical"
+            android:singleLine="true" android:ellipsize="end" android:textAppearance="?attr/textAppearanceBodyLarge" />
+        <TextView android:id="@id/row_detail" android:layout_width="@dimen/final_score_width"
+            android:layout_height="match_parent" android:gravity="end|center_vertical"
+            android:singleLine="true" android:textAppearance="?attr/textAppearanceBodyLarge" />
+        <TextView android:id="@+id/row_played_rounds" android:layout_width="@dimen/final_rounds_width"
+            android:layout_height="match_parent" android:gravity="end|center_vertical"
+            android:singleLine="true" android:textAppearance="?attr/textAppearanceBodyLarge" />
+        <TextView android:id="@+id/row_points_per_round" android:layout_width="@dimen/final_average_width"
+            android:layout_height="match_parent" android:gravity="end|center_vertical"
+            android:singleLine="true" android:textAppearance="?attr/textAppearanceBodyLarge" />
+    </LinearLayout>
+    <LinearLayout android:id="@id/row_actions" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="8dp" />
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="?attr/colorOutlineVariant" />
+</LinearLayout>

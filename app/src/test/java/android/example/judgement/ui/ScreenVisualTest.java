@@ -726,6 +726,80 @@ public class ScreenVisualTest {
         assertFixedControlsReachable(); capture("history_editor_font_200_320");
     }
 
+    @Test public void finalParticipationColumnsShowActualRoundsAndAbsentPlayerGaps() throws Exception {
+        participationFinalResults(1f,"final_participation_320");
+    }
+    @Test public void finalParticipationColumnsStayReachableAtLargeFonts() throws Exception {
+        participationFinalResults(2f,"final_participation_font200_320");
+    }
+    private void participationFinalResults(float fontScale,String image) throws Exception {
+        RuntimeEnvironment.setFontScale(fontScale);
+        databaseWorker.submit(() -> {
+            try (ScoreRepository repository=new ScoreRepository(context)) {
+                List<PlayerSpec> initial=new ArrayList<>();
+                for (String name:Arrays.asList("Alice","Ben","Charlie","Dana","Emma","Frank")) initial.add(new PlayerSpec(name));
+                long draft=repository.saveDraft(new DraftSpec(0,initial,"ASCENDING","CUSTOM",null));
+                repository.startGame(draft); completeParticipationRound(repository);
+                Snapshot before=repository.snapshot(); long ben=0;
+                List<PlayerSpec> remaining=new ArrayList<>();
+                for (Records.GamePlayer player:before.players) {
+                    if (player.name.equals("Ben")) ben=player.id;
+                    else remaining.add(new PlayerSpec(player.id,player.name));
+                }
+                repository.applyRoster(before.round.id,remaining,before.round.dealerId,true);
+                completeParticipationRound(repository);
+                Snapshot returning=repository.snapshot(); List<PlayerSpec> restored=new ArrayList<>();
+                for (Records.GamePlayer player:returning.players) restored.add(new PlayerSpec(player.id,player.name));
+                restored.add(new PlayerSpec(ben,"Ben")); restored.add(new PlayerSpec("Grace"));
+                repository.applyRoster(returning.round.id,restored,returning.round.dealerId,true);
+                for(int i=0;i<4;i++) completeParticipationRound(repository);
+                Snapshot end=repository.snapshot(); List<PlayerSpec> finalRoster=new ArrayList<>();
+                for(Records.GamePlayer player:end.players) finalRoster.add(new PlayerSpec(player.id,player.name));
+                finalRoster.add(new PlayerSpec("Hannah"));
+                repository.applyRoster(end.round.id,finalRoster,end.round.dealerId,true);
+                if(fontScale>=1.5f) {
+                    Snapshot complete=repository.snapshot(); long id=complete.players.get(0).id;
+                    repository.correctScore(id,complete.total(id),Long.MAX_VALUE);
+                }
+            }
+        }).get(10,TimeUnit.SECONDS);
+        launch(false,false,false); open("GAME","ROUND");
+        assertEquals("COMPLETE",model.state.getValue().game.status);
+        RecyclerView list=activity.findViewById(R.id.screen_list);
+        for(int i=0;i<8;i++) {
+            scrollTo(i);
+            View row=list.findViewHolderForAdapterPosition(i+contentOffset(list)).itemView;
+            TextView name=row.findViewById(R.id.row_name),score=row.findViewById(R.id.row_detail);
+            TextView rounds=row.findViewById(R.id.row_played_rounds),average=row.findViewById(R.id.row_points_per_round);
+            assertNotNull(rounds); assertNotNull(average);
+            for(TextView cell:Arrays.asList(name,score,rounds,average)) assertFullyVisible(cell);
+            if(fontScale<1.5f) assertTrue(name.getRight()<=score.getLeft());
+            else {
+                Rect nameBounds=new Rect(),scoreBounds=new Rect();
+                assertTrue(name.getGlobalVisibleRect(nameBounds)); assertTrue(score.getGlobalVisibleRect(scoreBounds));
+                assertTrue("Large-font metrics sit below the name",nameBounds.bottom<=scoreBounds.top);
+                int ellipsis=name.getLayout().getEllipsisStart(0);
+                assertTrue("Large-font names retain identifying text",ellipsis==0||ellipsis>5);
+            }
+            assertTrue(score.getRight()<=rounds.getLeft());
+            assertTrue(rounds.getRight()<=average.getLeft());
+            assertTrue(average.getPaint().measureText(average.getText().toString())<=average.getWidth());
+            if(name.getText().toString().endsWith("Hannah")) {
+                assertEquals("0",rounds.getText().toString()); assertEquals("—",average.getText().toString());
+            }
+        }
+        ((androidx.recyclerview.widget.LinearLayoutManager)list.getLayoutManager()).scrollToPositionWithOffset(0,0);layout();
+        capture(image);
+    }
+    private static void completeParticipationRound(ScoreRepository repository) {
+        Snapshot snapshot=repository.snapshot();
+        for(Records.RoundPlayer player:snapshot.roundPlayers) repository.submitBid(snapshot.round.id,player.playerId,0);
+        repository.recordBids(snapshot.round.id);
+        for(int i=0;i<snapshot.roundPlayers.size();i++) repository.setOutcome(snapshot.round.id,
+                snapshot.roundPlayers.get(i).playerId,i==0?Outcome.LOST:Outcome.WON);
+        repository.completeRound(snapshot.round.id);
+    }
+
     @Test public void finalTableShowsPlayerLegendsAndOneCumulativeGraph() throws Exception {
         seedEnglishSetup(false);
         databaseWorker.submit(() -> {

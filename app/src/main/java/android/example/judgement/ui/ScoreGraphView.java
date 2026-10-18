@@ -225,7 +225,8 @@ public final class ScoreGraphView extends View {
                 BigInteger value = value(events.get(index), playerId);
                 if (value == null) {
                     // Absence is a genuine gap, never a fabricated zero-point performance.
-                    hasPrevious = false;
+                    // Unrelated corrections have no point but do not invent an absence either.
+                    if (events.get(index).round != null) hasPrevious = false;
                     continue;
                 }
                 float pointX = x(index);
@@ -234,7 +235,8 @@ public final class ScoreGraphView extends View {
                 marker(canvas, playerId, pointX, pointY);
                 previousX = pointX;
                 previousY = pointY;
-                hasPrevious = true;
+                // Correcting a departed player's retained score does not restore participation.
+                if (events.get(index).round != null) hasPrevious = true;
             }
         }
         text.setColor(secondary);
@@ -349,7 +351,11 @@ public final class ScoreGraphView extends View {
     }
 
     private BigInteger value(GameStatistics.TimelineEvent event, long playerId) {
-        if (mode == Mode.CUMULATIVE) return event.cumulative.get(playerId);
+        if (mode == Mode.CUMULATIVE) {
+            if (event.round != null && event.round.player(playerId) == null) return null;
+            if (event.adjustment != null && event.adjustment.playerId != playerId) return null;
+            return event.cumulative.get(playerId);
+        }
         GameStatistics.Performance performance = event.round.player(playerId);
         return performance == null ? null : BigInteger.valueOf(performance.points);
     }
@@ -464,11 +470,13 @@ public final class ScoreGraphView extends View {
         }
         for (GameStatistics.PlayerStatistics player : players.values()) {
             if (!selectedIds.contains(player.playerId)) continue;
+            if (event.adjustment != null && event.adjustment.playerId != player.playerId) continue;
             description.append(' ').append(player.name).append(": ");
             if (event.round != null) {
                 GameStatistics.Performance performance = event.round.player(player.playerId);
                 if (performance == null) {
-                    description.append("did not participate");
+                    description.append("did not participate.");
+                    continue;
                 } else {
                     description.append("prediction ").append(performance.bid)
                             .append(performance.bid == 1 ? " hand, " : " hands, ")

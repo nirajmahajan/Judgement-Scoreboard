@@ -5,6 +5,7 @@ import android.example.judgement.domain.ScoringStrategy;
 
 import org.junit.Test;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -40,6 +41,9 @@ public class GameStatisticsTest {
         assertNull(report.player(44L).highestSuccessfulBid);
         assertNull(report.player(999L));
         assertEquals(5, report.completedRounds);
+        assertTrue(report.hasUnequalParticipation);
+        assertEquals(new BigDecimal("12.80"), alpha.pointsPerRound);
+        assertNull(report.player(44L).pointsPerRound);
         assertEquals("Original complete Alpha name", report.rounds.get(0).player(11L).name);
         assertEquals(10L, report.rounds.get(0).player(11L).points);
         assertEquals(15L, report.rounds.get(2).player(11L).points);
@@ -88,6 +92,70 @@ public class GameStatisticsTest {
         assertNull(report.rounds.get(1).player(33L));
         assertEquals(BigInteger.TEN, report.timeline.get(1).cumulative.get(33L));
         assertEquals(2, report.player(11L).longestExactStreak);
+    }
+
+    @Test
+    public void pointsPerRoundCountsLostZeroRoundsButExcludesAbsencesAndKeepsRestoredIdentity() {
+        Fixture fixture = twoPlayers();
+        fixture.addPlayer(33L, "Returned C", 2, true);
+        fixture.addPlayer(44L, "Joined after the final round", 3, true);
+        fixture.round(101L, 1, 1, ScoringStrategy.defaults(), result(11L, 0, true),
+                result(33L, 0, true));
+        fixture.round(102L, 2, 2, ScoringStrategy.defaults(), result(11L, 0, true),
+                result(22L, 0, false));
+        fixture.round(103L, 3, 3, ScoringStrategy.defaults(), result(11L, 0, true),
+                result(22L, 0, true), result(33L, 0, true));
+        fixture.adjust(1L, 33L, 5L, 350L);
+
+        GameStatistics report = GameStatistics.from(fixture.snapshot());
+        assertTrue(report.hasUnequalParticipation);
+        assertEquals(3, report.player(11L).playedRounds);
+        assertEquals(new BigDecimal("10.00"), report.player(11L).pointsPerRound);
+        assertEquals(2, report.player(22L).playedRounds);
+        assertEquals(new BigDecimal("5.00"), report.player(22L).pointsPerRound);
+        assertEquals(2, report.player(33L).playedRounds);
+        assertEquals(new BigDecimal("12.50"), report.player(33L).pointsPerRound);
+        assertEquals(0, report.player(44L).playedRounds);
+        assertNull(report.player(44L).pointsPerRound);
+        assertEquals(1, report.player(11L).rank);
+        assertEquals(2, report.player(33L).rank);
+        assertEquals(BigInteger.TEN, report.timeline.get(1).cumulative.get(33L));
+    }
+
+    @Test
+    public void uniformAndEmptyParticipationDoNotRequestExtraFinalMetrics() {
+        Fixture fixture = twoPlayers();
+        GameStatistics empty = GameStatistics.from(fixture.snapshot());
+        assertFalse(empty.hasUnequalParticipation);
+        assertNull(empty.player(11L).pointsPerRound);
+        fixture.round(101L, 1, 1, ScoringStrategy.defaults(), result(11L, 0, true),
+                result(22L, 0, false));
+        fixture.round(102L, 2, 2, ScoringStrategy.defaults(), result(11L, 0, true),
+                result(22L, 0, false));
+        GameStatistics report = GameStatistics.from(fixture.snapshot());
+        assertFalse(report.hasUnequalParticipation);
+        assertEquals(new BigDecimal("0.00"), report.player(22L).pointsPerRound);
+    }
+
+    @Test
+    public void pointsPerRoundUsesDecimalHalfUpWithoutLosingLongPrecision() {
+        Fixture rounded = twoPlayers();
+        for (int number = 1; number <= 8; number++) {
+            rounded.round(100L + number, number, number,
+                    ScoringStrategy.custom(0L, 0L, 0L, false), result(11L, 0, false),
+                    result(22L, 0, false));
+        }
+        rounded.adjust(1L, 11L, 1L, 850L);
+        assertEquals(new BigDecimal("0.13"),
+                GameStatistics.from(rounded.snapshot()).player(11L).pointsPerRound);
+
+        Fixture huge = twoPlayers();
+        huge.round(101L, 1, 1, ScoringStrategy.custom(Long.MAX_VALUE, 0L, 0L, false),
+                result(11L, 0, true), result(22L, 0, false));
+        huge.round(102L, 2, 2, ScoringStrategy.defaults(), result(11L, 0, false),
+                result(22L, 0, false));
+        assertEquals(new BigDecimal("4611686018427387903.50"),
+                GameStatistics.from(huge.snapshot()).player(11L).pointsPerRound);
     }
 
     @Test
