@@ -156,6 +156,19 @@ public class GameStatisticsTest {
         List<Long> ids=new ArrayList<>();for(GameStatistics.PlayerStatistics player:report.players) ids.add(player.playerId);return ids;
     }
 
+    @Test public void aggressiveZeroScoresUseEachRoundsParticipantsRatherThanTheCurrentRoster() {
+        Fixture fixture=twoPlayers(); fixture.addPlayer(33,"Played both rounds",2,true);
+        fixture.addPlayer(44,"Joined later",3,true);
+        fixture.round(101,1,2,ScoringStrategy.aggressive(),result(11,0,true),result(22,0,false),result(33,0,true));
+        fixture.round(102,2,3,ScoringStrategy.aggressive(),result(11,0,true),result(22,0,false),result(33,0,true));
+        GameStatistics report=GameStatistics.from(fixture.snapshot("COMPLETE"));
+        assertEquals(10,report.rounds.get(0).player(11).points);
+        assertEquals(7,report.rounds.get(1).player(11).points);
+        assertEquals(17,report.player(11).total);
+        assertEquals(0,report.player(22).total);
+        assertEquals(0,report.player(44).playedRounds);
+    }
+
     @Test
     public void uniformAndEmptyParticipationDoNotRequestExtraFinalMetrics() {
         Fixture fixture = twoPlayers();

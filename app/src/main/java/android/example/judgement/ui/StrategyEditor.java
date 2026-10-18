@@ -123,8 +123,10 @@ final class StrategyEditor extends RecyclerView.Adapter<StrategyEditor.Holder> {
         for (int[] pair : pairs) {
             int cards = pair[0], bid = pair[1];
             if (text.length() > 0) text.append("\n\n");
-            long total = strategy.points(cards, bid, Outcome.WON);
+            long total = strategy.points(cards, bid, Outcome.WON, 2);
             text.append(context.getString(R.string.strategy_example, cards, bid, total));
+            if (bid == 0 && strategy.preset == ScoringStrategy.Preset.AGGRESSIVE)
+                text.append('\n').append(context.getString(R.string.strategy_example_players, 2));
             if (bid == 0) text.append('\n').append(context.getString(R.string.strategy_exact_zero));
             else if (strategy.majorityBonus && bid > cards / 2) text.append('\n').append(
                     context.getString(R.string.strategy_bonus_calculation, strategy.exactBase,

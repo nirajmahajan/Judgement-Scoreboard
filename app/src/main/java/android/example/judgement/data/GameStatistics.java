@@ -70,7 +70,7 @@ public final class GameStatistics {
                     throw new IllegalArgumentException("A completed round needs every prediction and outcome.");
                 }
                 Outcome outcome = Outcome.valueOf(row.outcome);
-                long earned = strategy.points(source.cards, row.bid, outcome);
+                long earned = strategy.points(source.cards, row.bid, outcome, entry.players.size());
                 Performance performance = new Performance(row.playerId, row.nameSnapshot,
                         row.bidPosition, row.bid, outcome, earned);
                 performances.add(performance);

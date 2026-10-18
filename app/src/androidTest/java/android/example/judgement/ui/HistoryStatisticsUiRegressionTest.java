@@ -133,9 +133,9 @@ public final class HistoryStatisticsUiRegressionTest {
         Snapshot corrected=repository.snapshot();
         assertEquals(1,corrected.roundEdits.size());
         assertEquals(completed.total(last.players.get(0).playerId)+ScoringStrategy.aggressive().points(
-                last.round.cards,0,Outcome.WON),corrected.total(last.players.get(0).playerId));
+                last.round.cards,0,Outcome.WON,last.players.size()),corrected.total(last.players.get(0).playerId));
         assertEquals(completed.total(last.players.get(1).playerId)-ScoringStrategy.aggressive().points(
-                last.round.cards,0,Outcome.WON),corrected.total(last.players.get(1).playerId));
+                last.round.cards,0,Outcome.WON,last.players.size()),corrected.total(last.players.get(1).playerId));
         assertFinalTableAndGraph(corrected);
         scenario.recreate(); await(() -> screen().equals("GAME"));
         assertFinalTableAndGraph(corrected);

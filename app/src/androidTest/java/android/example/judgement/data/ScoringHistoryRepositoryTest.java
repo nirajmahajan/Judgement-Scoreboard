@@ -174,14 +174,14 @@ public class ScoringHistoryRepositoryTest {
         Snapshot before = repository.snapshot();
         Snapshot.RoundHistory historical = before.history.get(0);
         long first = historical.players.get(0).playerId, second = historical.players.get(1).playerId;
-        repository.correctScore(second, 7, 12);
+        repository.correctScore(second, 10, 12);
         repository.changeScoringStrategy(before.round.id, ScoringStrategy.defaults());
         repository.submitBid(before.round.id, before.roundPlayers.get(0).playerId, 0);
         Snapshot current = repository.snapshot();
         List<RoundPlayerEdit> edits = swapped(historical);
         RoundEditPreview preview = repository.previewRoundEdit(historical.round.id, 0, edits);
-        assertTrue(preview.changed); assertEquals(7, preview.players.get(0).afterPoints);
-        assertEquals(7, preview.totals.get(first).longValue()); assertEquals(5, preview.totals.get(second).longValue());
+        assertTrue(preview.changed); assertEquals(10, preview.players.get(0).afterPoints);
+        assertEquals(10, preview.totals.get(first).longValue()); assertEquals(2, preview.totals.get(second).longValue());
         assertEquals(0, repository.snapshot().history.get(0).round.revision);
         assertTrue(repository.snapshot().roundEdits.isEmpty());
         repository.editRound(historical.round.id, 0, edits);
@@ -191,18 +191,61 @@ public class ScoringHistoryRepositoryTest {
         assertEquals(current.round.dealerId, after.round.dealerId); assertEquals(current.roundPlayers.get(0).bid, after.roundPlayers.get(0).bid);
         assertEquals(1, after.history.get(0).round.revision);
         assertEquals(ScoringStrategy.aggressive().encode(), after.history.get(0).round.scoringConfig);
-        assertEquals(1, after.adjustments.size()); assertEquals(5, after.adjustments.get(0).delta);
+        assertEquals(1, after.adjustments.size()); assertEquals(2, after.adjustments.get(0).delta);
         assertEquals(1, after.roundEdits.size());
         Records.RoundEdit audit = after.roundEdits.get(0);
         assertEquals(0, audit.previousRevision); assertEquals(1, audit.revision); assertTrue(audit.createdAt > 0);
         assertEquals("LOST", new JSONArray(audit.previousValues).getJSONObject(0).getString("outcome"));
-        assertEquals(7, new JSONArray(audit.newValues).getJSONObject(0).getLong("points"));
+        assertEquals(10, new JSONArray(audit.newValues).getJSONObject(0).getLong("points"));
         String recorded = audit.newValues;
         repository.renamePlayer(first, "Renamed after correction"); reopen();
         assertEquals(recorded, repository.snapshot().roundEdits.get(0).newValues);
         rejects(() -> repository.editRound(historical.round.id, 0, edits));
         GameStatistics report = GameStatistics.from(repository.snapshot());
-        assertEquals(7, report.player(first).total); assertEquals(5, report.player(second).total);
+        assertEquals(10, report.player(first).total); assertEquals(2, report.player(second).total);
+    }
+
+    @Test public void aggressiveZeroThresholdUsesRecordedRoundRosterDuringCompletionAndHistoricalEdits() throws Exception {
+        start(3, ScoringStrategy.aggressive());
+        completeZeroRound(); completeZeroRound(); completeZeroRound();
+        Snapshot completed = repository.snapshot();
+        Snapshot.RoundHistory below = completed.history.get(1), equal = completed.history.get(2);
+        assertEquals(2, below.round.cards); assertEquals(3, equal.round.cards);
+        GameStatistics initial = GameStatistics.from(completed);
+        assertEquals(10, initial.rounds.get(1).players.get(1).points);
+        assertEquals(7, initial.rounds.get(2).players.get(1).points);
+        assertEquals(0, initial.rounds.get(1).players.get(0).points);
+        assertEquals(0, initial.rounds.get(2).players.get(0).points);
+
+        // Removing a player cannot retroactively turn a two-card round into a penalized round.
+        List<PlayerSpec> twoPlayers = Arrays.asList(
+                new PlayerSpec(completed.players.get(0).id, completed.players.get(0).name),
+                new PlayerSpec(completed.players.get(1).id, completed.players.get(1).name));
+        repository.applyRoster(completed.round.id, twoPlayers, completed.players.get(0).id, true);
+        RoundEditPreview belowPreview = repository.previewRoundEdit(below.round.id, 0, swapFirstTwo(below));
+        assertEquals(10, belowPreview.players.get(0).afterPoints);
+        repository.editRound(below.round.id, 0, swapFirstTwo(below));
+
+        // Adding players cannot remove the original equality penalty from a three-card round.
+        List<PlayerSpec> fourPlayers = new ArrayList<>(twoPlayers);
+        fourPlayers.add(new PlayerSpec("Fourth")); fourPlayers.add(new PlayerSpec("Fifth"));
+        repository.applyRoster(repository.snapshot().round.id, fourPlayers, completed.players.get(0).id, true);
+        RoundEditPreview equalPreview = repository.previewRoundEdit(equal.round.id, 0, swapFirstTwo(equal));
+        assertEquals(7, equalPreview.players.get(0).afterPoints);
+        repository.editRound(equal.round.id, 0, swapFirstTwo(equal));
+        reopen();
+        Snapshot corrected = repository.snapshot();
+        assertEquals(4, corrected.players.size());
+        assertEquals(3, corrected.history.get(1).players.size());
+        assertEquals(3, corrected.history.get(2).players.size());
+        GameStatistics after = GameStatistics.from(corrected);
+        assertEquals(10, after.rounds.get(1).players.get(0).points);
+        assertEquals(7, after.rounds.get(2).players.get(0).points);
+        assertEquals(2, corrected.roundEdits.size());
+        for (Records.RoundEdit audit : corrected.roundEdits) {
+            long expected = audit.roundId == below.round.id ? 10 : 7;
+            assertEquals(expected, new JSONArray(audit.newValues).getJSONObject(0).getLong("points"));
+        }
     }
 
     @Test public void invalidHistoricalBidsAndOutcomesLeaveEveryRecordUnchanged() {
@@ -314,6 +357,15 @@ public class ScoringHistoryRepositoryTest {
     private static List<RoundPlayerEdit> swapped(Snapshot.RoundHistory history) {
         List<RoundPlayerEdit> edits = new ArrayList<>();
         for (Records.RoundPlayer row : history.players) edits.add(new RoundPlayerEdit(row.playerId, row.bid, "WON".equals(row.outcome) ? Outcome.LOST : Outcome.WON));
+        return edits;
+    }
+    private static List<RoundPlayerEdit> swapFirstTwo(Snapshot.RoundHistory history) {
+        List<RoundPlayerEdit> edits = new ArrayList<>();
+        for (int index = 0; index < history.players.size(); index++) {
+            Records.RoundPlayer row = history.players.get(index);
+            edits.add(new RoundPlayerEdit(row.playerId, row.bid,
+                    index == 0 ? Outcome.WON : index == 1 ? Outcome.LOST : Outcome.valueOf(row.outcome)));
+        }
         return edits;
     }
     private static void rejects(Runnable command) {

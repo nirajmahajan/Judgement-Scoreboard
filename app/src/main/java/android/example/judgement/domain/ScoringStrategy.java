@@ -83,16 +83,23 @@ public final class ScoringStrategy {
         return display;
     }
 
-    /** Missing results, invalid bids, and overflow are rejected before any score is changed. */
-    public long points(int cards, int bid, Outcome outcome) {
+    /** Scores against the participants recorded for this round, including historical players. */
+    public long points(int cards, int bid, Outcome outcome, int participantCount) {
         GameRules.validateBid(cards, bid);
+        if (participantCount < 1 || participantCount > GameRules.MAX_PLAYERS) {
+            throw new IllegalArgumentException("The round needs 1–52 recorded players.");
+        }
         if (outcome == null) {
             throw new IllegalArgumentException("Choose Won or Lost before scoring.");
         }
         if (outcome == Outcome.LOST) {
             return 0L;
         }
-        return bid == 0 ? zeroReward : checkedExactPoints(cards, bid);
+        if (bid == 0) {
+            return preset == Preset.AGGRESSIVE && cards < participantCount
+                    ? DEFAULT.zeroReward : zeroReward;
+        }
+        return checkedExactPoints(cards, bid);
     }
 
     /** A versioned, locale-independent representation suitable for a Room TEXT column. */

@@ -175,7 +175,8 @@ public class CriticalUiRegressionTest {
         onView(withId(R.id.tab_history)).perform(click());
         onView(withId(R.id.screen_list)).perform(RecyclerViewActions.scrollToPosition(0));
         awaitView(allOf(withId(R.id.screen_title), withText(R.string.history_tab)));
-        onView(withId(R.id.screen_list)).perform(RecyclerViewActions.scrollToPosition(26));
+        onView(withId(R.id.screen_list)).perform(RecyclerViewActions.scrollTo(
+                hasDescendant(withText("Round 26 · Deal 26 cards"))));
         onView(withText("Round 26 · Deal 26 cards")).check(matches(isDisplayed()));
     }
 

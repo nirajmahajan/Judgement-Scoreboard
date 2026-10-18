@@ -98,3 +98,8 @@ created by chatgpt-codex
 - Allowed text rows, prediction inputs, result choices, strategy selectors, and fixed actions to measure their full text rather than clip inside fixed dimensions.
 - Adapted final standings on enlarged-text phones and used a labelled Play again icon to preserve toolbar space.
 - Regression: `ScreenVisualTest.zoomed*` checks 320dp/360dp layouts at 200% text, including glyph bounds, two-digit input, result labels, and reachable actions.
+
+### Aggressive zero predictions and history order
+- Successful zero predictions earn 10 when fewer cards are dealt than participants in that round; the Aggressive 7-point reward begins at equality. All totals, history, edits, and statistics use each recorded round roster.
+- History cards show newest event time first, including score corrections among completed rounds.
+- Regression: scoring boundary matrix, repository completion/edit/reopen coverage, recorded-roster statistics, and mixed-event history ordering.

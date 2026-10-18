@@ -24,7 +24,7 @@ final class RoundDetails {
         for (Records.RoundPlayer player : history.players) {
             rows.add(new ScoreAdapter.Row(player.playerId, player.nameSnapshot, performance(context,
                     player.bid, player.outcome, scoring.points(history.round.cards, player.bid,
-                            Outcome.valueOf(player.outcome)))));
+                            Outcome.valueOf(player.outcome), history.players.size()))));
         }
         for (Records.RoundEdit edit : edits) if (edit.roundId == history.round.id) {
             String title = context.getString(R.string.history_edit_record, edit.revision,

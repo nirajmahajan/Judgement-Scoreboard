@@ -91,7 +91,7 @@ public class LifecycleFixtureTest {
             Snapshot state = repository.snapshot();
             assertEquals(1, state.history.size()); assertEquals(1, state.history.get(0).round.revision);
             assertEquals(1, state.roundEdits.size()); assertTrue(state.roundEdits.get(0).createdAt > 0);
-            assertEquals(7, state.total(state.history.get(0).players.get(0).playerId));
+            assertEquals(10, state.total(state.history.get(0).players.get(0).playerId));
             assertEquals(0, state.total(state.history.get(0).players.get(1).playerId));
             assertEquals("RESULTS", state.round.phase);
             assertEquals("LOST", state.roundPlayers.get(0).outcome);

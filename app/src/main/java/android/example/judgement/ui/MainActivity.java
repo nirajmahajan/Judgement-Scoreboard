@@ -872,7 +872,7 @@ public final class MainActivity extends AppCompatActivity {
                 Records.RoundPlayer player = history.players.get(i);
                 if (detail.length() > 0) detail.append("\n\n");
                 detail.append(getString(R.string.history_player, i + 1, player.nameSnapshot, player.bid,
-                        getString("WON".equals(player.outcome) ? R.string.won : R.string.lost), ScoringStrategy.decode(history.round.scoringConfig).points(history.round.cards, player.bid, Outcome.valueOf(player.outcome))));
+                        getString("WON".equals(player.outcome) ? R.string.won : R.string.lost), ScoringStrategy.decode(history.round.scoringConfig).points(history.round.cards, player.bid, Outcome.valueOf(player.outcome), history.players.size())));
             }
             entries.add(new HistoryEntry(history.round.completedAt == null ? history.round.createdAt : history.round.completedAt,
                     new ScoreAdapter.Row(history.round.id, roundHeading(history.round.number, history.round.cards),
@@ -881,7 +881,7 @@ public final class MainActivity extends AppCompatActivity {
         }
         for (Records.ScoreAdjustment adjustment : state.adjustments) entries.add(new HistoryEntry(adjustment.createdAt, new ScoreAdapter.Row(-adjustment.id - 1,
                 getString(R.string.adjustment_title, adjustment.nameSnapshot), getResources().getQuantityString(R.plurals.adjustment_detail, Math.addExact(adjustment.previousTotal, adjustment.delta) == 1 ? 1 : 2, adjustment.previousTotal, Math.addExact(adjustment.previousTotal, adjustment.delta)))));
-        entries.sort(Comparator.comparingLong(entry -> entry.time));
+        entries.sort(Comparator.comparingLong((HistoryEntry entry) -> entry.time).reversed());
         List<ScoreAdapter.Row> rows = new ArrayList<>(); for (HistoryEntry entry : entries) rows.add(entry.row);
         rows(rows);
     }

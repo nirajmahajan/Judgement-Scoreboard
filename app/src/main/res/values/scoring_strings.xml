@@ -7,7 +7,7 @@
     <string name="strategy_aggressive">Aggressive</string>
     <string name="strategy_custom">Custom</string>
     <string name="strategy_default_rules">Won means the hands you won matched your prediction. Earn 10 + predicted hands, including zero. Lost earns 0.\n\nPredict 0 and win 0 → 10 points. Predict 3 and win 3 → 13 points.</string>
-    <string name="strategy_aggressive_rules">Won with zero hands earns 7 points. Any other Won earns 10 + predicted hands. Lost earns 0.\n\nFor a matched prediction above half the hands in the round, add the round’s hand count, up to 10 bonus points. Exactly half earns no bonus. Only the bonus is capped at 10; the total round score is not capped.</string>
+    <string name="strategy_aggressive_rules">Won with zero hands earns 10 points when fewer cards are dealt than players in the round; otherwise 7 points. Any other Won earns 10 + predicted hands. Lost earns 0.\n\nFor a matched prediction above half the hands in the round, add the round’s hand count, up to 10 bonus points. Exactly half earns no bonus. Only the bonus is capped at 10; the total round score is not capped.</string>
     <string name="strategy_custom_rules">Won with zero hands earns %1$d points. Any other Won earns %2$d + (%3$d × predicted hands). Lost earns 0.</string>
     <string name="strategy_bonus_rules">A matched prediction above half the hands in the round earns a majority bonus: the round’s hand count, up to 10 points. Exactly half earns no bonus. Only the bonus is capped at 10.</string>
     <string name="strategy_no_bonus">The majority bonus is disabled.</string>
@@ -18,6 +18,7 @@
     <string name="strategy_enable_bonus">Enable majority bonus</string>
     <string name="strategy_examples_title">Live examples · exact predictions</string>
     <string name="strategy_example">Cards each: %1$d · Hands predicted: %2$d\nWon: %3$d points</string>
+    <string name="strategy_example_players">Example with %1$d players</string>
     <string name="strategy_bonus_calculation">%1$d base + (%2$d × %3$d) + %4$d majority bonus</string>
     <string name="strategy_exact_zero">Predicted 0 hands and won 0 hands</string>
     <string name="strategy_exactly_half">Exactly half the hands; no majority bonus</string>

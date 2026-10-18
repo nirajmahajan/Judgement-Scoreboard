@@ -86,7 +86,7 @@ final class RoundEditRequest {
 
     long originalPoints(long playerId) {
         PlayerInput player = player(playerId);
-        return scoring.points(cards, player.originalBid, player.originalOutcome);
+        return scoring.points(cards, player.originalBid, player.originalOutcome, players.size());
     }
 
     String bidError(long playerId) {

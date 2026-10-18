@@ -364,7 +364,7 @@ public final class ScoreRepository implements AutoCloseable {
                 bids[index] = row.bid;
                 outcomes[index] = Outcome.valueOf(row.outcome);
                 names[index] = row.nameSnapshot;
-                GameRules.addScore(totals.get(row.playerId), strategy.points(round.cards, row.bid, outcomes[index]));
+                GameRules.addScore(totals.get(row.playerId), strategy.points(round.cards, row.bid, outcomes[index], rows.size()));
             }
             String conflict = GameRules.outcomeConflict(round.cards, bids, outcomes, names);
             if (conflict != null) fail(conflict);
@@ -451,8 +451,8 @@ public final class ScoreRepository implements AutoCloseable {
             names[index] = original.nameSnapshot;
             RoundEditPreview.PlayerChange change = new RoundEditPreview.PlayerChange(row.playerId,
                     row.nameSnapshot, original.bid, edit.bid, Outcome.valueOf(original.outcome), edit.outcome,
-                    strategy.points(round.cards, original.bid, Outcome.valueOf(original.outcome)),
-                    strategy.points(round.cards, edit.bid, edit.outcome));
+                    strategy.points(round.cards, original.bid, Outcome.valueOf(original.outcome), before.size()),
+                    strategy.points(round.cards, edit.bid, edit.outcome, before.size()));
             changes.add(change); deltas.put(row.playerId, change.delta);
             changed |= original.bid != edit.bid || !original.outcome.equals(row.outcome);
         }
@@ -471,7 +471,7 @@ public final class ScoreRepository implements AutoCloseable {
                 JSONObject value = new JSONObject();
                 value.put("playerId", row.playerId); value.put("name", row.nameSnapshot);
                 value.put("bid", row.bid); value.put("outcome", row.outcome);
-                value.put("points", strategy.points(round.cards, row.bid, Outcome.valueOf(row.outcome)));
+                value.put("points", strategy.points(round.cards, row.bid, Outcome.valueOf(row.outcome), rows.size()));
                 values.put(value);
             }
         } catch (JSONException error) { throw new IllegalStateException("Cannot record the round correction.", error); }
@@ -796,8 +796,9 @@ public final class ScoreRepository implements AutoCloseable {
         for (Records.Round round : dao.rounds(gameId)) {
             if (!"COMPLETE".equals(round.phase)) continue;
             ScoringStrategy strategy = ScoringStrategy.decode(round.scoringConfig);
-            for (Records.RoundPlayer player : round.id == replacementRoundId ? replacement : dao.roundPlayers(round.id)) {
-                long award = strategy.points(round.cards, player.bid, Outcome.valueOf(player.outcome));
+            List<Records.RoundPlayer> participants = round.id == replacementRoundId ? replacement : dao.roundPlayers(round.id);
+            for (Records.RoundPlayer player : participants) {
+                long award = strategy.points(round.cards, player.bid, Outcome.valueOf(player.outcome), participants.size());
                 exact.put(player.playerId, exact.get(player.playerId).add(BigInteger.valueOf(award)));
             }
         }

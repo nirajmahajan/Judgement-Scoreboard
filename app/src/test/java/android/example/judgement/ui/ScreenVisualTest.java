@@ -271,6 +271,46 @@ public class ScreenVisualTest {
         capture("history_landscape_960");
     }
 
+    @Test public void historyCardsSortByDescendingEventTimeAcrossRoundsAndScoreCorrections() throws Exception {
+        databaseWorker.submit(() -> {
+            try (ScoreRepository repository = new ScoreRepository(context)) {
+                repository.startGame(repository.saveDraft(new DraftSpec(0,
+                        Arrays.asList(new PlayerSpec("Alice"),new PlayerSpec("Ben")),"ASCENDING","CUSTOM",null)));
+                for(int round=0;round<3;round++) {
+                    Snapshot current=repository.snapshot();
+                    for(Records.RoundPlayer player:current.roundPlayers) repository.submitBid(current.round.id,player.playerId,0);
+                    repository.recordBids(current.round.id);
+                    for(int i=0;i<current.roundPlayers.size();i++) repository.setOutcome(current.round.id,current.roundPlayers.get(i).playerId,
+                            i==0 ? Outcome.LOST : Outcome.WON);
+                    repository.completeRound(current.round.id);
+                }
+                Snapshot current=repository.snapshot();long player=current.players.get(0).id;
+                repository.correctScore(player,current.total(player),current.total(player)+5);
+            }
+            ScoreDatabase database=ScoreDatabase.open(context);
+            try {
+                database.getOpenHelper().getWritableDatabase().execSQL("UPDATE rounds SET completedAt=number*100 WHERE phase='COMPLETE'");
+                database.getOpenHelper().getWritableDatabase().execSQL("UPDATE score_adjustments SET createdAt=250");
+            } finally { database.close(); }
+        }).get(10,TimeUnit.SECONDS);
+        launch(false,false,false);open("GAME","HISTORY");
+        Snapshot snapshot=model.state.getValue();RecyclerView list=activity.findViewById(R.id.screen_list);
+        RecyclerView.Adapter<?> cards=contentAdapter(list);
+        assertEquals(4,cards.getItemCount());
+        assertEquals(snapshot.history.get(2).round.id,cards.getItemId(0));
+        assertEquals(-snapshot.adjustments.get(0).id-1,cards.getItemId(1));
+        assertEquals(snapshot.history.get(1).round.id,cards.getItemId(2));
+        assertEquals(snapshot.history.get(0).round.id,cards.getItemId(3));
+        capture("history_newest_first_320");
+        databaseWorker.submit(() -> {
+            ScoreDatabase database=ScoreDatabase.open(context);
+            try { database.getOpenHelper().getWritableDatabase().execSQL("UPDATE rounds SET completedAt=400 WHERE number=1"); }
+            finally { database.close(); }
+        }).get(10,TimeUnit.SECONDS);
+        open("GAME","HISTORY");
+        assertEquals("Event time takes precedence over round number",snapshot.history.get(0).round.id,contentAdapter(list).getItemId(0));
+    }
+
     @Test @Config(qualifiers = "w320dp-h740dp-night-mdpi")
     public void roundDarkShowsNamedTrumpAndDealer() throws Exception {
         roundPreview("FIXED", false, "round_dark_320");
