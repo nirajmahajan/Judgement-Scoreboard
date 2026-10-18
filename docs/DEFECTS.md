@@ -113,3 +113,7 @@ created by chatgpt-codex
 - Custom trumps mark the first player to place the highest prediction, updating after edits and retaining the first caller on ties. Cyclic trumps show no player badge.
 - Aggressive prediction entry shows the 7-point zero reward below the deal heading from four cards onward.
 - Regression: `TrumpCallerTest`, scoring boundary matrix, and completion/historical-edit roster changes.
+
+### Strategy selection layout
+- Heading and single-select strategy buttons stay above the scrollable explanation and compact bulleted examples. Saved strategies remain selectable and editable; the add-players dropdown and custom-only editor remain available.
+- Focused native checks exercise selection/theme preview, cancellation, heading/button order, fixed controls, and custom editing.

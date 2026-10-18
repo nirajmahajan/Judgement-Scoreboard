@@ -14,4 +14,6 @@
     <item name="resume_game" type="id"/>
     <item name="strategy_name" type="id"/><item name="delete_strategy" type="id"/>
     <item name="create_custom_strategy" type="id"/>
+    <item name="strategy_selection_title" type="id"/><item name="strategy_selection_choices" type="id"/>
+    <item name="modify_selected_strategy" type="id"/>
 </resources>

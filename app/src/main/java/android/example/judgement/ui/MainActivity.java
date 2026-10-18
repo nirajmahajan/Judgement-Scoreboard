@@ -55,7 +55,7 @@ public final class MainActivity extends AppCompatActivity {
     private ScoreAdapter adapter;
     private BidAdapter bids;
     private ResultAdapter outcomes;
-    private LinearLayout fixedActions;
+    private LinearLayout fixedActions, strategySelection;
     private View addSavedPlayer, homeHelp;
     private boolean biddingColumns;
     private boolean predictionRevealPending;
@@ -137,6 +137,7 @@ public final class MainActivity extends AppCompatActivity {
         ViewCompat.setOnApplyWindowInsetsListener(navigation, (view, insets) -> insets);
         navigation.setPaddingRelative(0, 0, 0, 0);
         fixedActions = findViewById(R.id.fixed_actions);
+        strategySelection = findViewById(R.id.strategy_selection);
         adapter = new ScoreAdapter(); setContent(adapter);
         model = new ViewModelProvider(this).get(ScoreViewModel.class);
         homeHelp = findViewById(R.id.home_help);
@@ -263,6 +264,7 @@ public final class MainActivity extends AppCompatActivity {
         footerActions.clear();
         tableDetailLabel = 0; rosterColumns = false; biddingColumns = false; participationColumns = false; stackedParticipationColumns = false;
         fixedActions.setVisibility(View.GONE);
+        strategySelection.setVisibility(View.GONE);
         homeHelp.setVisibility("HOME".equals(screen) ? View.VISIBLE : View.GONE);
         boolean savedPicker = "SAVED".equals(screen) || "QUICK_ADD".equals(screen);
         addSavedPlayer.setVisibility(savedPicker ? View.VISIBLE : View.GONE);
@@ -381,7 +383,7 @@ public final class MainActivity extends AppCompatActivity {
         strategy.setVisibility(choosingPlayers ? View.VISIBLE : View.GONE);
         if (choosingPlayers) SetupStrategyHeader.bind(strategy, model, state.draft.id,
                 ScoringStrategy.decode(state.draft.scoringConfig));
-        TextView heading = view.findViewById(R.id.screen_title); heading.setText(headingText); ViewCompat.setAccessibilityHeading(heading, true);
+        TextView heading = view.findViewById(R.id.screen_title); heading.setText(headingText); heading.setVisibility(headingText.isEmpty() ? View.GONE : View.VISIBLE); ViewCompat.setAccessibilityHeading(heading, true);
         TextView scoringNote = view.findViewById(R.id.round_scoring_note);
         boolean showZeroNote = "GAME".equals(model.screen()) && "ROUND".equals(model.tab())
                 && state.round != null && "BIDDING".equals(state.round.phase)
@@ -656,7 +658,11 @@ public final class MainActivity extends AppCompatActivity {
             }
         }
         header(request.customEditor ? getString(request.profileId == 0 ? R.string.create_custom_strategy : R.string.modify_strategy)
-                : getString(R.string.choose_scoring), effect);
+                : "", effect);
+        if (!request.customEditor) {
+            strategySelection.setVisibility(View.VISIBLE);
+            StrategySelection.bind(strategySelection, request, state.savedStrategies, model::editStrategy);
+        }
         if (request.customEditor && request.profileId != 0) {
             android.view.MenuItem delete = toolbar.getMenu().add(0, R.id.delete_strategy, 0, R.string.delete_strategy);
             android.graphics.drawable.Drawable icon = androidx.appcompat.content.res.AppCompatResources.getDrawable(this,R.drawable.ic_roster_remove).mutate();
@@ -680,8 +686,13 @@ public final class MainActivity extends AppCompatActivity {
                 model.scoringHelp(config, "SCORING"); open("SCORING_HELP");
             }
         });
-        strategyEditor.savedStrategies(state.savedStrategies); strategyEditor.update(request); setContent(strategyEditor);
-        action(R.string.save_scoring, R.id.primary_action, () -> {
+        strategyEditor.update(request); setContent(strategyEditor);
+        fixedActions.removeAllViews(); fixedActions.setVisibility(View.VISIBLE);
+        MaterialButton save = new MaterialButton(this);
+        save.setId(R.id.primary_action); save.setText(R.string.save_scoring);
+        save.setSingleLine(false); save.setMaxLines(10); save.setMinWidth(0); save.setMinimumWidth(0);
+        save.setMinHeight(dp(56));
+        save.setOnClickListener(view -> {
             StrategyRequest current = model.strategyRequest();
             if (current == null) return;
             try { model.saveStrategy(current, current.validatedStrategy()); }
@@ -689,8 +700,16 @@ public final class MainActivity extends AppCompatActivity {
                 model.strategyError(current.token, invalid.getMessage());
                 if (strategyEditor != null) strategyEditor.focusFirstError();
             }
-        }).setEnabled(!model.savingStrategy(request.token));
-        action(R.string.cancel, R.id.strategy_cancel, () -> model.finishStrategy(request.token));
+        });
+        save.setEnabled(!model.savingStrategy(request.token));
+        fixedActions.addView(save,new LinearLayout.LayoutParams(0,-2,1));
+        MaterialButton cancel = new MaterialButton(this,null,com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        cancel.setId(R.id.strategy_cancel); cancel.setText(R.string.cancel);
+        cancel.setSingleLine(false); cancel.setMaxLines(10); cancel.setMinWidth(0); cancel.setMinimumWidth(0);
+        cancel.setMinHeight(dp(56));
+        cancel.setOnClickListener(view -> model.finishStrategy(request.token));
+        LinearLayout.LayoutParams cancelLayout = new LinearLayout.LayoutParams(-2,-2); cancelLayout.setMarginStart(dp(8));
+        fixedActions.addView(cancel,cancelLayout);
     }
     private void showScoringHelp(ScoringStrategy strategy, String backTo) {
         model.scoringHelp(strategy.encode(), backTo); open("SCORING_HELP");

@@ -1198,13 +1198,22 @@ public class ScreenVisualTest {
         chooser.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(themed));
         chooser.setBackgroundColor(com.google.android.material.color.MaterialColors.getColor(themed,
                 com.google.android.material.R.attr.colorSurface, "chooser"));
-        chooser.setAdapter(new StrategyEditor(new StrategyRequest(StrategyRequest.Target.DRAFT, 1,
-                "SETTINGS", ScoringStrategy.aggressive()), new StrategyEditor.Listener() {
+        StrategyRequest selection = new StrategyRequest(StrategyRequest.Target.DRAFT, 1, "SETTINGS", ScoringStrategy.aggressive());
+        chooser.setAdapter(new StrategyEditor(selection, new StrategyEditor.Listener() {
             @Override public void onChanged(StrategyRequest request) { }
             @Override public void onHelp() { }
         }));
-        activity.setContentView(chooser); layout();
-        assertButtons(chooser); capture(name, activity.getWindow().getDecorView());
+        android.widget.LinearLayout root = new android.widget.LinearLayout(themed);
+        root.setOrientation(android.widget.LinearLayout.VERTICAL);
+        root.setBackgroundColor(com.google.android.material.color.MaterialColors.getColor(themed,
+                com.google.android.material.R.attr.colorSurface, "chooser"));
+        root.setPadding(dp(16),0,dp(16),0);
+        android.widget.LinearLayout selectionPanel = new android.widget.LinearLayout(themed);
+        StrategySelection.bind(selectionPanel, selection, java.util.Collections.emptyList(), ignored -> { });
+        root.addView(selectionPanel,new android.widget.LinearLayout.LayoutParams(-1,-2));
+        root.addView(chooser,new android.widget.LinearLayout.LayoutParams(-1,0,1));
+        activity.setContentView(root); layout();
+        assertButtons(root); capture(name, activity.getWindow().getDecorView());
     }
 
     private static ScoreGraphView graphIn(View view) {

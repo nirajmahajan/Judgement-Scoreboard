@@ -81,6 +81,26 @@ public final class StrategyUiRegressionTest {
         assertTrue(examples.contains(context.getString(R.string.strategy_example,12,8,28L)));
         assertTrue(examples.contains(context.getString(R.string.strategy_example,16,9,29L)));
         assertTrue(text(R.id.strategy_rules).contains("total round score is not capped"));
+        scenario.onActivity(activity -> {
+            View title=activity.findViewById(R.id.strategy_selection_title);
+            View choices=activity.findViewById(R.id.strategy_selection_choices);
+            RecyclerView explanation=activity.findViewById(R.id.screen_list);
+            int[] titleAt=new int[2], choicesAt=new int[2], explanationAt=new int[2];
+            title.getLocationOnScreen(titleAt); choices.getLocationOnScreen(choicesAt); explanation.getLocationOnScreen(explanationAt);
+            assertTrue("Title appears before selection buttons",titleAt[1]+title.getHeight()<=choicesAt[1]);
+            assertTrue("Explanation scrolls below the buttons",choicesAt[1]+choices.getHeight()<=explanationAt[1]);
+            explanation.scrollBy(0,500);
+            int[] after=new int[2]; choices.getLocationOnScreen(after);
+            assertArrayEquals("Selecting controls stay fixed while explanation scrolls",choicesAt,after);
+            explanation.scrollToPosition(0);
+        });
+        try {
+            UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+            device.executeShellCommand("mkdir -p /sdcard/judgement-test-evidence");
+            device.waitForIdle();
+            assertTrue(device.takeScreenshot(new java.io.File(context.getExternalFilesDir(null),"strategy-selection-updated.png")));
+        } catch (java.io.IOException error) { throw new AssertionError(error); }
+
         clickId(R.id.strategy_help);
         await(() -> screen().equals("SCORING_HELP"));
         clickId(R.id.primary_action); await(() -> screen().equals("SCORING"));
@@ -357,7 +377,6 @@ public final class StrategyUiRegressionTest {
                 assertEquals(Configuration.UI_MODE_NIGHT_NO,activity.getResources().getConfiguration().uiMode&Configuration.UI_MODE_NIGHT_MASK);
             });
             clickText(R.string.choose_scoring); await(() -> current()!=null && hasAppearance(true));
-            clickId(R.id.setup_strategy_choices);
             onView(withId(R.id.strategy_aggressive)).check((view,noMatch) -> assertCompleteText((TextView)view)).perform(click());
             scenario.onActivity(activity -> {
                 com.google.android.material.appbar.MaterialToolbar toolbar=activity.findViewById(R.id.toolbar);
@@ -610,12 +629,12 @@ public final class StrategyUiRegressionTest {
         onView(withText(label)).perform(click());
     }
     private void choosePreset(int id) {
-        clickId(R.id.setup_strategy_choices);
-        onView(withId(id)).perform(click());
+        if (!"SCORING".equals(screen())) clickId(R.id.setup_strategy_choices);
+        clickId(id);
     }
     private void createCustom() {
-        clickId(R.id.setup_strategy_choices);
-        onView(withId(R.id.create_custom_strategy)).perform(click());
+        if (!"SCORING".equals(screen())) clickId(R.id.setup_strategy_choices);
+        clickId(R.id.create_custom_strategy);
         enter(R.id.strategy_name, "Custom rules");
     }
     private void enter(int id,String value) { onView(withId(id)).perform(reveal(),replaceText(value),closeSoftKeyboard()); }

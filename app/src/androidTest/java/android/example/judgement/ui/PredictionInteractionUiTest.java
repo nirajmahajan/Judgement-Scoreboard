@@ -7,6 +7,9 @@ import android.example.judgement.data.PlayerSpec;
 import android.example.judgement.data.ScoreDatabase;
 import android.example.judgement.data.ScoreRepository;
 import android.example.judgement.data.Snapshot;
+import android.example.judgement.data.Records;
+import android.example.judgement.domain.Outcome;
+import android.example.judgement.domain.ScoringStrategy;
 import android.os.SystemClock;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
@@ -129,6 +132,91 @@ public final class PredictionInteractionUiTest {
             device.executeShellCommand("settings " + ("null".equals(previous) ? "delete" : "put")
                     + " secure show_ime_with_hard_keyboard" + ("null".equals(previous) ? "" : " " + previous));
         }
+    }
+
+    @Test public void customTrumpBadgeKeepsTheFirstHighestPredictionAndMovesAfterAnEdit() {
+        start(4, 4, 3, 4); launchGame();
+        assertTrumpCaller(0);
+        editLatest(2, 5); assertTrumpCaller(2);
+        editLatest(2, 4); assertTrumpCaller(0);
+        onView(withId(R.id.quick_bid_0)).perform(click()); awaitBid(3, 0);
+        onView(withId(R.id.primary_action)).perform(click());
+        await(() -> inspect(activity -> {
+            RecyclerView.Adapter<?> adapter = list(activity).getAdapter();
+            return adapter instanceof ConcatAdapter
+                    && ((ConcatAdapter) adapter).getAdapters().get(1) instanceof ResultAdapter;
+        }), "recorded results retain the custom trump caller");
+        assertTrumpCaller(0);
+        scenario.recreate();
+        await(() -> inspect(activity -> model(activity).state.getValue() != null
+                && model(activity).state.getValue().round != null
+                && "RESULTS".equals(model(activity).state.getValue().round.phase)), "results restored");
+        assertTrumpCaller(0);
+    }
+
+    @Test public void defaultScoringAndCyclicTrumpsShowNeitherZeroPenaltyNoteNorTrumpCaller() {
+        startAscendingDeal(4, "FIXED", ScoringStrategy.defaults());
+        Snapshot state = repository.snapshot();
+        repository.submitBid(state.round.id, state.roundPlayers.get(0).playerId, 2);
+        launchGame(); assertZeroNote(false); assertTrumpCaller(-1);
+    }
+
+    /** Leaves a compact four-card Aggressive fixture for screenshots and manual inspection. */
+    @Test public void aggressiveZeroNoteStartsAtFourCardsWithCustomTrumpCallerVisible() {
+        startAscendingDeal(3, "CUSTOM", ScoringStrategy.aggressive()); launchGame();
+        assertZeroNote(false); assertTrumpCaller(-1);
+        completeZeroRound();
+        scenario.onActivity(activity -> model(activity).repository.execute(model(activity).repository::refresh));
+        await(() -> inspect(activity -> {
+            Snapshot state = model(activity).state.getValue();
+            return state != null && state.round != null && state.round.cards == 4;
+        }), "four-card deal displayed");
+        awaitGame(); assertZeroNote(true);
+        onView(withId(R.id.quick_bid_2)).perform(click()); awaitBid(0, 2);
+        onView(withId(R.id.quick_bid_1)).perform(click()); awaitBid(1, 1);
+        assertTrumpCaller(0);
+        scenario.onActivity(activity -> {
+            View name = row(list(activity), 0).findViewById(R.id.row_name);
+            View tag = row(list(activity), 0).findViewById(R.id.round_trump_tag);
+            assertTrue("Trump badge follows the player's name", tag.getLeft() >= name.getRight());
+        });
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+        java.io.File screenshot = new java.io.File(context.getExternalFilesDir(null), "aggressive-four-card-trump.png");
+        assertTrue("Prediction screen screenshot captured", UiDevice.getInstance(
+                InstrumentationRegistry.getInstrumentation()).takeScreenshot(screenshot));
+    }
+
+    private void startAscendingDeal(int cards, String trumpMode, ScoringStrategy strategy) {
+        List<PlayerSpec> players = new ArrayList<>();
+        for (int i = 0; i < 4; i++) players.add(new PlayerSpec(name(i)));
+        long draft = repository.saveDraft(new DraftSpec(0, players, "ASCENDING", trumpMode, null, strategy));
+        repository.startGame(draft);
+        for (int current = 1; current < cards; current++) completeZeroRound();
+    }
+    private void completeZeroRound() {
+        Snapshot state = repository.snapshot();
+        for (Records.RoundPlayer player : state.roundPlayers)
+            repository.submitBid(state.round.id, player.playerId, 0);
+        repository.recordBids(state.round.id);
+        for (int i = 0; i < state.roundPlayers.size(); i++) repository.setOutcome(state.round.id,
+                state.roundPlayers.get(i).playerId, i == 0 ? Outcome.LOST : Outcome.WON);
+        repository.completeRound(state.round.id);
+    }
+    private void assertTrumpCaller(int expectedIndex) {
+        await(() -> inspect(activity -> {
+            for (int i = 0; i < 4; i++) {
+                View row = row(list(activity), i);
+                if (row == null || (row.findViewById(R.id.round_trump_tag).getVisibility() == View.VISIBLE)
+                        != (i == expectedIndex)) return false;
+            }
+            return true;
+        }), "Trump badge belongs only to player " + expectedIndex);
+    }
+    private void assertZeroNote(boolean visible) {
+        await(() -> inspect(activity -> {
+            View note = activity.findViewById(R.id.round_scoring_note);
+            return note != null && (note.getVisibility() == View.VISIBLE) == visible;
+        }), visible ? "four-card successful-zero note visible" : "successful-zero note hidden");
     }
 
     private void start(int count, int... predictions) {

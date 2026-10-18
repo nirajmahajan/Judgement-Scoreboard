@@ -51,6 +51,7 @@ if new_key:
 - Responsive text and controls for smaller screens, display zoom, and large fonts.
 - Aggressive successful zero predictions earn 10 for 1–3 cards and 7 from 4 cards; the prediction screen shows the 7-point note.
 - Custom trumps mark the first player with the highest prediction; history shows newest events first.
+- Strategy selection keeps its heading and choice buttons above a scrollable explanation with compact bulleted examples.
 - Scoring strategies, durable game state, editable round history, and cumulative score graph.
 - Repaired scoring, results validation, lifecycle behavior, and large-score/graph layouts.
 - Launcher app name: **Judgement Scoreboard**.
